@@ -128,7 +128,10 @@ public class Scanner {
         return true;
     }
 
-    private char advance() { return advance(true); }
+    private char advance() {
+        return advance(true);
+    }
+
     private char advance(boolean append) {
         if (append) sb.append(current);
 
@@ -170,9 +173,12 @@ public class Scanner {
                 case '/' -> {
                     if (peekNext() == '/') {
                         while (peek() != '\n' && !isAtEnd()) advance(false);
-                    } else return;
+                    }
+                    else return;
                 }
-                default -> { return; }
+                default -> {
+                    return;
+                }
             }
         }
     }
