@@ -6,7 +6,7 @@ import java.io.StringReader;
 
 public class LexerTest {
     public static void main(String[] args) {
-        String source = "+*;    ()\n// comment\n<>=\"Hello\"\n23 && 6.23\nMain true false, for f";
+        String source = "+*;    ()\n// comment\n<>=\"Hello\"\n23 && 6.23\nMain true : false, for f";
         Scanner scanner = new Scanner(new StringReader(source));
 
         Token token;
