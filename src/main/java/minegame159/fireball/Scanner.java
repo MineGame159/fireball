@@ -34,6 +34,7 @@ public class Scanner {
             case ')' -> token(TokenType.RightParen);
             case '{' -> token(TokenType.LeftBrace);
             case '}' -> token(TokenType.RightBrace);
+            case ':' -> token(TokenType.Colon);
             case ';' -> token(TokenType.Semicolon);
             case ',' -> token(TokenType.Comma);
             case '.' -> token(TokenType.Dot);

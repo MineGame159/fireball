@@ -3,7 +3,7 @@ package minegame159.fireball;
 public enum TokenType {
     // Single-character tokens.
     LeftParen, RightParen, LeftBrace, RightBrace,
-    Comma, Dot, Semicolon,
+    Comma, Dot, Colon, Semicolon,
 
     // One or two character tokens.
     Bang, BangEqual,
