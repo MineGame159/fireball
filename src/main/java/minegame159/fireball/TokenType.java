@@ -1,11 +1,11 @@
 package minegame159.fireball;
 
 public enum TokenType {
-    // Single-character tokens.
+    // Single-character tokens
     LeftParen, RightParen, LeftBrace, RightBrace,
     Comma, Dot, Colon, Semicolon,
 
-    // One or two character tokens.
+    // One or two character tokens
     Bang, BangEqual,
     Equal, EqualEqual,
     Greater, GreaterEqual,
@@ -19,10 +19,10 @@ public enum TokenType {
 
     And, Or,
 
-    // Literals.
+    // Literals
     Null, Int, Float, String, Identifier,
 
-    // Keywords.
+    // Keywords
     True, False, If, While, For,
 
     Error, Eof
