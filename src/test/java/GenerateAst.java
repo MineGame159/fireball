@@ -6,8 +6,9 @@ import java.util.List;
 public class GenerateAst {
     public static void main(String[] args) throws IOException {
         defineAst("src/main/java/minegame159/fireball", "Expr", List.of(
-                "Binary   : Expr left, Token operator, Expr right",
+                "Literal  : Object value",
                 "Grouping : Expr expression",
+                "Binary   : Expr left, Token operator, Expr right",
                 "Unary    : Token operator, Expr right"
         ));
     }
