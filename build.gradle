@@ -1,0 +1,12 @@
+plugins {
+    id "java"
+    id "application"
+}
+
+group "minegame159"
+version "0.1"
+mainClassName = group + ".fireball.Fireball"
+
+repositories {
+    mavenCentral()
+}
