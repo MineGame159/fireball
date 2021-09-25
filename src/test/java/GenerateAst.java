@@ -8,7 +8,12 @@ public class GenerateAst {
         String dir = "src/main/java/minegame159/fireball";
 
         defineAst(dir, "Stmt", List.of(
-                "Expression : Expr expression"
+                "Expression : Expr expression",
+                "Block      : List<Stmt> statements",
+                "Variable   : Token type, Token name, Expr initializer",
+                "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
+                "While      : Expr condition, Stmt body",
+                "For        : Stmt initializer, Expr condition, Expr increment, Stmt body"
         ));
 
         defineAst(dir, "Expr", List.of(
@@ -21,7 +26,10 @@ public class GenerateAst {
 
                 "Grouping    : Expr expression",
                 "Binary      : Expr left, Token operator, Expr right",
-                "Unary       : Token operator, Expr right"
+                "Unary       : Token operator, Expr right",
+                "Logical     : Expr left, Token operator, Expr right",
+                "Variable    : Token name",
+                "Assign      : Token name, Expr value"
         ));
     }
 

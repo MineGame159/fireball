@@ -7,6 +7,11 @@ import java.util.List;
 public abstract class Stmt {
     interface Visitor {
         void visitExpressionStmt(Expression stmt);
+        void visitBlockStmt(Block stmt);
+        void visitVariableStmt(Variable stmt);
+        void visitIfStmt(If stmt);
+        void visitWhileStmt(While stmt);
+        void visitForStmt(For stmt);
     }
 
     public static class Expression extends Stmt {
@@ -19,6 +24,87 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitExpressionStmt(this);
+        }
+    }
+
+    public static class Block extends Stmt {
+        public final List<Stmt> statements;
+
+        Block(List<Stmt> statements) {
+            this.statements = statements;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitBlockStmt(this);
+        }
+    }
+
+    public static class Variable extends Stmt {
+        public final Token type;
+        public final Token name;
+        public final Expr initializer;
+
+        Variable(Token type, Token name, Expr initializer) {
+            this.type = type;
+            this.name = name;
+            this.initializer = initializer;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitVariableStmt(this);
+        }
+    }
+
+    public static class If extends Stmt {
+        public final Expr condition;
+        public final Stmt thenBranch;
+        public final Stmt elseBranch;
+
+        If(Expr condition, Stmt thenBranch, Stmt elseBranch) {
+            this.condition = condition;
+            this.thenBranch = thenBranch;
+            this.elseBranch = elseBranch;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitIfStmt(this);
+        }
+    }
+
+    public static class While extends Stmt {
+        public final Expr condition;
+        public final Stmt body;
+
+        While(Expr condition, Stmt body) {
+            this.condition = condition;
+            this.body = body;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitWhileStmt(this);
+        }
+    }
+
+    public static class For extends Stmt {
+        public final Stmt initializer;
+        public final Expr condition;
+        public final Expr increment;
+        public final Stmt body;
+
+        For(Stmt initializer, Expr condition, Expr increment, Stmt body) {
+            this.initializer = initializer;
+            this.condition = condition;
+            this.increment = increment;
+            this.body = body;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitForStmt(this);
         }
     }
 

@@ -9,18 +9,19 @@ public class Parser {
     public final List<Error> errors = new ArrayList<>();
 
     private final Scanner scanner;
-    private Token current, previous;
+    private Token next, current, previous;
 
     public Parser(Reader reader) {
         scanner = new Scanner(reader);
 
+        advance();
         advance();
     }
 
     public void parse() {
         while (peek().type() != TokenType.Eof) {
             try {
-                stmts.add(statement());
+                stmts.add(declaration());
             } catch (Error error) {
                 errors.add(error);
                 synchronize();
@@ -28,10 +29,79 @@ public class Parser {
         }
     }
 
+    // Declaration
+
+    private Stmt declaration() {
+        if (checkNext(TokenType.Identifier) && match(TokenType.Identifier, TokenType.Var)) return variableDeclaration();
+
+        return statement();
+    }
+
+    private Stmt variableDeclaration() {
+        Token type = previous();
+        Token name = advance();
+
+        Expr initializer = null;
+        if (match(TokenType.Equal)) initializer = expression();
+
+        consume(TokenType.Semicolon, "Expected ';' after variable declaration.");
+        return new Stmt.Variable(type, name, initializer);
+    }
+
     // Statements
 
     private Stmt statement() {
+        if (match(TokenType.LeftBrace)) return blockStatement();
+        if (match(TokenType.If)) return ifStatement();
+        if (match(TokenType.While)) return whileStatement();
+        if (match(TokenType.For)) return forStatement();
+
         return expressionStatement();
+    }
+
+    private Stmt blockStatement() {
+        List<Stmt> stmts = new ArrayList<>();
+
+        while (!check(TokenType.RightBrace) && !isAtEnd()) {
+            stmts.add(declaration());
+        }
+
+        consume(TokenType.RightBrace, "Expected '}' after block.");
+        return new Stmt.Block(stmts);
+    }
+
+    private Stmt ifStatement() {
+        consume(TokenType.LeftParen, "Expected '(' after 'if'.");
+        Expr condition = expression();
+        consume(TokenType.RightParen, "Expected ')' after if condition.");
+
+        Stmt thenBranch = statement();
+        Stmt elseBranch = match(TokenType.Else) ? statement() : null;
+
+        return new Stmt.If(condition, thenBranch, elseBranch);
+    }
+
+    private Stmt whileStatement() {
+        consume(TokenType.LeftParen, "Expected '(' after 'while'.");
+        Expr condition = expression();
+        consume(TokenType.RightParen, "Expected ')' after condition.");
+
+        Stmt body = statement();
+        return new Stmt.While(condition, body);
+    }
+
+    private Stmt forStatement() {
+        consume(TokenType.LeftParen, "Expected '(' after 'for'.");
+        Stmt initializer = match(TokenType.Semicolon) ? null : declaration();
+
+        Expr condition = check(TokenType.Semicolon) ? null : expression();
+        consume(TokenType.Semicolon, "Expected ';' after loop condition.");
+
+        Expr increment = check(TokenType.RightParen) ? null : expression();
+        consume(TokenType.RightParen, "Expected ')' after for clauses.");
+
+        Stmt body = statement();
+        return new Stmt.For(initializer, condition, increment, body);
     }
 
     private Stmt expressionStatement() {
@@ -43,7 +113,49 @@ public class Parser {
     // Expressions
 
     private Expr expression() {
-        return equality();
+        return assignment();
+    }
+
+    private Expr assignment() {
+        Expr expr = or();
+
+        if (match(TokenType.Equal)) {
+            Token equals = previous();
+            Expr value = assignment();
+
+            if (expr instanceof Expr.Variable) {
+                Token name = ((Expr.Variable)expr).name;
+                return new Expr.Assign(name, value);
+            }
+
+            throw error(equals, "Invalid assignment target.");
+        }
+
+        return expr;
+    }
+
+    private Expr or() {
+        Expr expr = and();
+
+        while (match(TokenType.Or)) {
+            Token operator = previous();
+            Expr right = and();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+
+        return expr;
+    }
+
+    private Expr and() {
+        Expr expr = equality();
+
+        while (match(TokenType.And)) {
+            Token operator = previous();
+            Expr right = equality();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+
+        return expr;
     }
 
     private Expr equality() {
@@ -117,6 +229,7 @@ public class Parser {
             consume(TokenType.RightParen, "Expected ')' after expression.");
             return new Expr.Grouping(expr);
         }
+        if (match(TokenType.Identifier)) return new Expr.Variable(previous());
 
         throw error(peek(), "Expected expression.");
     }
@@ -145,10 +258,16 @@ public class Parser {
         return peek().type() == type;
     }
 
+    private boolean checkNext(TokenType type) {
+        if (isAtEnd()) return false;
+        return peekNext().type() == type;
+    }
+
     private Token advance() {
         if (!isAtEnd()) {
             previous = current;
-            current = scanner.next();
+            current = next;
+            next = scanner.next();
         }
 
         return previous();
@@ -160,6 +279,10 @@ public class Parser {
 
     private Token peek() {
         return current;
+    }
+
+    private Token peekNext() {
+        return next;
     }
 
     private Token previous() {

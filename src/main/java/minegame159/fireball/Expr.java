@@ -15,6 +15,9 @@ public abstract class Expr {
         void visitGroupingExpr(Grouping expr);
         void visitBinaryExpr(Binary expr);
         void visitUnaryExpr(Unary expr);
+        void visitLogicalExpr(Logical expr);
+        void visitVariableExpr(Variable expr);
+        void visitAssignExpr(Assign expr);
     }
 
     public static class Null extends Expr {
@@ -137,6 +140,51 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitUnaryExpr(this);
+        }
+    }
+
+    public static class Logical extends Expr {
+        public final Expr left;
+        public final Token operator;
+        public final Expr right;
+
+        Logical(Expr left, Token operator, Expr right) {
+            this.left = left;
+            this.operator = operator;
+            this.right = right;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitLogicalExpr(this);
+        }
+    }
+
+    public static class Variable extends Expr {
+        public final Token name;
+
+        Variable(Token name) {
+            this.name = name;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitVariableExpr(this);
+        }
+    }
+
+    public static class Assign extends Expr {
+        public final Token name;
+        public final Expr value;
+
+        Assign(Token name, Expr value) {
+            this.name = name;
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitAssignExpr(this);
         }
     }
 

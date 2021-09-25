@@ -110,6 +110,8 @@ public class Scanner {
             }
             case 'i' -> checkKeyword(1, "f", TokenType.If);
             case 'w' -> checkKeyword(1, "hile", TokenType.While);
+            case 'v' -> checkKeyword(1, "ar", TokenType.Var);
+            case 'e' -> checkKeyword(1, "lse", TokenType.Else);
 
             default -> TokenType.Identifier;
         };
