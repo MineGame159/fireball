@@ -1,11 +1,13 @@
 import minegame159.fireball.Scanner;
 import minegame159.fireball.Token;
 import minegame159.fireball.TokenType;
+import org.junit.Test;
 
 import java.io.StringReader;
 
 public class LexerTest {
-    public static void main(String[] args) {
+    @Test
+    public void main() {
         String source = "+*;    ()\n// comment\n<>=\"Hello\"\n23 && 6.23\nMain true : false, for f";
         Scanner scanner = new Scanner(new StringReader(source));
 

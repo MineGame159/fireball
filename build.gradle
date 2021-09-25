@@ -10,3 +10,11 @@ mainClassName = group + ".fireball.Fireball"
 repositories {
     mavenCentral()
 }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}
+
+test {
+    useJUnit()
+}

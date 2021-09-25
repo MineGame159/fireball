@@ -1,19 +1,23 @@
 import minegame159.fireball.*;
 import minegame159.fireball.Compiler;
 import minegame159.fireball.Error;
+import org.junit.Test;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 
 public class CompilerTest {
-    public static void main(String[] args) {
+    @Test
+    public void main() {
         String source = """
-                void main() {
+                int main() {
                     i32 b = 8;
-                    b = 6;
+                    b = 6 / 2;
                     
                     print(b);
+                    
+                    return 0;
                 }
                 
                 void print(i32 number) {

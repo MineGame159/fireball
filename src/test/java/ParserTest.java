@@ -1,11 +1,13 @@
 import minegame159.fireball.Context;
 import minegame159.fireball.Error;
 import minegame159.fireball.Parser;
+import org.junit.Test;
 
 import java.io.StringReader;
 
 public class ParserTest {
-    public static void main(String[] args) {
+    @Test
+    public void main() {
         String source = """
                 void hi() {
                     print("Hi");
