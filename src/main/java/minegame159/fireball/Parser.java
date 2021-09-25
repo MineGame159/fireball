@@ -76,6 +76,7 @@ public class Parser {
         if (match(TokenType.While)) return whileStatement();
         if (match(TokenType.For)) return forStatement();
         if (match(TokenType.Return)) return returnStatement();
+        if (match(TokenType.CBlock)) return cBlockStatement();
 
         return expressionStatement();
     }
@@ -130,6 +131,17 @@ public class Parser {
         consume(TokenType.Semicolon, "Expected ';' after return value.");
 
         return new Stmt.Return(value);
+    }
+
+    private Stmt cBlockStatement() {
+        StringBuilder sb = new StringBuilder();
+
+        while (!check(TokenType.RightBrace) && !isAtEnd()) {
+            sb.append(advance().lexeme());
+        }
+
+        consume(TokenType.RightBrace, "Expected '}' after C block.");
+        return new Stmt.CBlock(sb.toString());
     }
 
     private Stmt expressionStatement() {

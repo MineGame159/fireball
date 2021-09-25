@@ -26,6 +26,10 @@ public class Scanner {
         char c = advance();
         if (isTwice(c, '&')) return token(TokenType.And);
         if (isTwice(c, '|')) return token(TokenType.Or);
+        if (c == 'c' && peek() == '{') {
+            advance();
+            return token(TokenType.CBlock);
+        }
         if (isDigit(c)) return number();
         if (isAlpha(c)) return identifier();
 

@@ -14,6 +14,7 @@ public abstract class Stmt {
         void visitForStmt(For stmt);
         void visitFunctionStmt(Function stmt);
         void visitReturnStmt(Return stmt);
+        void visitCBlockStmt(CBlock stmt);
     }
 
     public static class Expression extends Stmt {
@@ -139,6 +140,19 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitReturnStmt(this);
+        }
+    }
+
+    public static class CBlock extends Stmt {
+        public final String code;
+
+        public CBlock(String code) {
+            this.code = code;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitCBlockStmt(this);
         }
     }
 

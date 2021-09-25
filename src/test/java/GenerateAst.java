@@ -15,7 +15,8 @@ public class GenerateAst {
                 "While      : Expr condition, Stmt body",
                 "For        : Stmt initializer, Expr condition, Expr increment, Stmt body",
                 "Function   : Token returnType, Token name, List<TokenPair> params, Stmt body",
-                "Return     : Expr value"
+                "Return     : Expr value",
+                "CBlock     : String code"
         ));
 
         defineAst(dir, "Expr", List.of(
