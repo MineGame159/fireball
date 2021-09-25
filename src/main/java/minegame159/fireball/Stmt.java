@@ -17,7 +17,7 @@ public abstract class Stmt {
     public static class Expression extends Stmt {
         public final Expr expression;
 
-        Expression(Expr expression) {
+        public Expression(Expr expression) {
             this.expression = expression;
         }
 
@@ -30,7 +30,7 @@ public abstract class Stmt {
     public static class Block extends Stmt {
         public final List<Stmt> statements;
 
-        Block(List<Stmt> statements) {
+        public Block(List<Stmt> statements) {
             this.statements = statements;
         }
 
@@ -45,7 +45,7 @@ public abstract class Stmt {
         public final Token name;
         public final Expr initializer;
 
-        Variable(Token type, Token name, Expr initializer) {
+        public Variable(Token type, Token name, Expr initializer) {
             this.type = type;
             this.name = name;
             this.initializer = initializer;
@@ -62,7 +62,7 @@ public abstract class Stmt {
         public final Stmt thenBranch;
         public final Stmt elseBranch;
 
-        If(Expr condition, Stmt thenBranch, Stmt elseBranch) {
+        public If(Expr condition, Stmt thenBranch, Stmt elseBranch) {
             this.condition = condition;
             this.thenBranch = thenBranch;
             this.elseBranch = elseBranch;
@@ -78,7 +78,7 @@ public abstract class Stmt {
         public final Expr condition;
         public final Stmt body;
 
-        While(Expr condition, Stmt body) {
+        public While(Expr condition, Stmt body) {
             this.condition = condition;
             this.body = body;
         }
@@ -95,7 +95,7 @@ public abstract class Stmt {
         public final Expr increment;
         public final Stmt body;
 
-        For(Stmt initializer, Expr condition, Expr increment, Stmt body) {
+        public For(Stmt initializer, Expr condition, Expr increment, Stmt body) {
             this.initializer = initializer;
             this.condition = condition;
             this.increment = increment;

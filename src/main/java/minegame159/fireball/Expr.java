@@ -30,7 +30,7 @@ public abstract class Expr {
     public static class Bool extends Expr {
         public final boolean value;
 
-        Bool(boolean value) {
+        public Bool(boolean value) {
             this.value = value;
         }
 
@@ -44,7 +44,7 @@ public abstract class Expr {
         public final int bytes;
         public final long value;
 
-        UnsignedInt(int bytes, long value) {
+        public UnsignedInt(int bytes, long value) {
             this.bytes = bytes;
             this.value = value;
         }
@@ -59,7 +59,7 @@ public abstract class Expr {
         public final int bytes;
         public final long value;
 
-        Int(int bytes, long value) {
+        public Int(int bytes, long value) {
             this.bytes = bytes;
             this.value = value;
         }
@@ -74,7 +74,7 @@ public abstract class Expr {
         public final boolean is64bit;
         public final double value;
 
-        Float(boolean is64bit, double value) {
+        public Float(boolean is64bit, double value) {
             this.is64bit = is64bit;
             this.value = value;
         }
@@ -88,7 +88,7 @@ public abstract class Expr {
     public static class String extends Expr {
         public final java.lang.String value;
 
-        String(java.lang.String value) {
+        public String(java.lang.String value) {
             this.value = value;
         }
 
@@ -101,7 +101,7 @@ public abstract class Expr {
     public static class Grouping extends Expr {
         public final Expr expression;
 
-        Grouping(Expr expression) {
+        public Grouping(Expr expression) {
             this.expression = expression;
         }
 
@@ -116,7 +116,7 @@ public abstract class Expr {
         public final Token operator;
         public final Expr right;
 
-        Binary(Expr left, Token operator, Expr right) {
+        public Binary(Expr left, Token operator, Expr right) {
             this.left = left;
             this.operator = operator;
             this.right = right;
@@ -132,7 +132,7 @@ public abstract class Expr {
         public final Token operator;
         public final Expr right;
 
-        Unary(Token operator, Expr right) {
+        public Unary(Token operator, Expr right) {
             this.operator = operator;
             this.right = right;
         }
@@ -148,7 +148,7 @@ public abstract class Expr {
         public final Token operator;
         public final Expr right;
 
-        Logical(Expr left, Token operator, Expr right) {
+        public Logical(Expr left, Token operator, Expr right) {
             this.left = left;
             this.operator = operator;
             this.right = right;
@@ -163,7 +163,7 @@ public abstract class Expr {
     public static class Variable extends Expr {
         public final Token name;
 
-        Variable(Token name) {
+        public Variable(Token name) {
             this.name = name;
         }
 
@@ -177,7 +177,7 @@ public abstract class Expr {
         public final Token name;
         public final Expr value;
 
-        Assign(Token name, Expr value) {
+        public Assign(Token name, Expr value) {
             this.name = name;
             this.value = value;
         }

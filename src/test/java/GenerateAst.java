@@ -85,7 +85,7 @@ public class GenerateAst {
 
             // Constructor
             writer.println();
-            writer.println("        " + className + "(" + fieldList + ") {");
+            writer.println("        public " + className + "(" + fieldList + ") {");
 
             for (String field : fields) {
                 String name = field.split(" ")[1];
