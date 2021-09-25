@@ -51,7 +51,7 @@ public class Parser {
 
         Stmt body = statement();
 
-        context.declareFunction(name);
+        context.declareFunction(name, returnType, parameters);
         return new Stmt.Function(returnType, name, parameters, body);
     }
 

@@ -4,13 +4,16 @@ import java.io.Writer;
 import java.util.List;
 
 public class Compiler extends AstPass {
+    private final Context context;
     private final CompilerWriter w;
 
-    public Compiler(Writer writer) {
+    public Compiler(Context context, Writer writer) {
+        this.context = context;
         this.w = new CompilerWriter(writer);
     }
 
     public void compile(List<Stmt> stmts) {
+        // Standard library
         w.writeln("\n// Standard library\n");
         w.writeln("#include <stdbool.h>");
         w.writeln("#include <stdint.h>");
@@ -27,6 +30,23 @@ public class Compiler extends AstPass {
         w.writeln("typedef float f32;");
         w.writeln("typedef double f64;");
 
+        // Forward declarations
+        w.writeln("\n// Forward declarations\n");
+
+        for (Function function : context.getFunctions()) {
+            w.write(function.returnType.lexeme()).write(' ').write(function.name.lexeme()).write('(');
+
+            for (int i = 0; i < function.params.size(); i++) {
+                TokenPair param = function.params.get(i);
+
+                if (i > 0) w.write(", ");
+                w.write(param.first().lexeme()).write(' ').write(param.second().lexeme());
+            }
+
+            w.writeln(");");
+        }
+
+        // User code
         w.writeln("\n// User code\n");
         acceptS(stmts);
 

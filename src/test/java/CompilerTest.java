@@ -9,17 +9,17 @@ import java.io.StringReader;
 public class CompilerTest {
     public static void main(String[] args) {
         String source = """
-                void print(i32 number) {
-                    c{
-                        printf("%d", number);
-                    }
-                }
-                
                 void main() {
                     i32 b = 8;
                     b = 6;
                     
                     print(b);
+                }
+                
+                void print(i32 number) {
+                    c{
+                        printf("%d", number);
+                    }
                 }
                 """;
 
@@ -51,7 +51,7 @@ public class CompilerTest {
 
         // Compile
         try {
-            Compiler compiler = new Compiler(new FileWriter("out/test.c"));
+            Compiler compiler = new Compiler(context, new FileWriter("out/test.c"));
             compiler.compile(parser.stmts);
         } catch (IOException e) {
             e.printStackTrace();
