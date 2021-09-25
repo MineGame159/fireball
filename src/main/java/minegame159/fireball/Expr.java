@@ -6,22 +6,92 @@ import java.util.List;
 
 public abstract class Expr {
     interface Visitor {
-        void visitLiteralExpr(Literal expr);
+        void visitNullExpr(Null expr);
+        void visitBoolExpr(Bool expr);
+        void visitUnsignedIntExpr(UnsignedInt expr);
+        void visitIntExpr(Int expr);
+        void visitFloatExpr(Float expr);
+        void visitStringExpr(String expr);
         void visitGroupingExpr(Grouping expr);
         void visitBinaryExpr(Binary expr);
         void visitUnaryExpr(Unary expr);
     }
 
-    public static class Literal extends Expr {
-        public final Object value;
+    public static class Null extends Expr {
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitNullExpr(this);
+        }
+    }
 
-        Literal(Object value) {
+    public static class Bool extends Expr {
+        public final boolean value;
+
+        Bool(boolean value) {
             this.value = value;
         }
 
         @Override
         public void accept(Visitor visitor) {
-            visitor.visitLiteralExpr(this);
+            visitor.visitBoolExpr(this);
+        }
+    }
+
+    public static class UnsignedInt extends Expr {
+        public final int bytes;
+        public final long value;
+
+        UnsignedInt(int bytes, long value) {
+            this.bytes = bytes;
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitUnsignedIntExpr(this);
+        }
+    }
+
+    public static class Int extends Expr {
+        public final int bytes;
+        public final long value;
+
+        Int(int bytes, long value) {
+            this.bytes = bytes;
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitIntExpr(this);
+        }
+    }
+
+    public static class Float extends Expr {
+        public final boolean is64bit;
+        public final double value;
+
+        Float(boolean is64bit, double value) {
+            this.is64bit = is64bit;
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitFloatExpr(this);
+        }
+    }
+
+    public static class String extends Expr {
+        public final java.lang.String value;
+
+        String(java.lang.String value) {
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitStringExpr(this);
         }
     }
 

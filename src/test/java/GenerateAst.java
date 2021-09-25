@@ -12,10 +12,16 @@ public class GenerateAst {
         ));
 
         defineAst(dir, "Expr", List.of(
-                "Literal  : Object value",
-                "Grouping : Expr expression",
-                "Binary   : Expr left, Token operator, Expr right",
-                "Unary    : Token operator, Expr right"
+                "Null        : ",
+                "Bool        : boolean value",
+                "UnsignedInt : int bytes, long value",
+                "Int         : int bytes, long value",
+                "Float       : boolean is64bit, double value",
+                "String      : java.lang.String value",
+
+                "Grouping    : Expr expression",
+                "Binary      : Expr left, Token operator, Expr right",
+                "Unary       : Token operator, Expr right"
         ));
     }
 
@@ -61,25 +67,28 @@ public class GenerateAst {
     private static void defineType(PrintWriter writer, String baseName, String className, String fieldList) {
         writer.println("    public static class " + className + " extends " + baseName + " {");
 
-        // Fields
-        String[] fields = fieldList.split(", ");
+        if (!fieldList.isEmpty()) {
+            // Fields
+            String[] fields = fieldList.split(", ");
 
-        for (String field : fields) {
-            writer.println("        public final " + field + ";");
+            for (String field : fields) {
+                writer.println("        public final " + field + ";");
+            }
+
+            // Constructor
+            writer.println();
+            writer.println("        " + className + "(" + fieldList + ") {");
+
+            for (String field : fields) {
+                String name = field.split(" ")[1];
+                writer.println("            this." + name + " = " + name + ";");
+            }
+            writer.println("        }");
+
+            writer.println();
         }
-
-        // Constructor
-        writer.println();
-        writer.println("        " + className + "(" + fieldList + ") {");
-
-        for (String field : fields) {
-            String name = field.split(" ")[1];
-            writer.println("            this." + name + " = " + name + ";");
-        }
-        writer.println("        }");
 
         // Visitor pattern.
-        writer.println();
         writer.println("        @Override");
         writer.println("        public void accept(Visitor visitor) {");
         writer.println("            visitor.visit" + className + baseName + "(this);");

@@ -105,11 +105,12 @@ public class Parser {
     }
 
     private Expr primary() {
-        if (match(TokenType.False)) return new Expr.Literal(false);
-        if (match(TokenType.True)) return new Expr.Literal(true);
-        if (match(TokenType.Null)) return new Expr.Literal(null);
-        if (match(TokenType.Int, TokenType.Float)) return new Expr.Literal(previous().lexeme());
-        if (match(TokenType.String)) return new Expr.Literal(previous.lexeme().substring(1, previous.lexeme().length() - 1));
+        if (match(TokenType.Null)) return new Expr.Null();
+        if (match(TokenType.True)) return new Expr.Bool(true);
+        if (match(TokenType.False)) return new Expr.Bool(false);
+        if (match(TokenType.Int)) return new Expr.Int(4, Integer.parseInt(previous().lexeme()));
+        if (match(TokenType.Float)) return new Expr.Float(true, Double.parseDouble(previous().lexeme()));
+        if (match(TokenType.String)) return new Expr.String(previous.lexeme().substring(1, previous.lexeme().length() - 1));
 
         if (match(TokenType.LeftParen)) {
             Expr expr = expression();
