@@ -1,6 +1,7 @@
 import minegame159.fireball.*;
 import minegame159.fireball.Compiler;
 import minegame159.fireball.Error;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.FileWriter;
@@ -33,24 +34,24 @@ public class CompilerTest {
         Parser parser = new Parser(context, new StringReader(source));
         parser.parse();
 
-        if (parser.errors.size() > 0) {
+        if (!parser.errors.isEmpty()) {
             for (Error error : parser.errors) {
                 System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
             }
 
-            return;
+            Assert.fail();
         }
 
         // Check
         Checker checker = new Checker(context);
         checker.check(parser.stmts);
 
-        if (checker.errors.size() > 0) {
+        if (!checker.errors.isEmpty()) {
             for (Error error : checker.errors) {
                 System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
             }
 
-            return;
+            Assert.fail();
         }
 
         // Compile
@@ -59,6 +60,7 @@ public class CompilerTest {
             compiler.compile(parser.stmts);
         } catch (IOException e) {
             e.printStackTrace();
+            Assert.fail();
         }
 
         // Run
@@ -67,6 +69,7 @@ public class CompilerTest {
             new ProcessBuilder().command("out/test.exe").inheritIO().start().waitFor();
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
+            Assert.fail();
         }
     }
 }

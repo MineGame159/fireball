@@ -1,6 +1,7 @@
 import minegame159.fireball.Context;
 import minegame159.fireball.Error;
 import minegame159.fireball.Parser;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.StringReader;
@@ -44,8 +45,12 @@ public class ParserTest {
 
         System.out.printf("Statements: %d%n", parser.stmts.size());
 
-        for (Error error : parser.errors) {
-            System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
+        if (!parser.errors.isEmpty()) {
+            for (Error error : parser.errors) {
+                System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
+            }
+
+            Assert.fail();
         }
     }
 }
