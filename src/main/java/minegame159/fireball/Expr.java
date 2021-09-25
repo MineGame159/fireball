@@ -2,6 +2,9 @@
 
 package minegame159.fireball;
 
+import minegame159.fireball.types.PrimitiveTypes;
+import minegame159.fireball.types.Type;
+
 import java.util.List;
 
 public abstract class Expr {
@@ -26,6 +29,11 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitNullExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            throw new RuntimeException("No type for null."); // TODO
+        }
     }
 
     public static class Bool extends Expr {
@@ -38,6 +46,11 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitBoolExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return PrimitiveTypes.Bool.type;
         }
     }
 
@@ -54,6 +67,17 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitUnsignedIntExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return switch (bytes) {
+                case 1 -> PrimitiveTypes.U8.type;
+                case 2 -> PrimitiveTypes.U16.type;
+                case 4 -> PrimitiveTypes.U32.type;
+                case 8 -> PrimitiveTypes.U64.type;
+                default -> throw new RuntimeException("Unknown unsigned integer size.");
+            };
+        }
     }
 
     public static class Int extends Expr {
@@ -68,6 +92,17 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitIntExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return switch (bytes) {
+                case 1 -> PrimitiveTypes.I8.type;
+                case 2 -> PrimitiveTypes.I16.type;
+                case 4 -> PrimitiveTypes.I32.type;
+                case 8 -> PrimitiveTypes.I64.type;
+                default -> throw new RuntimeException("Unknown integer size.");
+            };
         }
     }
 
@@ -84,6 +119,11 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitFloatExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return is64bit ? PrimitiveTypes.F64.type : PrimitiveTypes.F32.type;
+        }
     }
 
     public static class String extends Expr {
@@ -97,6 +137,11 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitStringExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            throw new RuntimeException("No type for string."); // TODO
+        }
     }
 
     public static class Grouping extends Expr {
@@ -109,6 +154,11 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitGroupingExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return expression.getType();
         }
     }
 
@@ -127,6 +177,11 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitBinaryExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return left.getType();
+        }
     }
 
     public static class Unary extends Expr {
@@ -141,6 +196,11 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitUnaryExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return right.getType();
         }
     }
 
@@ -159,10 +219,16 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitLogicalExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return left.getType();
+        }
     }
 
     public static class Variable extends Expr {
         public final Token name;
+        public Type type;
 
         public Variable(Token name) {
             this.name = name;
@@ -172,11 +238,17 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitVariableExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return type;
+        }
     }
 
     public static class Assign extends Expr {
         public final Token name;
         public final Expr value;
+        public Type type;
 
         public Assign(Token name, Expr value) {
             this.name = name;
@@ -187,13 +259,20 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitAssignExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return type;
+        }
     }
 
     public static class Call extends Expr {
+        public final Token token;
         public final Expr callee;
         public final List<Expr> arguments;
 
-        public Call(Expr callee, List<Expr> arguments) {
+        public Call(Token token, Expr callee, List<Expr> arguments) {
+            this.token = token;
             this.callee = callee;
             this.arguments = arguments;
         }
@@ -202,7 +281,14 @@ public abstract class Expr {
         public void accept(Visitor visitor) {
             visitor.visitCallExpr(this);
         }
+
+        @Override
+        public Type getType() {
+            return callee.getType();
+        }
     }
 
     public abstract void accept(Visitor visitor);
+
+    public abstract Type getType();
 }

@@ -1,15 +1,9 @@
 package minegame159.fireball;
 
+import minegame159.fireball.types.Type;
+
 import java.util.List;
 
-public class Function {
-    public final Token name;
-    public final Token returnType;
-    public final List<TokenPair> params;
-
-    public Function(Token name, Token returnType, List<TokenPair> params) {
-        this.name = name;
-        this.returnType = returnType;
-        this.params = params;
-    }
+public record Function(Token name, Type returnType, List<Param> params) {
+    public record Param(Type type, Token name) {}
 }

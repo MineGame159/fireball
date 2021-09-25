@@ -1,24 +1,29 @@
-import minegame159.fireball.*;
 import minegame159.fireball.Compiler;
 import minegame159.fireball.Error;
+import minegame159.fireball.*;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.List;
 
 public class CompilerTest {
     @Test
     public void main() {
         String source = """
-                int main() {
-                    i32 b = 8;
+                i32 main() {
+                    i32 b = getNumber();
                     b = 6 / 2;
                     
                     print(b);
                     
                     return 0;
+                }
+                
+                i32 getNumber() {
+                    return 8;
                 }
                 
                 void print(i32 number) {
@@ -34,25 +39,19 @@ public class CompilerTest {
         Parser parser = new Parser(context, new StringReader(source));
         parser.parse();
 
-        if (!parser.errors.isEmpty()) {
-            for (Error error : parser.errors) {
-                System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
-            }
+        Assert.assertTrue(reportErrors(parser.errors));
 
-            Assert.fail();
-        }
+        // Resolve types
+        TypeResolver typeResolver = new TypeResolver(context);
+        typeResolver.resolve(parser.stmts);
+
+        Assert.assertTrue(reportErrors(typeResolver.errors));
 
         // Check
         Checker checker = new Checker(context);
         checker.check(parser.stmts);
 
-        if (!checker.errors.isEmpty()) {
-            for (Error error : checker.errors) {
-                System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
-            }
-
-            Assert.fail();
-        }
+        Assert.assertTrue(reportErrors(checker.errors));
 
         // Compile
         try {
@@ -71,5 +70,13 @@ public class CompilerTest {
             e.printStackTrace();
             Assert.fail();
         }
+    }
+
+    private boolean reportErrors(List<Error> errors) {
+        for (Error error : errors) {
+            System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
+        }
+
+        return errors.isEmpty();
     }
 }

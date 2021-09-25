@@ -19,14 +19,14 @@ public class Compiler extends AstPass {
         w.writeln("#include <stdint.h>");
         w.writeln("#include <stdio.h>\n");
 
+        w.writeln("typedef uint8_t u8;");
+        w.writeln("typedef uint16_t u16;");
+        w.writeln("typedef uint32_t u32;");
+        w.writeln("typedef uint64_t u64;");
         w.writeln("typedef int8_t i8;");
         w.writeln("typedef int16_t i16;");
         w.writeln("typedef int32_t i32;");
         w.writeln("typedef int64_t i64;");
-        w.writeln("typedef int8_t u8;");
-        w.writeln("typedef uint16_t u16;");
-        w.writeln("typedef uint32_t u32;");
-        w.writeln("typedef uint64_t u64;");
         w.writeln("typedef float f32;");
         w.writeln("typedef double f64;");
 
@@ -34,13 +34,13 @@ public class Compiler extends AstPass {
         w.writeln("\n// Forward declarations\n");
 
         for (Function function : context.getFunctions()) {
-            w.write(function.returnType.lexeme()).write(' ').write(function.name.lexeme()).write('(');
+            w.write(function.returnType().name).write(' ').write(function.name().lexeme()).write('(');
 
-            for (int i = 0; i < function.params.size(); i++) {
-                TokenPair param = function.params.get(i);
+            for (int i = 0; i < function.params().size(); i++) {
+                Function.Param param = function.params().get(i);
 
                 if (i > 0) w.write(", ");
-                w.write(param.first().lexeme()).write(' ').write(param.second().lexeme());
+                w.write(param.type().name).write(' ').write(param.name().lexeme());
             }
 
             w.writeln(");");

@@ -131,10 +131,12 @@ public class Parser {
     }
 
     private Stmt returnStatement() {
+        Token token = previous();
+
         Expr value = check(TokenType.Semicolon) ? null : expression();
         consume(TokenType.Semicolon, "Expected ';' after return value.");
 
-        return new Stmt.Return(value);
+        return new Stmt.Return(token, value);
     }
 
     private Stmt cBlockStatement() {
@@ -280,8 +282,8 @@ public class Parser {
             } while (match(TokenType.Comma));
         }
 
-        consume(TokenType.RightParen, "Expected ')' after arguments.");
-        return new Expr.Call(callee, arguments);
+        Token token = consume(TokenType.RightParen, "Expected ')' after arguments.");
+        return new Expr.Call(token, callee, arguments);
     }
 
     private Expr primary() {
