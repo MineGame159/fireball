@@ -3,7 +3,7 @@ package minegame159.fireball;
 import java.io.Writer;
 import java.util.List;
 
-public class Compiler implements Stmt.Visitor, Expr.Visitor {
+public class Compiler extends AstPass {
     private final CompilerWriter w;
 
     public Compiler(Writer writer) {
@@ -233,28 +233,20 @@ public class Compiler implements Stmt.Visitor, Expr.Visitor {
         w.write(')');
     }
 
-
-    // Utils
-
     // Accept
 
-    private void acceptS(Stmt stmt) {
+
+    @Override
+    protected void acceptS(Stmt stmt) {
         w.indent();
-        stmt.accept(this);
+        super.acceptS(stmt);
     }
 
-    private void acceptS(List<Stmt> stmts) {
+    @Override
+    protected void acceptS(List<Stmt> stmts) {
         for (Stmt stmt : stmts) {
             w.indent();
             stmt.accept(this);
         }
-    }
-
-    private void acceptE(Expr expr) {
-        expr.accept(this);
-    }
-
-    private void acceptE(List<Expr> exprs) {
-        for (Expr expr : exprs) expr.accept(this);
     }
 }

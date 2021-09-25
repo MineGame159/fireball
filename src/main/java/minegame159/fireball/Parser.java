@@ -8,11 +8,13 @@ public class Parser {
     public final List<Stmt> stmts = new ArrayList<>();
     public final List<Error> errors = new ArrayList<>();
 
+    private final Context context;
     private final Scanner scanner;
     private Token next, current, previous;
 
-    public Parser(Reader reader) {
-        scanner = new Scanner(reader);
+    public Parser(Context context, Reader reader) {
+        this.context = context;
+        this.scanner = new Scanner(reader);
 
         advance();
         advance();
@@ -48,6 +50,8 @@ public class Parser {
         consume(TokenType.RightParen, "Expected ')' after parameters.");
 
         Stmt body = statement();
+
+        context.declareFunction(name);
         return new Stmt.Function(returnType, name, parameters, body);
     }
 

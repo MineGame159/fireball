@@ -1,3 +1,4 @@
+import minegame159.fireball.Context;
 import minegame159.fireball.Error;
 import minegame159.fireball.Parser;
 
@@ -36,7 +37,7 @@ public class ParserTest {
                 }
                 """;
 
-        Parser parser = new Parser(new StringReader(source));
+        Parser parser = new Parser(new Context(), new StringReader(source));
         parser.parse();
 
         System.out.printf("Statements: %d%n", parser.stmts.size());
