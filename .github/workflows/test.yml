@@ -15,5 +15,6 @@ jobs:
 
       - name: Run tests
         run: |
+          mkdir -p out
           chmod a+x gradlew
           ./gradlew test
