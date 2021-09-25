@@ -9,11 +9,13 @@ import java.io.StringReader;
 public class CompilerTest {
     public static void main(String[] args) {
         String source = """
-                void main() {
+                int main() {
                     i32 b = 8;
-                    b = 6;
+                    b = 6 / 2;
                     
                     print(b);
+                    
+                    return 0;
                 }
                 
                 void print(i32 number) {
