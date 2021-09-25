@@ -13,7 +13,9 @@ public class GenerateAst {
                 "Variable   : Token type, Token name, Expr initializer",
                 "If         : Expr condition, Stmt thenBranch, Stmt elseBranch",
                 "While      : Expr condition, Stmt body",
-                "For        : Stmt initializer, Expr condition, Expr increment, Stmt body"
+                "For        : Stmt initializer, Expr condition, Expr increment, Stmt body",
+                "Function   : Token returnType, Token name, List<TokenPair> params, Stmt body",
+                "Return     : Expr value"
         ));
 
         defineAst(dir, "Expr", List.of(
@@ -29,7 +31,8 @@ public class GenerateAst {
                 "Unary       : Token operator, Expr right",
                 "Logical     : Expr left, Token operator, Expr right",
                 "Variable    : Token name",
-                "Assign      : Token name, Expr value"
+                "Assign      : Token name, Expr value",
+                "Call        : Expr callee, List<Expr> arguments"
         ));
     }
 

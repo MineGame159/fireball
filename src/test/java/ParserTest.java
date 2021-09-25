@@ -6,20 +6,34 @@ import java.io.StringReader;
 public class ParserTest {
     public static void main(String[] args) {
         String source = """
-                i32 number = 159;
-                number = 9;
-                
-                {
-                    String name = "MineGame159";
-                    var me = name;
+                void hi() {
+                    print("Hi");
                 }
                 
-                if (true && number == 159) {}
+                void hello(i32 number, String string) {
+                    return;
+                    print("No cope");
+                }
                 
-                while (cope || notCope) {}
-                
-                for (i32 i = 0; i < 5; i = i + 1) {}
-                for (;;) {}
+                void main() {
+                    i32 number = 159;
+                    number = 9;
+                    
+                    {
+                        String name = "MineGame159";
+                        var me = name;
+                    }
+                    
+                    if (true && number == 159) {
+                        hi();
+                        hello(5, "no");
+                    }
+                    
+                    while (cope || notCope) {}
+                    
+                    for (i32 i = 0; i < 5; i = i + 1) {}
+                    for (;;) {}
+                }
                 """;
 
         Parser parser = new Parser(new StringReader(source));

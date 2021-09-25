@@ -12,6 +12,8 @@ public abstract class Stmt {
         void visitIfStmt(If stmt);
         void visitWhileStmt(While stmt);
         void visitForStmt(For stmt);
+        void visitFunctionStmt(Function stmt);
+        void visitReturnStmt(Return stmt);
     }
 
     public static class Expression extends Stmt {
@@ -105,6 +107,38 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitForStmt(this);
+        }
+    }
+
+    public static class Function extends Stmt {
+        public final Token returnType;
+        public final Token name;
+        public final List<TokenPair> params;
+        public final Stmt body;
+
+        public Function(Token returnType, Token name, List<TokenPair> params, Stmt body) {
+            this.returnType = returnType;
+            this.name = name;
+            this.params = params;
+            this.body = body;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitFunctionStmt(this);
+        }
+    }
+
+    public static class Return extends Stmt {
+        public final Expr value;
+
+        public Return(Expr value) {
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitReturnStmt(this);
         }
     }
 

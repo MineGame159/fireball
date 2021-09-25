@@ -18,6 +18,7 @@ public abstract class Expr {
         void visitLogicalExpr(Logical expr);
         void visitVariableExpr(Variable expr);
         void visitAssignExpr(Assign expr);
+        void visitCallExpr(Call expr);
     }
 
     public static class Null extends Expr {
@@ -185,6 +186,21 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitAssignExpr(this);
+        }
+    }
+
+    public static class Call extends Expr {
+        public final Expr callee;
+        public final List<Expr> arguments;
+
+        public Call(Expr callee, List<Expr> arguments) {
+            this.callee = callee;
+            this.arguments = arguments;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitCallExpr(this);
         }
     }
 

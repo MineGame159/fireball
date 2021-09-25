@@ -21,7 +21,7 @@ public class Parser {
     public void parse() {
         while (peek().type() != TokenType.Eof) {
             try {
-                stmts.add(declaration());
+                stmts.add(functionDeclaration());
             } catch (Error error) {
                 errors.add(error);
                 synchronize();
@@ -30,6 +30,26 @@ public class Parser {
     }
 
     // Declaration
+
+    private Stmt functionDeclaration() {
+        Token returnType = consume(TokenType.Identifier, "Expected return type.");
+        Token name = consume(TokenType.Identifier, "Expected function name.");
+
+        consume(TokenType.LeftParen, "Expected '(' after function name.");
+        List<TokenPair> parameters = new ArrayList<>();
+        if (!check(TokenType.RightParen)) {
+            do {
+                parameters.add(new TokenPair(
+                        consume(TokenType.Identifier, "Expected parameter type."),
+                        consume(TokenType.Identifier, "Expected parameter name.")
+                ));
+            } while (match(TokenType.Comma));
+        }
+        consume(TokenType.RightParen, "Expected ')' after parameters.");
+
+        Stmt body = statement();
+        return new Stmt.Function(returnType, name, parameters, body);
+    }
 
     private Stmt declaration() {
         if (checkNext(TokenType.Identifier) && match(TokenType.Identifier, TokenType.Var)) return variableDeclaration();
@@ -55,6 +75,7 @@ public class Parser {
         if (match(TokenType.If)) return ifStatement();
         if (match(TokenType.While)) return whileStatement();
         if (match(TokenType.For)) return forStatement();
+        if (match(TokenType.Return)) return returnStatement();
 
         return expressionStatement();
     }
@@ -102,6 +123,13 @@ public class Parser {
 
         Stmt body = statement();
         return new Stmt.For(initializer, condition, increment, body);
+    }
+
+    private Stmt returnStatement() {
+        Expr value = check(TokenType.Semicolon) ? null : expression();
+        consume(TokenType.Semicolon, "Expected ';' after return value.");
+
+        return new Stmt.Return(value);
     }
 
     private Stmt expressionStatement() {
@@ -213,7 +241,31 @@ public class Parser {
             return new Expr.Unary(operator, right);
         }
 
-        return primary();
+        return call();
+    }
+
+    private Expr call() {
+        Expr expr = primary();
+
+        while (true) {
+            if (match(TokenType.LeftParen)) expr = finishCall(expr);
+            else break;
+        }
+
+        return expr;
+    }
+
+    private Expr finishCall(Expr callee) {
+        List<Expr> arguments = new ArrayList<>();
+
+        if (!check(TokenType.RightParen)) {
+            do {
+                arguments.add(expression());
+            } while (match(TokenType.Comma));
+        }
+
+        consume(TokenType.RightParen, "Expected ')' after arguments.");
+        return new Expr.Call(callee, arguments);
     }
 
     private Expr primary() {
