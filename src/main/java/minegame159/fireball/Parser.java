@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Parser {
-    public final List<Expr> exprs = new ArrayList<>();
+    public final List<Stmt> stmts = new ArrayList<>();
     public final List<Error> errors = new ArrayList<>();
 
     private final Scanner scanner;
@@ -20,12 +20,24 @@ public class Parser {
     public void parse() {
         while (peek().type() != TokenType.Eof) {
             try {
-                exprs.add(expression());
+                stmts.add(statement());
             } catch (Error error) {
                 errors.add(error);
                 synchronize();
             }
         }
+    }
+
+    // Statements
+
+    private Stmt statement() {
+        return expressionStatement();
+    }
+
+    private Stmt expressionStatement() {
+        Expr expr = expression();
+        consume(TokenType.Semicolon, "Expected ';' after expression.");
+        return new Stmt.Expression(expr);
     }
 
     // Expressions

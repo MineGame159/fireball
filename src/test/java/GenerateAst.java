@@ -5,7 +5,13 @@ import java.util.List;
 
 public class GenerateAst {
     public static void main(String[] args) throws IOException {
-        defineAst("src/main/java/minegame159/fireball", "Expr", List.of(
+        String dir = "src/main/java/minegame159/fireball";
+
+        defineAst(dir, "Stmt", List.of(
+                "Expression : Expr expression"
+        ));
+
+        defineAst(dir, "Expr", List.of(
                 "Literal  : Object value",
                 "Grouping : Expr expression",
                 "Binary   : Expr left, Token operator, Expr right",
