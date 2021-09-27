@@ -68,14 +68,22 @@ public class Scanner {
     private Token cBlock() {
         boolean countTrimStart = true;
         int trimStart = 0;
+        
+        int braceCount = 0;
 
-        while (peek() != '}' && !isAtEnd()) {
+        while (!isAtEnd()) {
             if (countTrimStart) {
                 if (isMeaninglessWhitespace(peek())) trimStart++;
                 else countTrimStart = false;
             }
 
             if (peek() == '\n') line++;
+            else if (peek() == '{') braceCount++;
+            else if (peek() == '}') {
+                if (braceCount > 0) braceCount--;
+                else break;
+            }
+
             advance();
         }
 
