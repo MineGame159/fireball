@@ -29,6 +29,8 @@ public class CompilerTest {
                     print(b);
                     
                     // Structs
+                    Point p;
+                    //printPoint(p);
                     
                     return 0;
                 }
@@ -38,11 +40,11 @@ public class CompilerTest {
                 }
                 
                 void printPoint(Point p) {
-                    c{ printf("[%d, %d]", p.x, p.y); }
+                    c{ printf("[%d, %d]\n", p.x, p.y); }
                 }
                 
                 void print(i32 number) {
-                    c{ printf("%d", number); }
+                    c{ printf("%d\n", number); }
                 }
                 """;
 

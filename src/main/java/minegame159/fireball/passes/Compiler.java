@@ -233,7 +233,7 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitStringExpr(Expr.String expr) {
-        w.write('"').write(expr.value).write('"');
+        w.write('"').write(expr.value.replace("\n", "\\n")).write('"');
     }
 
     @Override

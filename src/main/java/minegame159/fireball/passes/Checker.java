@@ -53,12 +53,15 @@ public class Checker extends AstPass {
     @Override
     public void visitVariableStmt(Stmt.Variable stmt) {
         Type type = stmt.getType(context);
-        Type valueType = stmt.initializer.getType();
-        if (!type.equals(valueType)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
+
+        if (stmt.initializer != null) {
+            Type valueType = stmt.initializer.getType();
+            if (!type.equals(valueType)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
+        }
 
         declare(stmt.name, type);
         acceptE(stmt.initializer);
-        define(stmt.name);
+        if (stmt.initializer != null) define(stmt.name);
     }
 
     @Override

@@ -108,8 +108,7 @@ public class Parser {
         Token type = previous();
         Token name = advance();
 
-        consume(TokenType.Equal, "Expected '=' after variable declaration.");
-        Expr initializer = expression();
+        Expr initializer = match(TokenType.Equal) ? expression() : null;
 
         consume(TokenType.Semicolon, "Expected ';' after variable initializer.");
         return new Stmt.Variable(type, name, initializer);
@@ -186,7 +185,8 @@ public class Parser {
         StringBuilder sb = new StringBuilder();
 
         while (!check(TokenType.RightBrace) && !isAtEnd()) {
-            sb.append(advance().lexeme());
+            Token token = advance();
+            sb.append(token.type() == TokenType.String ? token.lexeme().replace("\n", "\\n") : token.lexeme());
         }
 
         consume(TokenType.RightBrace, "Expected '}' after C block.");

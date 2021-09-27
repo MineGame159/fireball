@@ -10,6 +10,8 @@ public class Scanner {
     private char current, next;
     private int line = 1, character, firstTokenCharacter;
 
+    private boolean inString;
+
     public Scanner(Reader reader) {
         this.reader = reader;
 
@@ -78,14 +80,17 @@ public class Scanner {
     }
 
     private Token string() {
+        inString = true;
         while (peek() != '"' && !isAtEnd()) {
-            if (peek() == '\n') incrementLine();
+            if (peek() == '\n') line++;
             advance();
         }
 
         if (isAtEnd()) return error("Unterminated string.");
 
         advance();
+        inString = false;
+
         return token(TokenType.String);
     }
 
@@ -148,7 +153,7 @@ public class Scanner {
             e.printStackTrace();
         }
 
-        if (prev != '\0' && prev != '\n') character++;
+        if (prev != '\0' && (inString || prev != '\n')) character++;
         return prev;
     }
 

@@ -63,7 +63,7 @@ public abstract class Stmt {
         }
 
         public Type getType(Context context) {
-            return type.type() == TokenType.Var ? initializer.getType() : context.getType(type);
+            return type.type() == TokenType.Var ? (initializer == null ? null : initializer.getType()) : context.getType(type);
         }
     }
 
