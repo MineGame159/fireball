@@ -111,6 +111,7 @@ public class Scanner {
             case 'v' -> checkKeyword(1, "ar", TokenType.Var);
             case 'e' -> checkKeyword(1, "lse", TokenType.Else);
             case 'r' -> checkKeyword(1, "eturn", TokenType.Return);
+            case 's' -> checkKeyword(1, "truct", TokenType.Struct);
 
             default -> TokenType.Identifier;
         };

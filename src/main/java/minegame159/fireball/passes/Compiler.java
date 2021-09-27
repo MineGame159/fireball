@@ -3,6 +3,7 @@ package minegame159.fireball.passes;
 import minegame159.fireball.TokenPair;
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
+import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Stmt;
@@ -44,6 +45,13 @@ public class Compiler extends AstPass {
         // Forward declarations
         w.writeln("\n// Forward declarations\n");
 
+        //     Structs
+        for (Struct struct : context.getStructs()) {
+            w.write("typedef struct ").write(struct.name().lexeme()).write(' ').write(struct.name().lexeme()).writeSemicolon();
+        }
+        if (context.getStructs().size() > 0) w.write('\n');
+
+        //     Functions
         for (Function function : context.getFunctions()) {
             w.write(function.returnType().name).write(' ').write(function.name().lexeme()).write('(');
 
@@ -179,6 +187,21 @@ public class Compiler extends AstPass {
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {
         w.write(stmt.code).write('\n');
+    }
+
+    @Override
+    public void visitStructStmt(Stmt.Struct stmt) {
+        w.write("struct ").write(stmt.name.lexeme()).write(" {\n");
+        w.indentUp();
+
+        for (TokenPair field : stmt.fields) {
+            w.indent().write(field.first().lexeme()).write(' ').write(field.second().lexeme()).writeSemicolon();
+        }
+
+        w.indentDown();
+        w.indent().write("}").writeSemicolon();
+
+        w.write('\n');
     }
 
     // Expressions

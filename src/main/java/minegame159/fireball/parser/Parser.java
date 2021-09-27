@@ -10,6 +10,7 @@ import java.util.List;
 public class Parser {
     public static class Result {
         public final List<Stmt> stmts = new ArrayList<>();
+        public final List<Stmt.Struct> structs = new ArrayList<>();
         public final List<Stmt.Function> functions = new ArrayList<>();
 
         public Error error;
@@ -38,7 +39,7 @@ public class Parser {
     private void parse() {
         try {
             while (peek().type() != TokenType.Eof) {
-                result.stmts.add(functionDeclaration());
+                result.stmts.add(topLevelDeclaration());
             }
         } catch (Error error) {
             result.error = error;
@@ -46,6 +47,33 @@ public class Parser {
     }
 
     // Declaration
+
+    private Stmt topLevelDeclaration() {
+        if (match(TokenType.Struct)) return structDeclaration();
+
+        return functionDeclaration();
+    }
+
+    private Stmt structDeclaration() {
+        Token name = consume(TokenType.Identifier, "Expected struct name.");
+
+        consume(TokenType.LeftBrace, "Expected '{' after struct name.");
+        List<TokenPair> fields = new ArrayList<>();
+
+        while (!check(TokenType.RightBrace)) {
+            Token fieldType = consume(TokenType.Identifier, "Expected field type.");
+            Token fieldName = consume(TokenType.Identifier, "Expected field name.");
+
+            consume(TokenType.Semicolon, "Expected ';' after field name.");
+            fields.add(new TokenPair(fieldType, fieldName));
+        }
+
+        consume(TokenType.RightBrace, "Expected '}' after struct body.");
+
+        Stmt.Struct struct = new Stmt.Struct(name, fields);
+        result.structs.add(struct);
+        return struct;
+    }
 
     private Stmt functionDeclaration() {
         Token returnType = consume(TokenType.Identifier, "Expected return type.");

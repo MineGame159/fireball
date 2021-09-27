@@ -100,6 +100,9 @@ public class Checker extends AstPass {
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
 
+    @Override
+    public void visitStructStmt(Stmt.Struct stmt) {}
+
     // Expressions
 
     @Override

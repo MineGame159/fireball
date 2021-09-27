@@ -7,12 +7,15 @@ import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.parser.Token;
 import minegame159.fireball.types.PrimitiveTypes;
+import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
 import java.util.*;
 
 public class Context {
     private final Map<String, Type> types = new HashMap<>();
+
+    private final Map<String, Struct> structs = new HashMap<>();
     private final Map<String, Function> functions = new HashMap<>();
 
     public Context() {
@@ -25,6 +28,12 @@ public class Context {
 
     public Type getType(Token name) {
         return types.get(name.lexeme());
+    }
+
+    // Structs
+
+    public Collection<Struct> getStructs() {
+        return structs.values();
     }
 
     // Functions
@@ -41,6 +50,14 @@ public class Context {
 
     public List<Error> apply(Parser.Result result) {
         List<Error> errors = new ArrayList<>();
+
+        // Structs
+        for (Stmt.Struct stmt : result.structs) {
+            Struct struct = new Struct(stmt.name);
+
+            types.put(stmt.name.lexeme(), new StructType(stmt.name.lexeme(), struct));
+            structs.put(stmt.name.lexeme(), struct);
+        }
 
         // Functions
         for (Stmt.Function stmt : result.functions) {

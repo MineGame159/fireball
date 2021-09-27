@@ -17,6 +17,7 @@ public abstract class Stmt {
         void visitFunctionStmt(Function stmt);
         void visitReturnStmt(Return stmt);
         void visitCBlockStmt(CBlock stmt);
+        void visitStructStmt(Struct stmt);
     }
 
     public static class Expression extends Stmt {
@@ -161,6 +162,21 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitCBlockStmt(this);
+        }
+    }
+
+    public static class Struct extends Stmt {
+        public final Token name;
+        public final List<TokenPair> fields;
+
+        public Struct(Token name, List<TokenPair> fields) {
+            this.name = name;
+            this.fields = fields;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitStructStmt(this);
         }
     }
 

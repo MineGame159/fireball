@@ -16,11 +16,19 @@ public class CompilerTest {
     @Test
     public void main() {
         String source = """
+                struct Point {
+                    i32 x;
+                    i32 y;
+                }
+                
                 i32 main() {
+                    // Basic
                     var b = getNumber();
                     b = 6 / 2;
                     
                     print(b);
+                    
+                    // Structs
                     
                     return 0;
                 }
@@ -29,10 +37,12 @@ public class CompilerTest {
                     return 8;
                 }
                 
+                void printPoint(Point p) {
+                    c{ printf("[%d, %d]", p.x, p.y); }
+                }
+                
                 void print(i32 number) {
-                    c{
-                        printf("%d", number);
-                    }
+                    c{ printf("%d", number); }
                 }
                 """;
 
