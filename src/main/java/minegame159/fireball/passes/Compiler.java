@@ -287,6 +287,19 @@ public class Compiler extends AstPass {
         w.write(')');
     }
 
+    @Override
+    public void visitGetExpr(Expr.Get expr) {
+        acceptE(expr.object);
+        w.write('.').write(expr.name.lexeme());
+    }
+
+    @Override
+    public void visitSetExpr(Expr.Set expr) {
+        acceptE(expr.object);
+        w.write('.').write(expr.name.lexeme()).write(" = ");
+        acceptE(expr.value);
+    }
+
     // Accept
 
 

@@ -5,6 +5,7 @@ import minegame159.fireball.Errors;
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
 import minegame159.fireball.parser.*;
+import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
 import java.util.*;
@@ -61,7 +62,7 @@ public class Checker extends AstPass {
 
         declare(stmt.name, type);
         acceptE(stmt.initializer);
-        if (stmt.initializer != null) define(stmt.name);
+        if (stmt.initializer != null || context.getType(stmt.type) instanceof StructType) define(stmt.name);
     }
 
     @Override
@@ -200,6 +201,19 @@ public class Checker extends AstPass {
 
         acceptE(expr.callee);
         acceptE(expr.arguments);
+    }
+
+    @Override
+    public void visitGetExpr(Expr.Get expr) {
+        acceptE(expr.object);
+    }
+
+    @Override
+    public void visitSetExpr(Expr.Set expr) {
+        acceptE(expr.object);
+        acceptE(expr.value);
+
+        if (!expr.getType().equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
     }
 
     // Scope

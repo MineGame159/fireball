@@ -2,10 +2,15 @@ package minegame159.fireball.passes;
 
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
-import minegame159.fireball.TokenPair;
 import minegame159.fireball.context.Context;
+import minegame159.fireball.context.Field;
 import minegame159.fireball.context.Function;
-import minegame159.fireball.parser.*;
+import minegame159.fireball.context.Struct;
+import minegame159.fireball.parser.Expr;
+import minegame159.fireball.parser.Parser;
+import minegame159.fireball.parser.Stmt;
+import minegame159.fireball.parser.Token;
+import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
 import java.util.*;
@@ -86,16 +91,7 @@ public class TypeResolver extends AstPass {
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
 
     @Override
-    public void visitStructStmt(Stmt.Struct stmt) {
-        Set<String> fieldNames = new HashSet<>(stmt.fields.size());
-
-        for (TokenPair field : stmt.fields) {
-            if (context.getType(field.first()) == null) errors.add(Errors.unknownType(field.first(), field.first()));
-
-            if (fieldNames.contains(field.second().lexeme())) errors.add(Errors.duplicateField(field.second()));
-            else fieldNames.add(field.second().lexeme());
-        }
-    }
+    public void visitStructStmt(Stmt.Struct stmt) {}
 
     // Expressions
 
@@ -157,7 +153,35 @@ public class TypeResolver extends AstPass {
         acceptE(expr.arguments);
     }
 
+    @Override
+    public void visitGetExpr(Expr.Get expr) {
+        acceptE(expr.object);
+
+        expr.type = resolveFieldType(expr.object, expr.name);
+    }
+
+    @Override
+    public void visitSetExpr(Expr.Set expr) {
+        acceptE(expr.object);
+        acceptE(expr.value);
+
+        expr.type = resolveFieldType(expr.object, expr.name);
+    }
+
     // Utils
+
+    private Type resolveFieldType(Expr object, Token name) {
+        if (!(object.getType() instanceof StructType)) errors.add(Errors.invalidFieldTarget(name));
+        else {
+            Struct struct = ((StructType) object.getType()).struct;
+            Field field = struct.getField(name);
+
+            if (field == null) errors.add(Errors.unknownField(struct.name(), name));
+            else return field.type();
+        }
+
+        return null;
+    }
 
     private Type resolveType(Token name) {
         Type type = getLocalType(name);

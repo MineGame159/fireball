@@ -30,7 +30,9 @@ public class CompilerTest {
                     
                     // Structs
                     Point p;
-                    //printPoint(p);
+                    p.x = 6;
+                    p.y = 9;
+                    print2(p.x, p.y);
                     
                     return 0;
                 }
@@ -39,8 +41,8 @@ public class CompilerTest {
                     return 8;
                 }
                 
-                void printPoint(Point p) {
-                    c{ printf("[%d, %d]\n", p.x, p.y); }
+                void print2(i32 x, i32 y) {
+                    c{ printf("[%d, %d]\n", x, y); }
                 }
                 
                 void print(i32 number) {

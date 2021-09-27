@@ -22,6 +22,8 @@ public abstract class Expr {
         void visitVariableExpr(Variable expr);
         void visitAssignExpr(Assign expr);
         void visitCallExpr(Call expr);
+        void visitGetExpr(Get expr);
+        void visitSetExpr(Set expr);
     }
 
     public static class Null extends Expr {
@@ -285,6 +287,50 @@ public abstract class Expr {
         @Override
         public Type getType() {
             return callee.getType();
+        }
+    }
+
+    public static class Get extends Expr {
+        public final Expr object;
+        public final Token name;
+        public Type type;
+
+        public Get(Expr object, Token name) {
+            this.object = object;
+            this.name = name;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitGetExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return type;
+        }
+    }
+
+    public static class Set extends Expr {
+        public final Expr object;
+        public final Token name;
+        public final Expr value;
+        public Type type;
+
+        public Set(Expr object, Token name, Expr value) {
+            this.object = object;
+            this.name = name;
+            this.value = value;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitSetExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return type;
         }
     }
 

@@ -38,14 +38,24 @@ public class Errors {
         return new Error(token, "Wrong number of arguments, expected " + expected + " but got " + got + ".");
     }
 
+    // Structs
+
+    public static Error duplicateField(Token name) {
+        return new Error(name, "Duplicate field '" + name + "'.");
+    }
+
+    public static Error invalidFieldTarget(Token token) {
+        return new Error(token, "Can only use fields on structs.");
+    }
+
+    public static Error unknownField(Token struct, Token field) {
+        return new Error(field, "Struct '" + struct + "' does not contain field '" + field + "'.");
+    }
+
     // Other
 
     public static Error wrongOperands(Token token, String operation, String expected, boolean plural) {
         if (plural) return new Error(token, "Operands of " + operation + " operation must be " + expected + "s.");
         return new Error(token, "Operand of " + operation + " operation must be " + expected + ".");
-    }
-
-    public static Error duplicateField(Token name) {
-        return new Error(name, "Duplicate field '" + name + "'.");
     }
 }

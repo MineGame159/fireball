@@ -53,10 +53,25 @@ public class Context {
 
         // Structs
         for (Stmt.Struct stmt : result.structs) {
-            Struct struct = new Struct(stmt.name);
+            Struct struct = new Struct(stmt.name, new ArrayList<>(stmt.fields.size()));
 
             types.put(stmt.name.lexeme(), new StructType(stmt.name.lexeme(), struct));
             structs.put(stmt.name.lexeme(), struct);
+        }
+
+        for (Stmt.Struct stmt : result.structs) {
+            Struct struct = structs.get(stmt.name.lexeme());
+            Set<String> fieldNames = new HashSet<>(stmt.fields.size());
+
+            for (TokenPair field : stmt.fields) {
+                Type fieldType = getType(field.first());
+                if (fieldType == null) errors.add(Errors.unknownType(field.first(), field.first()));
+
+                if (fieldNames.contains(field.second().lexeme())) errors.add(Errors.duplicateField(field.second()));
+                else fieldNames.add(field.second().lexeme());
+
+                struct.fields().add(new Field(fieldType, field.second()));
+            }
         }
 
         // Functions
