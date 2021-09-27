@@ -1,4 +1,11 @@
-package minegame159.fireball;
+package minegame159.fireball.passes;
+
+import minegame159.fireball.TokenPair;
+import minegame159.fireball.context.Context;
+import minegame159.fireball.context.Function;
+import minegame159.fireball.parser.Expr;
+import minegame159.fireball.parser.Parser;
+import minegame159.fireball.parser.Stmt;
 
 import java.io.Writer;
 import java.util.List;
@@ -7,12 +14,16 @@ public class Compiler extends AstPass {
     private final Context context;
     private final CompilerWriter w;
 
-    public Compiler(Context context, Writer writer) {
+    private Compiler(Context context, Writer writer) {
         this.context = context;
         this.w = new CompilerWriter(writer);
     }
 
-    public void compile(List<Stmt> stmts) {
+    public static void compile(Parser.Result result, Context context, Writer writer) {
+        new Compiler(context, writer).compile(result.stmts);
+    }
+
+    private void compile(List<Stmt> stmts) {
         // Standard library
         w.writeln("\n// Standard library\n");
         w.writeln("#include <stdbool.h>");
@@ -79,7 +90,7 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitVariableStmt(Stmt.Variable stmt) {
-        w.write(stmt.type.lexeme()).write(' ').write(stmt.name.lexeme());
+        w.write(stmt.getType(context).name).write(' ').write(stmt.name.lexeme());
 
         if (stmt.initializer != null) {
             w.write(" = ");

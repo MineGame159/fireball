@@ -1,33 +1,47 @@
-package minegame159.fireball;
+package minegame159.fireball.parser;
+
+import minegame159.fireball.Error;
+import minegame159.fireball.TokenPair;
 
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Parser {
-    public final List<Stmt> stmts = new ArrayList<>();
-    public final List<Error> errors = new ArrayList<>();
+    public static class Result {
+        public final List<Stmt> stmts = new ArrayList<>();
+        public final List<Stmt.Function> functions = new ArrayList<>();
 
-    private final Context context;
+        public Error error;
+
+        private Result() {}
+    }
+
+    private final Result result = new Result();
+
     private final Scanner scanner;
     private Token next, current, previous;
 
-    public Parser(Context context, Reader reader) {
-        this.context = context;
+    private Parser(Reader reader) {
         this.scanner = new Scanner(reader);
 
         advance();
         advance();
     }
 
-    public void parse() {
-        while (peek().type() != TokenType.Eof) {
-            try {
-                stmts.add(functionDeclaration());
-            } catch (Error error) {
-                errors.add(error);
-                synchronize();
+    public static Result parse(Reader reader) {
+        Parser parser = new Parser(reader);
+        parser.parse();
+        return parser.result;
+    }
+
+    private void parse() {
+        try {
+            while (peek().type() != TokenType.Eof) {
+                result.stmts.add(functionDeclaration());
             }
+        } catch (Error error) {
+            result.error = error;
         }
     }
 
@@ -51,8 +65,9 @@ public class Parser {
 
         Stmt body = statement();
 
-        context.declareFunction(name, returnType, parameters);
-        return new Stmt.Function(returnType, name, parameters, body);
+        Stmt.Function function = new Stmt.Function(returnType, name, parameters, body);
+        result.functions.add(function);
+        return function;
     }
 
     private Stmt declaration() {
@@ -65,10 +80,10 @@ public class Parser {
         Token type = previous();
         Token name = advance();
 
-        Expr initializer = null;
-        if (match(TokenType.Equal)) initializer = expression();
+        consume(TokenType.Equal, "Expected '=' after variable declaration.");
+        Expr initializer = expression();
 
-        consume(TokenType.Semicolon, "Expected ';' after variable declaration.");
+        consume(TokenType.Semicolon, "Expected ';' after variable initializer.");
         return new Stmt.Variable(type, name, initializer);
     }
 
@@ -357,22 +372,6 @@ public class Parser {
 
     private Token previous() {
         return previous;
-    }
-
-    private void synchronize() {
-        advance();
-
-        while (!isAtEnd()) {
-            if (previous().type() == TokenType.Semicolon) return;
-
-            switch (peek().type()) {
-                case If, While, For -> {
-                    return;
-                }
-            }
-
-            advance();
-        }
     }
 
     private Error error(Token token, String message) {

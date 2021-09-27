@@ -1,5 +1,11 @@
-package minegame159.fireball;
+package minegame159.fireball.context;
 
+import minegame159.fireball.Error;
+import minegame159.fireball.Errors;
+import minegame159.fireball.TokenPair;
+import minegame159.fireball.parser.Parser;
+import minegame159.fireball.parser.Stmt;
+import minegame159.fireball.parser.Token;
 import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.Type;
 
@@ -8,8 +14,6 @@ import java.util.*;
 public class Context {
     private final Map<String, Type> types = new HashMap<>();
     private final Map<String, Function> functions = new HashMap<>();
-
-    private final List<FunctionPrototype> functionPrototypes = new ArrayList<>();
 
     public Context() {
         for (PrimitiveTypes type : PrimitiveTypes.values()) types.put(type.type.name, type.type);
@@ -25,10 +29,6 @@ public class Context {
 
     // Functions
 
-    public void declareFunction(Token name, Token returnType, List<TokenPair> params) {
-        functionPrototypes.add(new FunctionPrototype(name, returnType, params));
-    }
-
     public Function getFunction(Token name) {
         return functions.get(name.lexeme());
     }
@@ -37,27 +37,27 @@ public class Context {
         return functions.values();
     }
 
-    // Type resolver
+    // Apply
 
-    public List<Error> resolveTypes() {
+    public List<Error> apply(Parser.Result result) {
         List<Error> errors = new ArrayList<>();
 
         // Functions
-        for (FunctionPrototype prototype : functionPrototypes) {
+        for (Stmt.Function stmt : result.functions) {
             // Return type
-            Type returnType = getType(prototype.returnType);
+            Type returnType = getType(stmt.returnType);
             if (returnType == null) {
-                errors.add(new Error(prototype.returnType, "Unknown type '" + prototype.returnType + "'."));
+                errors.add(Errors.unknownType(stmt.returnType, stmt.returnType));
                 continue;
             }
 
             // Parameters
             List<Function.Param> params = new ArrayList<>();
 
-            for (TokenPair param : prototype.params) {
+            for (TokenPair param : stmt.params) {
                 Type type = getType(param.first());
                 if (type == null) {
-                    errors.add(new Error(param.first(), "Unknown type '" + prototype.returnType + "'."));
+                    errors.add(Errors.unknownType(param.first(), stmt.returnType));
                     continue;
                 }
 
@@ -65,10 +65,9 @@ public class Context {
             }
 
             // Create
-            functions.put(prototype.name.lexeme(), new Function(prototype.name, returnType, params));
+            functions.put(stmt.name.lexeme(), new Function(stmt.name, returnType, params));
         }
 
-        functionPrototypes.clear();
         return errors;
     }
 }

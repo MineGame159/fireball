@@ -1,26 +1,29 @@
-package minegame159.fireball;
+package minegame159.fireball.passes;
 
+import minegame159.fireball.Error;
+import minegame159.fireball.Errors;
+import minegame159.fireball.context.Context;
+import minegame159.fireball.context.Function;
+import minegame159.fireball.parser.*;
 import minegame159.fireball.types.Type;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 
 public class TypeResolver extends AstPass {
-    public List<Error> errors;
+    private final List<Error> errors = new ArrayList<>();
 
     private final Context context;
 
     private final Stack<Map<String, Type>> scopes = new Stack<>();
 
-    public TypeResolver(Context context) {
+    private TypeResolver(Context context) {
         this.context = context;
     }
 
-    public void resolve(List<Stmt> stmts) {
-        errors = context.resolveTypes();
-        acceptS(stmts);
+    public static List<Error> resolve(Parser.Result result, Context context) {
+        TypeResolver resolver = new TypeResolver(context);
+        resolver.acceptS(result.stmts);
+        return resolver.errors;
     }
 
     // Statements
@@ -39,11 +42,12 @@ public class TypeResolver extends AstPass {
 
     @Override
     public void visitVariableStmt(Stmt.Variable stmt) {
-        if (stmt.type.type() == TokenType.Var) throw new RuntimeException("Automatic type detection for variables is not supported."); // TODO
-
-        scopes.peek().put(stmt.name.lexeme(), context.getType(stmt.type));
-
         acceptE(stmt.initializer);
+
+        Type type = stmt.getType(context);
+        if (type == null) errors.add(Errors.unknownType(stmt.type, stmt.type));
+
+        scopes.peek().put(stmt.name.lexeme(), type);
     }
 
     @Override
@@ -148,6 +152,10 @@ public class TypeResolver extends AstPass {
         if (type == null) {
             Function function = context.getFunction(name);
             if (function != null) type = function.returnType();
+        }
+
+        if (type == null) {
+            errors.add(Errors.couldNotGetType(name));
         }
 
         return type;

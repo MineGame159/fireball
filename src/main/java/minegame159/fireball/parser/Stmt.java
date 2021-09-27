@@ -1,9 +1,13 @@
-package minegame159.fireball;
+package minegame159.fireball.parser;
+
+import minegame159.fireball.TokenPair;
+import minegame159.fireball.context.Context;
+import minegame159.fireball.types.Type;
 
 import java.util.List;
 
 public abstract class Stmt {
-    interface Visitor {
+    public interface Visitor {
         void visitExpressionStmt(Expression stmt);
         void visitBlockStmt(Block stmt);
         void visitVariableStmt(Variable stmt);
@@ -55,6 +59,10 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitVariableStmt(this);
+        }
+
+        public Type getType(Context context) {
+            return type.type() == TokenType.Var ? initializer.getType() : context.getType(type);
         }
     }
 

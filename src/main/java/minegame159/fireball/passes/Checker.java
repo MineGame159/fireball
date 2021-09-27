@@ -1,5 +1,10 @@
-package minegame159.fireball;
+package minegame159.fireball.passes;
 
+import minegame159.fireball.Error;
+import minegame159.fireball.Errors;
+import minegame159.fireball.context.Context;
+import minegame159.fireball.context.Function;
+import minegame159.fireball.parser.*;
 import minegame159.fireball.types.Type;
 
 import java.util.*;
@@ -14,19 +19,21 @@ public class Checker extends AstPass {
         }
     }
 
-    public final List<Error> errors = new ArrayList<>();
+    private final List<Error> errors = new ArrayList<>();
 
     private final Context context;
 
     private final Stack<Map<String, Variable>> scopes = new Stack<>();
     private Function currentFunction;
 
-    public Checker(Context context) {
+    private Checker(Context context) {
         this.context = context;
     }
 
-    public void check(List<Stmt> stmts) {
-        acceptS(stmts);
+    public static List<Error> check(Parser.Result result, Context context) {
+        Checker checker = new Checker(context);
+        checker.acceptS(result.stmts);
+        return checker.errors;
     }
 
     // Statements
@@ -45,12 +52,9 @@ public class Checker extends AstPass {
 
     @Override
     public void visitVariableStmt(Stmt.Variable stmt) {
-        Type type = context.getType(stmt.type);
-        if (type == null) errors.add(new Error(stmt.type, "Unknown type '" + stmt.type.lexeme() + "'."));
-        else {
-            Type valueType = stmt.initializer.getType();
-            if (!type.equals(valueType)) errors.add(new Error(stmt.name, "Mismatched type, expected '" + type + "' but got '" + valueType + "'."));
-        }
+        Type type = stmt.getType(context);
+        Type valueType = stmt.initializer.getType();
+        if (!type.equals(valueType)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
 
         declare(stmt.name, type);
         acceptE(stmt.initializer);
@@ -88,7 +92,7 @@ public class Checker extends AstPass {
     @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         Type valueType = stmt.value.getType();
-        if (!currentFunction.returnType().equals(valueType)) errors.add(new Error(stmt.token, "Mismatched type, expected '" + currentFunction.returnType() + "' but got '" + valueType + "'."));
+        if (!currentFunction.returnType().equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType(), valueType));
 
         acceptE(stmt.value);
     }
@@ -123,7 +127,7 @@ public class Checker extends AstPass {
 
     @Override
     public void visitBinaryExpr(Expr.Binary expr) {
-        if (!expr.left.getType().isNumber() || !expr.right.getType().isNumber()) errors.add(new Error(expr.operator, "Operands of binary operations must be numbers."));
+        if (!expr.left.getType().isNumber() || !expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "binary", "number", true));
 
         acceptE(expr.left);
         acceptE(expr.right);
@@ -132,10 +136,10 @@ public class Checker extends AstPass {
     @Override
     public void visitUnaryExpr(Expr.Unary expr) {
         if (expr.operator.type() == TokenType.Bang) {
-            if (!expr.right.getType().isBool()) errors.add(new Error(expr.operator, "Operand of invert operation must be a boolean."));
+            if (!expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "invert", "boolean", false));
         }
         else if (expr.operator.type() == TokenType.Minus) {
-            if (!expr.right.getType().isNumber()) errors.add(new Error(expr.operator, "Operand of negate operation must be a number."));
+            if (!expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "negate", "number", false));
         }
 
         acceptE(expr.right);
@@ -143,7 +147,7 @@ public class Checker extends AstPass {
 
     @Override
     public void visitLogicalExpr(Expr.Logical expr) {
-        if (!expr.left.getType().isBool() || !expr.right.getType().isBool()) errors.add(new Error(expr.operator, "Operands of logical operations must be booleans."));
+        if (!expr.left.getType().isBool() || !expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "logical", "boolean", true));
 
         acceptE(expr.left);
         acceptE(expr.right);
@@ -154,35 +158,35 @@ public class Checker extends AstPass {
         Variable var = getLocal(expr.name);
 
         if (var == null) {
-            if (context.getFunction(expr.name) == null) errors.add(new Error(expr.name, "Undeclared identifier '" + expr.name.lexeme() + "'."));
+            if (context.getFunction(expr.name) == null) errors.add(Errors.undeclared(expr.name));
         }
-        else if (!var.defined) errors.add(new Error(expr.name, "Undefined variable '" + expr.name.lexeme() + "'."));
+        else if (!var.defined) errors.add(Errors.undefined(expr.name));
     }
 
     @Override
     public void visitAssignExpr(Expr.Assign expr) {
         Variable var = getLocal(expr.name);
 
-        if (var == null) errors.add(new Error(expr.name, "Undeclared identifier '" + expr.name.lexeme() + "'."));
-        else if (!var.type.equals(expr.value.getType())) errors.add(new Error(expr.name, "Mismatched type, expected '" + var.type + "' but got '" + expr.value.getType() + "'."));
+        if (var == null) errors.add(Errors.undeclared(expr.name));
+        else if (!var.type.equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, var.type, expr.value.getType()));
 
         acceptE(expr.value);
     }
 
     @Override
     public void visitCallExpr(Expr.Call expr) {
-        if (!(expr.callee instanceof Expr.Variable)) errors.add(new Error(expr.token, "Invalid call target."));
+        if (!(expr.callee instanceof Expr.Variable)) errors.add(Errors.invalidCallTarget(expr.token));
         else {
             Function function = context.getFunction(((Expr.Variable) expr.callee).name);
 
             if (function != null) {
-                if (function.params().size() != expr.arguments.size()) errors.add(new Error(expr.token, "Invalid number of arguments, expected " + function.params().size() + " but got " + expr.arguments.size() + "."));
+                if (function.params().size() != expr.arguments.size()) errors.add(Errors.wrongArgumentCount(expr.token, function.params().size(), expr.arguments.size()));
                 else {
                     for (int i = 0; i < function.params().size(); i++) {
                         Function.Param param = function.params().get(i);
 
                         Type argType = expr.arguments.get(i).getType();
-                        if (!param.type().equals(argType)) errors.add(new Error(expr.token, "Mismatched type, expected '" + param.type() + "' but got '" + argType + "'."));
+                        if (!param.type().equals(argType)) errors.add(Errors.mismatchedType(expr.token, param.type(), argType));
                     }
                 }
             }

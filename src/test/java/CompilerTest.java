@@ -1,6 +1,9 @@
-import minegame159.fireball.Compiler;
 import minegame159.fireball.Error;
-import minegame159.fireball.*;
+import minegame159.fireball.context.Context;
+import minegame159.fireball.parser.Parser;
+import minegame159.fireball.passes.Checker;
+import minegame159.fireball.passes.Compiler;
+import minegame159.fireball.passes.TypeResolver;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -14,7 +17,7 @@ public class CompilerTest {
     public void main() {
         String source = """
                 i32 main() {
-                    i32 b = getNumber();
+                    var b = getNumber();
                     b = 6 / 2;
                     
                     print(b);
@@ -33,33 +36,24 @@ public class CompilerTest {
                 }
                 """;
 
-        Context context = new Context();
-
         // Parse
-        Parser parser = new Parser(context, new StringReader(source));
-        parser.parse();
-
-        Assert.assertTrue(reportErrors(parser.errors));
+        Parser.Result result = Parser.parse(new StringReader(source));
+        Assert.assertTrue(reportErrors(result.error));
 
         // Resolve types
-        TypeResolver typeResolver = new TypeResolver(context);
-        typeResolver.resolve(parser.stmts);
+        Context context = new Context();
 
-        Assert.assertTrue(reportErrors(typeResolver.errors));
+        Assert.assertTrue(reportErrors(context.apply(result)));
+        Assert.assertTrue(reportErrors(TypeResolver.resolve(result, context)));
 
         // Check
-        Checker checker = new Checker(context);
-        checker.check(parser.stmts);
-
-        Assert.assertTrue(reportErrors(checker.errors));
+        Assert.assertTrue(reportErrors(Checker.check(result, context)));
 
         // Compile
         try {
-            Compiler compiler = new Compiler(context, new FileWriter("out/test.c"));
-            compiler.compile(parser.stmts);
+            Compiler.compile(result, context, new FileWriter("out/test.c"));
         } catch (IOException e) {
             e.printStackTrace();
-            Assert.fail();
         }
 
         // Run
@@ -72,10 +66,14 @@ public class CompilerTest {
         }
     }
 
+    private boolean reportErrors(Error error) {
+        if (error != null) System.out.println(error);
+
+        return error == null;
+    }
+
     private boolean reportErrors(List<Error> errors) {
-        for (Error error : errors) {
-            System.out.printf("Error [line %d]: %s%n", error.token.line(), error.getMessage());
-        }
+        for (Error error : errors) System.out.println(error);
 
         return errors.isEmpty();
     }

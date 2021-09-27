@@ -1,4 +1,4 @@
-package minegame159.fireball;
+package minegame159.fireball.parser;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -8,7 +8,7 @@ public class Scanner {
     private final StringBuilder sb = new StringBuilder();
 
     private char current, next;
-    private int line = 1;
+    private int line = 1, character, firstTokenCharacter;
 
     public Scanner(Reader reader) {
         this.reader = reader;
@@ -23,7 +23,9 @@ public class Scanner {
         skipWhitespace();
         if (isAtEnd()) return token(TokenType.Eof);
 
+        firstTokenCharacter = character;
         char c = advance();
+
         if (isTwice(c, '&')) return token(TokenType.And);
         if (isTwice(c, '|')) return token(TokenType.Or);
         if (c == 'c' && peek() == '{') {
@@ -85,7 +87,7 @@ public class Scanner {
 
     private Token string() {
         while (peek() != '"' && !isAtEnd()) {
-            if (peek() == '\n') line++;
+            if (peek() == '\n') incrementLine();
             advance();
         }
 
@@ -153,6 +155,7 @@ public class Scanner {
             e.printStackTrace();
         }
 
+        if (prev != '\0' && prev != '\n') character++;
         return prev;
     }
 
@@ -175,7 +178,7 @@ public class Scanner {
             switch (c) {
                 case ' ', '\r', '\t' -> advance(false);
                 case '\n' -> {
-                    line++;
+                    incrementLine();
                     advance(false);
                 }
                 case '/' -> {
@@ -199,11 +202,16 @@ public class Scanner {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
     }
 
+    private void incrementLine() {
+        line++;
+        character = 0;
+    }
+
     private Token token(TokenType type) {
-        return new Token(type, sb.toString(), line);
+        return new Token(type, sb.toString(), line, firstTokenCharacter);
     }
 
     private Token error(String msg) {
-        return new Token(TokenType.Error, msg, line);
+        return new Token(TokenType.Error, msg, line, firstTokenCharacter);
     }
 }

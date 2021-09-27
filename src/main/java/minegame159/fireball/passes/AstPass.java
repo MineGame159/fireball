@@ -1,4 +1,7 @@
-package minegame159.fireball;
+package minegame159.fireball.passes;
+
+import minegame159.fireball.parser.Expr;
+import minegame159.fireball.parser.Stmt;
 
 import java.util.List;
 

@@ -1,6 +1,6 @@
-import minegame159.fireball.Scanner;
-import minegame159.fireball.Token;
-import minegame159.fireball.TokenType;
+import minegame159.fireball.parser.Scanner;
+import minegame159.fireball.parser.Token;
+import minegame159.fireball.parser.TokenType;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -14,7 +14,7 @@ public class LexerTest {
 
         Token token;
         while ((token = scanner.next()).type() != TokenType.Eof) {
-            System.out.printf("%s '%s' %d%n", token.type(), token.lexeme(), token.line());
+            System.out.printf("%s '%s' %d:%d%n", token.type(), token.lexeme(), token.line(), token.character());
             if (token.type() == TokenType.Error) Assert.fail();
         }
     }

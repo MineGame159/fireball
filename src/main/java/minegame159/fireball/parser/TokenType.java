@@ -1,4 +1,4 @@
-package minegame159.fireball;
+package minegame159.fireball.parser;
 
 public enum TokenType {
     // Single-character tokens

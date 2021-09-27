@@ -1,4 +1,4 @@
-package minegame159.fireball;
+package minegame159.fireball.passes;
 
 import java.io.IOException;
 import java.io.Writer;

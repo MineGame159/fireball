@@ -1,5 +1,6 @@
-package minegame159.fireball;
+package minegame159.fireball.context;
 
+import minegame159.fireball.parser.Token;
 import minegame159.fireball.types.Type;
 
 import java.util.List;
