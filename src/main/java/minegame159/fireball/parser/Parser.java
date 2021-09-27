@@ -182,15 +182,7 @@ public class Parser {
     }
 
     private Stmt cBlockStatement() {
-        StringBuilder sb = new StringBuilder();
-
-        while (!check(TokenType.RightBrace) && !isAtEnd()) {
-            Token token = advance();
-            sb.append(token.type() == TokenType.String ? token.lexeme().replace("\n", "\\n") : token.lexeme());
-        }
-
-        consume(TokenType.RightBrace, "Expected '}' after C block.");
-        return new Stmt.CBlock(sb.toString());
+        return new Stmt.CBlock(previous().lexeme().replace("\n", "\\n"));
     }
 
     private Stmt expressionStatement() {

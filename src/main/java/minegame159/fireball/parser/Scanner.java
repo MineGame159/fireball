@@ -29,8 +29,8 @@ public class Scanner {
         char c = advance();
 
         if (c == 'c' && peek() == '{') {
-            advance();
-            return token(TokenType.CBlock);
+            advance(false);
+            return cBlock();
         }
         if (isDigit(c)) return number();
         if (isAlpha(c)) return identifier();
@@ -63,6 +63,35 @@ public class Scanner {
 
             default -> error("Unexpected character");
         };
+    }
+
+    private Token cBlock() {
+        boolean countTrimStart = true;
+        int trimStart = 0;
+
+        while (peek() != '}' && !isAtEnd()) {
+            if (countTrimStart) {
+                if (isMeaninglessWhitespace(peek())) trimStart++;
+                else countTrimStart = false;
+            }
+
+            if (peek() == '\n') line++;
+            advance();
+        }
+
+        if (isAtEnd()) return error("Unterminated C block.");
+
+        advance(false);
+        sb.delete(0, trimStart + 1);
+
+        int trimEnd = 0;
+        for (int i = sb.length() - 1; i >= 0; i--) {
+            if (isMeaninglessWhitespace(sb.charAt(i))) trimEnd++;
+            else break;
+        }
+        sb.delete(sb.length() - trimEnd, sb.length() + trimEnd);
+
+        return new Token(TokenType.CBlock, sb.toString(), line, firstTokenCharacter);
     }
 
     private Token number() {
@@ -169,12 +198,18 @@ public class Scanner {
         return peek() == '\0';
     }
 
+    private boolean isMeaninglessWhitespace(char c) {
+        return c == ' ' || c == '\r' || c == '\t';
+    }
+
     private void skipWhitespace() {
         while (true) {
-            char c = peek();
+            if (isMeaninglessWhitespace(peek())) {
+                advance(false);
+                continue;
+            }
 
-            switch (c) {
-                case ' ', '\r', '\t' -> advance(false);
+            switch (peek()) {
                 case '\n' -> {
                     incrementLine();
                     advance(false);
