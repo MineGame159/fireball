@@ -44,4 +44,8 @@ public class Errors {
         if (plural) return new Error(token, "Operands of " + operation + " operation must be " + expected + "s.");
         return new Error(token, "Operand of " + operation + " operation must be " + expected + ".");
     }
+
+    public static Error duplicateField(Token name) {
+        return new Error(name, "Duplicate field '" + name + "'.");
+    }
 }

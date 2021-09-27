@@ -2,6 +2,7 @@ package minegame159.fireball.passes;
 
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
+import minegame159.fireball.TokenPair;
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
 import minegame159.fireball.parser.*;
@@ -85,7 +86,16 @@ public class TypeResolver extends AstPass {
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
 
     @Override
-    public void visitStructStmt(Stmt.Struct stmt) {}
+    public void visitStructStmt(Stmt.Struct stmt) {
+        Set<String> fieldNames = new HashSet<>(stmt.fields.size());
+
+        for (TokenPair field : stmt.fields) {
+            if (context.getType(field.first()) == null) errors.add(Errors.unknownType(field.first(), field.first()));
+
+            if (fieldNames.contains(field.second().lexeme())) errors.add(Errors.duplicateField(field.second()));
+            else fieldNames.add(field.second().lexeme());
+        }
+    }
 
     // Expressions
 
