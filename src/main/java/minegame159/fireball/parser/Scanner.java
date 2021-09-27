@@ -26,8 +26,6 @@ public class Scanner {
         firstTokenCharacter = character;
         char c = advance();
 
-        if (isTwice(c, '&')) return token(TokenType.And);
-        if (isTwice(c, '|')) return token(TokenType.Or);
         if (c == 'c' && peek() == '{') {
             advance();
             return token(TokenType.CBlock);
@@ -56,19 +54,13 @@ public class Scanner {
             case '/' -> token(match('=') ? TokenType.SlashEqual : TokenType.Slash);
             case '%' -> token(match('=') ? TokenType.PercentageEqual : TokenType.Percentage);
 
+            case '&' -> token(match('&') ? TokenType.And : TokenType.Ampersand);
+            case '|' -> token(match('|') ? TokenType.Or : TokenType.Pipe);
+
             case '"' -> string();
 
             default -> error("Unexpected character");
         };
-    }
-
-    private boolean isTwice(char current, char c) {
-        if (current == c && peek() == c) {
-            advance();
-            return true;
-        }
-
-        return false;
     }
 
     private Token number() {

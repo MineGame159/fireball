@@ -17,7 +17,8 @@ public enum TokenType {
     Slash, SlashEqual,
     Percentage, PercentageEqual,
 
-    And, Or,
+    Ampersand, And,
+    Pipe, Or,
 
     // Literals
     Null, Int, Float, String, Identifier,
