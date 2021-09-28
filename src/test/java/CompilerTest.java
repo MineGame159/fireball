@@ -76,7 +76,7 @@ public class CompilerTest {
 
         // Run
         try {
-            new ProcessBuilder().command("gcc", "-o", "out/test.exe", "out/test.c").inheritIO().start().waitFor();
+            new ProcessBuilder().command("gcc", "-Wall", "-o", "out/test.exe", "out/test.c").inheritIO().start().waitFor();
             new ProcessBuilder().command("out/test.exe").inheritIO().start().waitFor();
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();

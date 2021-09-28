@@ -31,11 +31,6 @@ public class Context {
         return proto.pointer() ? type.pointer() : type;
     }
 
-    @Deprecated
-    public Type getType(Token name) {
-        return types.get(name.lexeme());
-    }
-
     // Structs
 
     public Collection<Struct> getStructs() {

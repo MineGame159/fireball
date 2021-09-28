@@ -6,10 +6,7 @@ import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Field;
 import minegame159.fireball.context.Function;
 import minegame159.fireball.context.Struct;
-import minegame159.fireball.parser.Expr;
-import minegame159.fireball.parser.Parser;
-import minegame159.fireball.parser.Stmt;
-import minegame159.fireball.parser.Token;
+import minegame159.fireball.parser.*;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
 import minegame159.fireball.types.StructType;
@@ -138,6 +135,8 @@ public class TypeResolver extends AstPass {
     @Override
     public void visitUnaryExpr(Expr.Unary expr) {
         acceptE(expr.right);
+
+        if (expr.operator.type() == TokenType.Ampersand && !(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) errors.add(Errors.invalidPointerTarget(expr.operator));
     }
 
     @Override
