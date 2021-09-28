@@ -9,6 +9,7 @@ import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.*;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
+import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -20,7 +21,7 @@ public class TypeResolver extends AstPass {
     private final Context context;
 
     private final Stack<Map<String, Type>> scopes = new Stack<>();
-    private boolean skipBlockScopes;
+    private boolean skipBlockScopes, hasTopLevelReturn;
 
     private TypeResolver(Context context) {
         this.context = context;
@@ -36,6 +37,7 @@ public class TypeResolver extends AstPass {
     public void visitFunctionStart(ProtoFunction proto) {
         scopes.push(new HashMap<>());
         skipBlockScopes = proto.body() instanceof Stmt.Block;
+        hasTopLevelReturn = false;
 
         for (ProtoParameter param : proto.params()) {
             scopes.peek().put(param.name().lexeme(), context.getType(param.type()));
@@ -44,6 +46,8 @@ public class TypeResolver extends AstPass {
 
     @Override
     public void visitFunctionEnd(ProtoFunction proto) {
+        if (!hasTopLevelReturn && context.getType(proto.returnType()) != PrimitiveTypes.Void.type) errors.add(Errors.missingReturn(proto.name()));
+
         scopes.pop();
         skipBlockScopes = false;
     }
@@ -96,6 +100,8 @@ public class TypeResolver extends AstPass {
     @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         acceptE(stmt.value);
+
+        if (scopes.size() <= 1) hasTopLevelReturn = true;
     }
 
     @Override

@@ -28,7 +28,7 @@ public class Errors {
         return new Error(name, "Undefined variable '" + name + "'.");
     }
 
-    // Calls
+    // Functions
 
     public static Error invalidCallTarget(Token token) {
         return new Error(token, "Invalid call target.");
@@ -36,6 +36,10 @@ public class Errors {
 
     public static Error wrongArgumentCount(Token token, int expected, int got) {
         return new Error(token, "Wrong number of arguments, expected " + expected + " but got " + got + ".");
+    }
+
+    public static Error missingReturn(Token function) {
+        return new Error(function, "Function '" + function + "' is missing a top level return statement.");
     }
 
     // Structs
