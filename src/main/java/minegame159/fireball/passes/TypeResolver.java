@@ -10,6 +10,8 @@ import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.parser.Token;
+import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoParameter;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -21,6 +23,7 @@ public class TypeResolver extends AstPass {
     private final Context context;
 
     private final Stack<Map<String, Type>> scopes = new Stack<>();
+    private boolean skipBlockScopes;
 
     private TypeResolver(Context context) {
         this.context = context;
@@ -28,8 +31,24 @@ public class TypeResolver extends AstPass {
 
     public static List<Error> resolve(Parser.Result result, Context context) {
         TypeResolver resolver = new TypeResolver(context);
-        resolver.acceptS(result.stmts);
+        result.accept(resolver);
         return resolver.errors;
+    }
+
+    @Override
+    public void visitFunctionStart(ProtoFunction proto) {
+        scopes.push(new HashMap<>());
+        skipBlockScopes = proto.body() instanceof Stmt.Block;
+
+        for (ProtoParameter param : proto.params()) {
+            scopes.peek().put(param.name().lexeme(), context.getType(param.type()));
+        }
+    }
+
+    @Override
+    public void visitFunctionEnd(ProtoFunction proto) {
+        scopes.pop();
+        skipBlockScopes = false;
     }
 
     // Statements
@@ -41,9 +60,9 @@ public class TypeResolver extends AstPass {
 
     @Override
     public void visitBlockStmt(Stmt.Block stmt) {
-        scopes.push(new HashMap<>());
+        if (!skipBlockScopes) scopes.push(new HashMap<>());
         acceptS(stmt.statements);
-        scopes.pop();
+        if (!skipBlockScopes) scopes.pop();
     }
 
     @Override
@@ -51,7 +70,7 @@ public class TypeResolver extends AstPass {
         acceptE(stmt.initializer);
 
         Type type = stmt.getType(context);
-        if (type == null) errors.add(Errors.unknownType(stmt.type, stmt.type));
+        if (type == null) errors.add(Errors.unknownType(stmt.type.name(), stmt.type.name()));
 
         scopes.peek().put(stmt.name.lexeme(), type);
     }
@@ -78,20 +97,12 @@ public class TypeResolver extends AstPass {
     }
 
     @Override
-    public void visitFunctionStmt(Stmt.Function stmt) {
-        acceptS(stmt.body);
-    }
-
-    @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         acceptE(stmt.value);
     }
 
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
-
-    @Override
-    public void visitStructStmt(Stmt.Struct stmt) {}
 
     // Expressions
 

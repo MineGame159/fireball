@@ -11,6 +11,11 @@ public class StructType extends Type {
     }
 
     @Override
+    protected Type copy() {
+        return new StructType(name, struct);
+    }
+
+    @Override
     public boolean equals(Type type) {
         if (type instanceof StructType t) return this.name.equals(t.name);
         return false;

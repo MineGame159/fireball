@@ -202,7 +202,8 @@ public abstract class Expr {
 
         @Override
         public Type getType() {
-            return right.getType();
+            Type type = right.getType();
+            return operator.type() == TokenType.Ampersand ? type.pointer() : type;
         }
     }
 

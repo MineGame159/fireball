@@ -2,10 +2,12 @@ package minegame159.fireball.context;
 
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
-import minegame159.fireball.TokenPair;
 import minegame159.fireball.parser.Parser;
-import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.parser.Token;
+import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoParameter;
+import minegame159.fireball.parser.prototypes.ProtoStruct;
+import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
@@ -22,10 +24,14 @@ public class Context {
         for (PrimitiveTypes type : PrimitiveTypes.values()) types.put(type.type.name, type.type);
     }
 
-    // General
-
     // Types
 
+    public Type getType(ProtoType proto) {
+        Type type = types.get(proto.name().lexeme());
+        return proto.pointer() ? type.pointer() : type;
+    }
+
+    @Deprecated
     public Type getType(Token name) {
         return types.get(name.lexeme());
     }
@@ -52,52 +58,52 @@ public class Context {
         List<Error> errors = new ArrayList<>();
 
         // Structs
-        for (Stmt.Struct stmt : result.structs) {
-            Struct struct = new Struct(stmt.name, new ArrayList<>(stmt.fields.size()));
+        for (ProtoStruct proto : result.structs) {
+            Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()));
 
-            types.put(stmt.name.lexeme(), new StructType(stmt.name.lexeme(), struct));
-            structs.put(stmt.name.lexeme(), struct);
+            types.put(proto.name().lexeme(), new StructType(proto.name().lexeme(), struct));
+            structs.put(proto.name().lexeme(), struct);
         }
 
-        for (Stmt.Struct stmt : result.structs) {
-            Struct struct = structs.get(stmt.name.lexeme());
-            Set<String> fieldNames = new HashSet<>(stmt.fields.size());
+        for (ProtoStruct proto : result.structs) {
+            Struct struct = structs.get(proto.name().lexeme());
+            Set<String> fieldNames = new HashSet<>(proto.fields().size());
 
-            for (TokenPair field : stmt.fields) {
-                Type fieldType = getType(field.first());
-                if (fieldType == null) errors.add(Errors.unknownType(field.first(), field.first()));
+            for (ProtoParameter field : proto.fields()) {
+                Type fieldType = getType(field.type());
+                if (fieldType == null) errors.add(Errors.unknownType(field.type().name(), field.type().name()));
 
-                if (fieldNames.contains(field.second().lexeme())) errors.add(Errors.duplicateField(field.second()));
-                else fieldNames.add(field.second().lexeme());
+                if (fieldNames.contains(field.name().lexeme())) errors.add(Errors.duplicateField(field.name()));
+                else fieldNames.add(field.name().lexeme());
 
-                struct.fields().add(new Field(fieldType, field.second()));
+                struct.fields().add(new Field(fieldType, field.name()));
             }
         }
 
         // Functions
-        for (Stmt.Function stmt : result.functions) {
+        for (ProtoFunction proto : result.functions) {
             // Return type
-            Type returnType = getType(stmt.returnType);
+            Type returnType = getType(proto.returnType());
             if (returnType == null) {
-                errors.add(Errors.unknownType(stmt.returnType, stmt.returnType));
+                errors.add(Errors.unknownType(proto.returnType().name(), proto.returnType().name()));
                 continue;
             }
 
             // Parameters
             List<Function.Param> params = new ArrayList<>();
 
-            for (TokenPair param : stmt.params) {
-                Type type = getType(param.first());
+            for (ProtoParameter param : proto.params()) {
+                Type type = getType(param.type());
                 if (type == null) {
-                    errors.add(Errors.unknownType(param.first(), stmt.returnType));
+                    errors.add(Errors.unknownType(param.type().name(), proto.returnType().name()));
                     continue;
                 }
 
-                params.add(new Function.Param(type, param.second()));
+                params.add(new Function.Param(type, param.name()));
             }
 
             // Create
-            functions.put(stmt.name.lexeme(), new Function(stmt.name, returnType, params));
+            functions.put(proto.name().lexeme(), new Function(proto.name(), returnType, params));
         }
 
         return errors;

@@ -30,8 +30,7 @@ public class CompilerTest {
                     
                     // Structs
                     Point p;
-                    p.x = 6;
-                    p.y = 9;
+                    modify(&p);
                     print2(p.x, p.y);
                     
                     return 0;
@@ -39,6 +38,11 @@ public class CompilerTest {
                 
                 i32 getNumber() {
                     return 8;
+                }
+                
+                void modify(Point* p) {
+                    p.x = 6;
+                    p.y = 9;
                 }
                 
                 void print2(i32 x, i32 y) {

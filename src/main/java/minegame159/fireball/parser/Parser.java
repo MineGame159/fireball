@@ -1,7 +1,10 @@
 package minegame159.fireball.parser;
 
 import minegame159.fireball.Error;
-import minegame159.fireball.TokenPair;
+import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoParameter;
+import minegame159.fireball.parser.prototypes.ProtoStruct;
+import minegame159.fireball.parser.prototypes.ProtoType;
 
 import java.io.Reader;
 import java.util.ArrayList;
@@ -9,13 +12,17 @@ import java.util.List;
 
 public class Parser {
     public static class Result {
-        public final List<Stmt> stmts = new ArrayList<>();
-        public final List<Stmt.Struct> structs = new ArrayList<>();
-        public final List<Stmt.Function> functions = new ArrayList<>();
+        public final List<ProtoStruct> structs = new ArrayList<>();
+        public final List<ProtoFunction> functions = new ArrayList<>();
 
         public Error error;
 
         private Result() {}
+
+        public void accept(Stmt.Visitor visitor) {
+            for (ProtoStruct struct : structs) struct.accept(visitor);
+            for (ProtoFunction function : functions) function.accept(visitor);
+        }
     }
 
     private final Result result = new Result();
@@ -39,7 +46,7 @@ public class Parser {
     private void parse() {
         try {
             while (peek().type() != TokenType.Eof) {
-                result.stmts.add(topLevelDeclaration());
+                topLevelDeclaration();
             }
         } catch (Error error) {
             result.error = error;
@@ -48,70 +55,62 @@ public class Parser {
 
     // Declaration
 
-    private Stmt topLevelDeclaration() {
-        if (match(TokenType.Struct)) return structDeclaration();
-
-        return functionDeclaration();
+    private void topLevelDeclaration() {
+        if (match(TokenType.Struct)) structDeclaration();
+        else functionDeclaration();
     }
 
-    private Stmt structDeclaration() {
+    private void structDeclaration() {
         Token name = consume(TokenType.Identifier, "Expected struct name.");
 
         consume(TokenType.LeftBrace, "Expected '{' after struct name.");
-        List<TokenPair> fields = new ArrayList<>();
+        List<ProtoParameter> fields = new ArrayList<>();
 
         while (!check(TokenType.RightBrace)) {
-            Token fieldType = consume(TokenType.Identifier, "Expected field type.");
-            Token fieldName = consume(TokenType.Identifier, "Expected field name.");
-
+            fields.add(consumeParameter("field"));
             consume(TokenType.Semicolon, "Expected ';' after field name.");
-            fields.add(new TokenPair(fieldType, fieldName));
         }
 
         consume(TokenType.RightBrace, "Expected '}' after struct body.");
 
-        Stmt.Struct struct = new Stmt.Struct(name, fields);
-        result.structs.add(struct);
-        return struct;
+        result.structs.add(new ProtoStruct(name, fields));
     }
 
-    private Stmt functionDeclaration() {
-        Token returnType = consume(TokenType.Identifier, "Expected return type.");
-        Token name = consume(TokenType.Identifier, "Expected function name.");
+    private void functionDeclaration() {
+        ProtoType returnType = consumeType("return");
+        Token name = consume(TokenType.Identifier, "Expected function name");
 
-        consume(TokenType.LeftParen, "Expected '(' after function name.");
-        List<TokenPair> parameters = new ArrayList<>();
-        if (!check(TokenType.RightParen)) {
-            do {
-                parameters.add(new TokenPair(
-                        consume(TokenType.Identifier, "Expected parameter type."),
-                        consume(TokenType.Identifier, "Expected parameter name.")
-                ));
-            } while (match(TokenType.Comma));
+        consume(TokenType.LeftParen, "Expected '(' after function name");
+        List<ProtoParameter> params = new ArrayList<>();
+
+        boolean first = true;
+        while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
+            params.add(consumeParameter("parameter"));
+            first = false;
         }
-        consume(TokenType.RightParen, "Expected ')' after parameters.");
 
+        consume(TokenType.RightParen, "Expected ')' after function parameters.");
         Stmt body = statement();
 
-        Stmt.Function function = new Stmt.Function(returnType, name, parameters, body);
-        result.functions.add(function);
-        return function;
+        result.functions.add(new ProtoFunction(name, returnType, params, body));
     }
 
     private Stmt declaration() {
-        if (checkNext(TokenType.Identifier) && match(TokenType.Identifier, TokenType.Var)) return variableDeclaration();
+        if (check(TokenType.Var) || (check(TokenType.Identifier) && (checkNext(TokenType.Star) || checkNext(TokenType.Identifier)))) return variableDeclaration();
 
         return statement();
     }
 
     private Stmt variableDeclaration() {
-        Token type = previous();
+        Token type = advance();
+        boolean pointer = match(TokenType.Star);
+
         Token name = advance();
 
         Expr initializer = match(TokenType.Equal) ? expression() : null;
 
         consume(TokenType.Semicolon, "Expected ';' after variable initializer.");
-        return new Stmt.Variable(type, name, initializer);
+        return new Stmt.Variable(new ProtoType(type, pointer), name, initializer);
     }
 
     // Statements
@@ -291,7 +290,7 @@ public class Parser {
     }
 
     private Expr unary() {
-        if (match(TokenType.Bang, TokenType.Minus)) {
+        if (match(TokenType.Bang, TokenType.Minus, TokenType.Ampersand)) {
             Token operator = previous();
             Expr right = unary();
             return new Expr.Unary(operator, right);
@@ -344,6 +343,22 @@ public class Parser {
         if (match(TokenType.Identifier)) return new Expr.Variable(previous());
 
         throw error(peek(), "Expected expression.");
+    }
+
+    // Prototypes
+
+    private ProtoParameter consumeParameter(String constructName) {
+        ProtoType type = consumeType(constructName);
+        Token name = consume(TokenType.Identifier, "Expected " + constructName + " name.");
+
+        return new ProtoParameter(type, name);
+    }
+
+    private ProtoType consumeType(String constructName) {
+        Token type = consume(TokenType.Identifier, "Expected " + constructName + " type.");
+        boolean pointer = match(TokenType.Star);
+
+        return new ProtoType(type, pointer);
     }
 
     // Utils

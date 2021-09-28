@@ -1,23 +1,25 @@
 package minegame159.fireball.parser;
 
-import minegame159.fireball.TokenPair;
 import minegame159.fireball.context.Context;
+import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.Type;
 
 import java.util.List;
 
 public abstract class Stmt {
     public interface Visitor {
+        void visitFunctionStart(ProtoFunction proto);
+        void visitFunctionEnd(ProtoFunction proto);
+
         void visitExpressionStmt(Expression stmt);
         void visitBlockStmt(Block stmt);
         void visitVariableStmt(Variable stmt);
         void visitIfStmt(If stmt);
         void visitWhileStmt(While stmt);
         void visitForStmt(For stmt);
-        void visitFunctionStmt(Function stmt);
         void visitReturnStmt(Return stmt);
         void visitCBlockStmt(CBlock stmt);
-        void visitStructStmt(Struct stmt);
     }
 
     public static class Expression extends Stmt {
@@ -47,11 +49,11 @@ public abstract class Stmt {
     }
 
     public static class Variable extends Stmt {
-        public final Token type;
+        public final ProtoType type;
         public final Token name;
         public final Expr initializer;
 
-        public Variable(Token type, Token name, Expr initializer) {
+        public Variable(ProtoType type, Token name, Expr initializer) {
             this.type = type;
             this.name = name;
             this.initializer = initializer;
@@ -63,7 +65,7 @@ public abstract class Stmt {
         }
 
         public Type getType(Context context) {
-            return type.type() == TokenType.Var ? (initializer == null ? null : initializer.getType()) : context.getType(type);
+            return type.name().type() == TokenType.Var ? (initializer == null ? null : initializer.getType()) : context.getType(type);
         }
     }
 
@@ -118,25 +120,6 @@ public abstract class Stmt {
         }
     }
 
-    public static class Function extends Stmt {
-        public final Token returnType;
-        public final Token name;
-        public final List<TokenPair> params;
-        public final Stmt body;
-
-        public Function(Token returnType, Token name, List<TokenPair> params, Stmt body) {
-            this.returnType = returnType;
-            this.name = name;
-            this.params = params;
-            this.body = body;
-        }
-
-        @Override
-        public void accept(Visitor visitor) {
-            visitor.visitFunctionStmt(this);
-        }
-    }
-
     public static class Return extends Stmt {
         public final Token token;
         public final Expr value;
@@ -162,21 +145,6 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitCBlockStmt(this);
-        }
-    }
-
-    public static class Struct extends Stmt {
-        public final Token name;
-        public final List<TokenPair> fields;
-
-        public Struct(Token name, List<TokenPair> fields) {
-            this.name = name;
-            this.fields = fields;
-        }
-
-        @Override
-        public void accept(Visitor visitor) {
-            visitor.visitStructStmt(this);
         }
     }
 

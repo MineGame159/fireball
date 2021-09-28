@@ -1,7 +1,8 @@
 package minegame159.fireball.types;
 
-public abstract class Type {
-    public final String name;
+public abstract class Type implements Cloneable {
+    public String name;
+    private boolean pointer;
 
     public Type(String name) {
         this.name = name;
@@ -21,6 +22,21 @@ public abstract class Type {
 
         return false;
     }
+
+    public boolean isPointer() {
+        return pointer;
+    }
+
+    public Type pointer() {
+        if (pointer) return this;
+
+        Type type = copy();
+        type.name += '*';
+        type.pointer = true;
+        return type;
+    }
+
+    protected abstract Type copy();
 
     public abstract boolean equals(Type type);
 

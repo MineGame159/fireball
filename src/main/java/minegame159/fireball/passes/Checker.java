@@ -5,6 +5,8 @@ import minegame159.fireball.Errors;
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
 import minegame159.fireball.parser.*;
+import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoParameter;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -25,6 +27,7 @@ public class Checker extends AstPass {
     private final Context context;
 
     private final Stack<Map<String, Variable>> scopes = new Stack<>();
+    private boolean skipBlockScopes;
     private Function currentFunction;
 
     private Checker(Context context) {
@@ -33,8 +36,27 @@ public class Checker extends AstPass {
 
     public static List<Error> check(Parser.Result result, Context context) {
         Checker checker = new Checker(context);
-        checker.acceptS(result.stmts);
+        result.accept(checker);
         return checker.errors;
+    }
+
+    @Override
+    public void visitFunctionStart(ProtoFunction proto) {
+        beginScope();
+        skipBlockScopes = proto.body() instanceof Stmt.Block;
+        currentFunction = context.getFunction(proto.name());
+
+        for (ProtoParameter param : proto.params()) {
+            declare(param.name(), context.getType(param.type()));
+            define(param.name());
+        }
+    }
+
+    @Override
+    public void visitFunctionEnd(ProtoFunction proto) {
+        endScope();
+        skipBlockScopes = false;
+        currentFunction = null;
     }
 
     // Statements
@@ -46,9 +68,9 @@ public class Checker extends AstPass {
 
     @Override
     public void visitBlockStmt(Stmt.Block stmt) {
-        beginScope();
+        if (!skipBlockScopes) beginScope();
         acceptS(stmt.statements);
-        endScope();
+        if (!skipBlockScopes) endScope();
     }
 
     @Override
@@ -87,13 +109,6 @@ public class Checker extends AstPass {
     }
 
     @Override
-    public void visitFunctionStmt(Stmt.Function stmt) {
-        currentFunction = context.getFunction(stmt.name);
-        acceptS(stmt.body);
-        currentFunction = null;
-    }
-
-    @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         Type valueType = stmt.value.getType();
         if (!currentFunction.returnType().equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType(), valueType));
@@ -103,9 +118,6 @@ public class Checker extends AstPass {
 
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
-
-    @Override
-    public void visitStructStmt(Stmt.Struct stmt) {}
 
     // Expressions
 

@@ -1,12 +1,14 @@
 package minegame159.fireball.passes;
 
-import minegame159.fireball.TokenPair;
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
 import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Stmt;
+import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoParameter;
+import minegame159.fireball.parser.prototypes.ProtoStruct;
 
 import java.io.Writer;
 import java.util.List;
@@ -21,10 +23,10 @@ public class Compiler extends AstPass {
     }
 
     public static void compile(Parser.Result result, Context context, Writer writer) {
-        new Compiler(context, writer).compile(result.stmts);
+        new Compiler(context, writer).compile(result);
     }
 
-    private void compile(List<Stmt> stmts) {
+    private void compile(Parser.Result result) {
         // Standard library
         w.writeln("\n// Standard library\n");
         w.writeln("#include <stdbool.h>");
@@ -67,7 +69,37 @@ public class Compiler extends AstPass {
 
         // User code
         w.writeln("\n// User code\n");
-        acceptS(stmts);
+
+        //     Structs
+        for (ProtoStruct struct : result.structs) {
+            w.write("struct ").write(struct.name().lexeme()).write(" {\n");
+            w.indentUp();
+
+            for (ProtoParameter field : struct.fields()) {
+                w.indent().write(field.type().toString()).write(' ').write(field.name().lexeme()).writeSemicolon();
+            }
+
+            w.indentDown();
+            w.indent().write("}").writeSemicolon();
+
+            w.write('\n');
+        }
+
+        //     Functions
+        for (ProtoFunction function : result.functions) {
+            w.write(function.returnType().toString()).write(' ').write(function.name().lexeme()).write('(');
+
+            for (int i = 0; i < function.params().size(); i++) {
+                ProtoParameter param = function.params().get(i);
+
+                if (i > 0) w.write(", ");
+                w.write(param.type().toString()).write(' ').write(param.name().lexeme());
+            }
+
+            w.write(") ");
+            function.accept(this);
+            w.write('\n');
+        }
 
         w.close();
     }
@@ -157,22 +189,6 @@ public class Compiler extends AstPass {
     }
 
     @Override
-    public void visitFunctionStmt(Stmt.Function stmt) {
-        w.write(stmt.returnType.lexeme()).write(' ').write(stmt.name.lexeme()).write('(');
-
-        for (int i = 0; i < stmt.params.size(); i++) {
-            TokenPair param = stmt.params.get(i);
-
-            if (i > 0) w.write(", ");
-            w.write(param.first().lexeme()).write(' ').write(param.second().lexeme());
-        }
-
-        w.write(") ");
-        acceptS(stmt.body);
-        w.write('\n');
-    }
-
-    @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         w.write("return");
 
@@ -187,21 +203,6 @@ public class Compiler extends AstPass {
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {
         w.write(stmt.code).write('\n');
-    }
-
-    @Override
-    public void visitStructStmt(Stmt.Struct stmt) {
-        w.write("struct ").write(stmt.name.lexeme()).write(" {\n");
-        w.indentUp();
-
-        for (TokenPair field : stmt.fields) {
-            w.indent().write(field.first().lexeme()).write(' ').write(field.second().lexeme()).writeSemicolon();
-        }
-
-        w.indentDown();
-        w.indent().write("}").writeSemicolon();
-
-        w.write('\n');
     }
 
     // Expressions
@@ -290,13 +291,13 @@ public class Compiler extends AstPass {
     @Override
     public void visitGetExpr(Expr.Get expr) {
         acceptE(expr.object);
-        w.write('.').write(expr.name.lexeme());
+        w.write(expr.object.getType().isPointer() ? "->" : ".").write(expr.name.lexeme());
     }
 
     @Override
     public void visitSetExpr(Expr.Set expr) {
         acceptE(expr.object);
-        w.write('.').write(expr.name.lexeme()).write(" = ");
+        w.write(expr.object.getType().isPointer() ? "->" : ".").write(expr.name.lexeme()).write(" = ");
         acceptE(expr.value);
     }
 
