@@ -142,7 +142,10 @@ public class TypeResolver extends AstPass {
     public void visitUnaryExpr(Expr.Unary expr) {
         acceptE(expr.right);
 
-        if (expr.operator.type() == TokenType.Ampersand && !(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) errors.add(Errors.invalidPointerTarget(expr.operator));
+        if (expr.operator.type() == TokenType.Ampersand) {
+            if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) errors.add(Errors.invalidPointerTarget(expr.operator));
+            else if (expr.right.getType().isPointer()) errors.add(Errors.invalidPointerTarget(expr.operator));
+        }
     }
 
     @Override
