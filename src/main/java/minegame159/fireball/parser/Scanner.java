@@ -226,6 +226,17 @@ public class Scanner {
                     if (peekNext() == '/') {
                         while (peek() != '\n' && !isAtEnd()) advance(false);
                     }
+                    else if (peekNext() == '*') {
+                        advance(false);
+                        advance(false);
+
+                        while ((peek() != '*' || peekNext() != '/') && !isAtEnd()) {
+                            advance(false);
+                        }
+
+                        advance(false);
+                        advance(false);
+                    }
                     else return;
                 }
                 default -> {
