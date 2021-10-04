@@ -10,49 +10,21 @@ import org.junit.Test;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 public class CompilerTest {
     @Test
     public void main() {
-        String source = """
-                struct Point {
-                    i32 x;
-                    i32 y;
-                }
-                
-                i32 main() {
-                    // Basic
-                    var b = getNumber();
-                    b = 6 / 2;
-                    
-                    print(b);
-                    
-                    // Structs
-                    Point p;
-                    modify(&p);
-                    print2(p.x, p.y);
-                    
-                    return 0;
-                }
-                
-                i32 getNumber() {
-                    return 8;
-                }
-                
-                void modify(Point* p) {
-                    p.x = 6;
-                    p.y = 9;
-                }
-                
-                void print2(i32 x, i32 y) {
-                    c{ printf("[%d, %d]\n", x, y); }
-                }
-                
-                void print(i32 number) {
-                    c{ printf("%d\n", number); }
-                }
-                """;
+        String source;
+
+        try {
+            source = Files.readString(Path.of("scripts/test.fb"));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
 
         // Parse
         Parser.Result result = Parser.parse(new StringReader(source));
