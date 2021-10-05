@@ -2,13 +2,17 @@ package minegame159.fireball.passes;
 
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
+import minegame159.fireball.context.Method;
 import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
+import minegame159.fireball.parser.prototypes.ProtoMethod;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
 import minegame159.fireball.parser.prototypes.ProtoStruct;
+import minegame159.fireball.types.StructType;
+import minegame159.fireball.types.Type;
 
 import java.io.Writer;
 import java.util.List;
@@ -50,22 +54,13 @@ public class Compiler extends AstPass {
         //     Structs
         for (Struct struct : context.getStructs()) {
             w.write("typedef struct ").write(struct.name().lexeme()).write(' ').write(struct.name().lexeme()).writeSemicolon();
+
+            for (Method method : struct.methods()) writeFunctionTypedef(method);
         }
         if (context.getStructs().size() > 0) w.write('\n');
 
         //     Functions
-        for (Function function : context.getFunctions()) {
-            w.write(function.returnType().name).write(' ').write(function.name().lexeme()).write('(');
-
-            for (int i = 0; i < function.params().size(); i++) {
-                Function.Param param = function.params().get(i);
-
-                if (i > 0) w.write(", ");
-                w.write(param.type().name).write(' ').write(param.name().lexeme());
-            }
-
-            w.writeln(");");
-        }
+        for (Function function : context.getFunctions()) writeFunctionTypedef(function);
 
         // User code
         w.writeln("\n// User code\n");
@@ -83,25 +78,46 @@ public class Compiler extends AstPass {
             w.indent().write("}").writeSemicolon();
 
             w.write('\n');
+
+            for (ProtoMethod method : struct.methods()) {
+                writeFunction(method, "_" + struct.name() + "__" + method.name);
+            }
         }
 
         //     Functions
         for (ProtoFunction function : result.functions) {
-            w.write(function.returnType().toString()).write(' ').write(function.name().lexeme()).write('(');
-
-            for (int i = 0; i < function.params().size(); i++) {
-                ProtoParameter param = function.params().get(i);
-
-                if (i > 0) w.write(", ");
-                w.write(param.type().toString()).write(' ').write(param.name().lexeme());
-            }
-
-            w.write(") ");
-            function.accept(this);
-            w.write('\n');
+            writeFunction(function, function.name.lexeme());
         }
 
         w.close();
+    }
+
+    private void writeFunctionTypedef(Function function) {
+        w.write(function.returnType.name).write(' ').write(function.getOutputName()).write('(');
+
+        for (int i = 0; i < function.params.size(); i++) {
+            Function.Param param = function.params.get(i);
+
+            if (i > 0) w.write(", ");
+            w.write(param.type().name).write(' ').write(param.name().lexeme());
+        }
+
+        w.writeln(");");
+    }
+
+    private void writeFunction(ProtoFunction function, String name) {
+        w.write(function.returnType.toString()).write(' ').write(name).write('(');
+
+        for (int i = 0; i < function.params.size(); i++) {
+            ProtoParameter param = function.params.get(i);
+
+            if (i > 0) w.write(", ");
+            w.write(param.type().toString()).write(' ').write(param.name().lexeme());
+        }
+
+        w.write(") ");
+        function.accept(this);
+        w.write('\n');
     }
 
     // Statements
@@ -277,15 +293,35 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitCallExpr(Expr.Call expr) {
-        acceptE(expr.callee);
-        w.write('(');
+        if (expr.callee instanceof Expr.Variable) {
+            acceptE(expr.callee);
+            w.write('(');
 
-        for (int i = 0; i < expr.arguments.size(); i++) {
-            if (i > 0) w.write(", ");
-            acceptE(expr.arguments.get(i));
+            for (int i = 0; i < expr.arguments.size(); i++) {
+                if (i > 0) w.write(", ");
+                acceptE(expr.arguments.get(i));
+            }
+
+            w.write(')');
         }
+        else {
+            Type type = ((Expr.Get) expr.callee).object.getType();
+            Struct struct = ((StructType) type).struct;
+            Method method = struct.getMethod(((Expr.Get) expr.callee).name);
 
-        w.write(')');
+            w.write(method.getOutputName());
+            w.write('(');
+
+            w.write('&');
+            acceptE(((Expr.Get) expr.callee).object);
+
+            for (int i = 0; i < expr.arguments.size(); i++) {
+                w.write(", ");
+                acceptE(expr.arguments.get(i));
+            }
+
+            w.write(')');
+        }
     }
 
     @Override

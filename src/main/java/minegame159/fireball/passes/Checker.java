@@ -4,6 +4,8 @@ import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
 import minegame159.fireball.context.Context;
 import minegame159.fireball.context.Function;
+import minegame159.fireball.context.Method;
+import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.*;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
@@ -43,10 +45,10 @@ public class Checker extends AstPass {
     @Override
     public void visitFunctionStart(ProtoFunction proto) {
         beginScope();
-        skipBlockScopes = proto.body() instanceof Stmt.Block;
-        currentFunction = context.getFunction(proto.name());
+        skipBlockScopes = proto.body instanceof Stmt.Block;
+        currentFunction = context.getFunction(proto.name);
 
-        for (ProtoParameter param : proto.params()) {
+        for (ProtoParameter param : proto.params) {
             declare(param.name(), context.getType(param.type()));
             define(param.name());
         }
@@ -111,7 +113,7 @@ public class Checker extends AstPass {
     @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         Type valueType = stmt.value.getType();
-        if (!currentFunction.returnType().equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType(), valueType));
+        if (!currentFunction.returnType.equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
 
         acceptE(stmt.value);
     }
@@ -194,17 +196,41 @@ public class Checker extends AstPass {
 
     @Override
     public void visitCallExpr(Expr.Call expr) {
-        if (!(expr.callee instanceof Expr.Variable)) errors.add(Errors.invalidCallTarget(expr.token));
+        if (!(expr.callee instanceof Expr.Variable || expr.callee instanceof Expr.Get)) errors.add(Errors.invalidCallTarget(expr.token));
         else {
-            Function function = context.getFunction(((Expr.Variable) expr.callee).name);
+            Function function = null;
+            boolean check = true;
 
-            if (function != null) {
-                if (function.params().size() != expr.arguments.size()) errors.add(Errors.wrongArgumentCount(expr.token, function.params().size(), expr.arguments.size()));
+            if (expr.callee instanceof Expr.Variable) function = context.getFunction(((Expr.Variable) expr.callee).name);
+            else {
+                Type type = ((Expr.Get) expr.callee).object.getType();
+
+                if (!(type instanceof StructType)) {
+                    errors.add(Errors.invalidCallTarget(expr.token));
+                    check = false;
+                }
                 else {
-                    for (int i = 0; i < function.params().size(); i++) {
-                        Function.Param param = function.params().get(i);
+                    Struct struct = ((StructType) type).struct;
+                    function = struct.getMethod(((Expr.Get) expr.callee).name);
+                }
+            }
 
-                        Type argType = expr.arguments.get(i).getType();
+            if (function != null && check) {
+                boolean isMethod = function instanceof Method;
+                int argCount = expr.arguments.size() + (isMethod ? 1 : 0);
+
+                if (function.params.size() != argCount) errors.add(Errors.wrongArgumentCount(expr.token, function.params.size(), argCount));
+                else {
+                    for (int i = 0; i < function.params.size(); i++) {
+                        Function.Param param = function.params.get(i);
+
+                        Type argType;
+                        if (isMethod) {
+                            if (i == 0) argType = ((Expr.Get) expr.callee).object.getType().pointer();
+                            else argType = expr.arguments.get(i - 1).getType();
+                        }
+                        else argType = expr.arguments.get(i).getType();
+
                         if (!param.type().equals(argType)) errors.add(Errors.mismatchedType(expr.token, param.type(), argType));
                     }
                 }

@@ -4,10 +4,7 @@ import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Token;
-import minegame159.fireball.parser.prototypes.ProtoFunction;
-import minegame159.fireball.parser.prototypes.ProtoParameter;
-import minegame159.fireball.parser.prototypes.ProtoStruct;
-import minegame159.fireball.parser.prototypes.ProtoType;
+import minegame159.fireball.parser.prototypes.*;
 import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
@@ -33,6 +30,10 @@ public class Context {
 
     // Structs
 
+    public Struct getStruct(Token name) {
+        return structs.get(name.lexeme());
+    }
+
     public Collection<Struct> getStructs() {
         return structs.values();
     }
@@ -54,7 +55,7 @@ public class Context {
 
         // Structs
         for (ProtoStruct proto : result.structs) {
-            Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()));
+            Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()), new ArrayList<>(proto.methods().size()));
 
             types.put(proto.name().lexeme(), new StructType(proto.name().lexeme(), struct));
             structs.put(proto.name().lexeme(), struct);
@@ -73,24 +74,48 @@ public class Context {
 
                 struct.fields().add(new Field(fieldType, field.name()));
             }
+
+            for (ProtoMethod method : proto.methods()) {
+                // Return type
+                Type returnType = getType(method.returnType);
+                if (returnType == null) {
+                    errors.add(Errors.unknownType(method.returnType.name(), method.returnType.name()));
+                    continue;
+                }
+
+                // Parameters
+                List<Function.Param> params = new ArrayList<>();
+
+                for (ProtoParameter param : method.params) {
+                    Type type = getType(param.type());
+                    if (type == null) {
+                        errors.add(Errors.unknownType(param.type().name(), method.returnType.name()));
+                        continue;
+                    }
+
+                    params.add(new Function.Param(type, param.name()));
+                }
+
+                struct.methods().add(new Method(struct, method.name, returnType, params));
+            }
         }
 
         // Functions
         for (ProtoFunction proto : result.functions) {
             // Return type
-            Type returnType = getType(proto.returnType());
+            Type returnType = getType(proto.returnType);
             if (returnType == null) {
-                errors.add(Errors.unknownType(proto.returnType().name(), proto.returnType().name()));
+                errors.add(Errors.unknownType(proto.returnType.name(), proto.returnType.name()));
                 continue;
             }
 
             // Parameters
             List<Function.Param> params = new ArrayList<>();
 
-            for (ProtoParameter param : proto.params()) {
+            for (ProtoParameter param : proto.params) {
                 Type type = getType(param.type());
                 if (type == null) {
-                    errors.add(Errors.unknownType(param.type().name(), proto.returnType().name()));
+                    errors.add(Errors.unknownType(param.type().name(), proto.returnType.name()));
                     continue;
                 }
 
@@ -98,7 +123,7 @@ public class Context {
             }
 
             // Create
-            functions.put(proto.name().lexeme(), new Function(proto.name(), returnType, params));
+            functions.put(proto.name.lexeme(), new Function(proto.name, returnType, params));
         }
 
         return errors;

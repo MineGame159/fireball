@@ -2,10 +2,7 @@ package minegame159.fireball.passes;
 
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
-import minegame159.fireball.context.Context;
-import minegame159.fireball.context.Field;
-import minegame159.fireball.context.Function;
-import minegame159.fireball.context.Struct;
+import minegame159.fireball.context.*;
 import minegame159.fireball.parser.*;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
@@ -36,17 +33,17 @@ public class TypeResolver extends AstPass {
     @Override
     public void visitFunctionStart(ProtoFunction proto) {
         scopes.push(new HashMap<>());
-        skipBlockScopes = proto.body() instanceof Stmt.Block;
+        skipBlockScopes = proto.body instanceof Stmt.Block;
         hasTopLevelReturn = false;
 
-        for (ProtoParameter param : proto.params()) {
+        for (ProtoParameter param : proto.params) {
             scopes.peek().put(param.name().lexeme(), context.getType(param.type()));
         }
     }
 
     @Override
     public void visitFunctionEnd(ProtoFunction proto) {
-        if (!hasTopLevelReturn && context.getType(proto.returnType()) != PrimitiveTypes.Void.type) errors.add(Errors.missingReturn(proto.name()));
+        if (!hasTopLevelReturn && context.getType(proto.returnType) != PrimitiveTypes.Void.type) errors.add(Errors.missingReturn(proto.name));
 
         scopes.pop();
         skipBlockScopes = false;
@@ -195,7 +192,12 @@ public class TypeResolver extends AstPass {
             Struct struct = ((StructType) object.getType()).struct;
             Field field = struct.getField(name);
 
-            if (field == null) errors.add(Errors.unknownField(struct.name(), name));
+            if (field == null) {
+                Method method = struct.getMethod(name);
+
+                if (method == null) errors.add(Errors.unknownField(struct.name(), name));
+                else return method.returnType;
+            }
             else return field.type();
         }
 
@@ -207,7 +209,7 @@ public class TypeResolver extends AstPass {
 
         if (type == null) {
             Function function = context.getFunction(name);
-            if (function != null) type = function.returnType();
+            if (function != null) type = function.returnType;
         }
 
         if (type == null) {

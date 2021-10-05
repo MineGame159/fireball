@@ -1,10 +1,7 @@
 package minegame159.fireball.parser;
 
 import minegame159.fireball.Error;
-import minegame159.fireball.parser.prototypes.ProtoFunction;
-import minegame159.fireball.parser.prototypes.ProtoParameter;
-import minegame159.fireball.parser.prototypes.ProtoStruct;
-import minegame159.fireball.parser.prototypes.ProtoType;
+import minegame159.fireball.parser.prototypes.*;
 
 import java.io.Reader;
 import java.util.ArrayList;
@@ -65,15 +62,37 @@ public class Parser {
 
         consume(TokenType.LeftBrace, "Expected '{' after struct name.");
         List<ProtoParameter> fields = new ArrayList<>();
+        List<ProtoMethod> methods = new ArrayList<>();
 
         while (!check(TokenType.RightBrace)) {
-            fields.add(consumeParameter("field"));
-            consume(TokenType.Semicolon, "Expected ';' after field name.");
+            ProtoType type = consumeType("field or method");
+            Token name2 = consume(TokenType.Identifier, "Expected field or method name.");
+
+            if (match(TokenType.Semicolon)) {
+                fields.add(new ProtoParameter(type, name2));
+            }
+            else {
+                consume(TokenType.LeftParen, "Expected '(' after method name");
+                List<ProtoParameter> params = new ArrayList<>();
+
+                params.add(new ProtoParameter(new ProtoType(name, true), new Token(TokenType.Identifier, "this", 0, 0)));
+
+                boolean first = true;
+                while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
+                    params.add(consumeParameter("parameter"));
+                    first = false;
+                }
+
+                consume(TokenType.RightParen, "Expected ')' after method parameters.");
+                Stmt body = statement();
+
+                methods.add(new ProtoMethod(name2, type, params, body));
+            }
         }
 
         consume(TokenType.RightBrace, "Expected '}' after struct body.");
 
-        result.structs.add(new ProtoStruct(name, fields));
+        result.structs.add(new ProtoStruct(name, fields, methods));
     }
 
     private void functionDeclaration() {
