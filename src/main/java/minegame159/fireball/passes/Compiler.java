@@ -312,7 +312,7 @@ public class Compiler extends AstPass {
             w.write(method.getOutputName());
             w.write('(');
 
-            w.write('&');
+            if (!((Expr.Get) expr.callee).object.getType().isPointer()) w.write('&');
             acceptE(((Expr.Get) expr.callee).object);
 
             for (int i = 0; i < expr.arguments.size(); i++) {
