@@ -70,9 +70,9 @@ public class CompilerWriter {
         }
     }
 
-    public CompilerWriter write(String s) {
+    public CompilerWriter write(Object o) {
         try {
-            writer.write(s);
+            writer.write(o.toString());
         } catch (IOException e) {
             e.printStackTrace();
         }

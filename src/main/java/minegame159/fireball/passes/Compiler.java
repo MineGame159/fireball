@@ -1,16 +1,9 @@
 package minegame159.fireball.passes;
 
-import minegame159.fireball.context.Context;
-import minegame159.fireball.context.Function;
-import minegame159.fireball.context.Method;
-import minegame159.fireball.context.Struct;
+import minegame159.fireball.context.*;
 import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Stmt;
-import minegame159.fireball.parser.prototypes.ProtoFunction;
-import minegame159.fireball.parser.prototypes.ProtoMethod;
-import minegame159.fireball.parser.prototypes.ProtoParameter;
-import minegame159.fireball.parser.prototypes.ProtoStruct;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -53,69 +46,69 @@ public class Compiler extends AstPass {
 
         //     Structs
         for (Struct struct : context.getStructs()) {
-            w.write("typedef struct ").write(struct.name().lexeme()).write(' ').write(struct.name().lexeme()).writeSemicolon();
+            w.write("typedef struct ").write(struct.name()).write(' ').write(struct.name()).writeSemicolon();
 
-            for (Method method : struct.methods()) writeFunctionTypedef(method);
+            for (Method method : struct.methods()) {
+                writeFunctionDefinition(method);
+                w.writeSemicolon();
+            }
         }
         if (context.getStructs().size() > 0) w.write('\n');
 
         //     Functions
-        for (Function function : context.getFunctions()) writeFunctionTypedef(function);
+        for (Function function : context.getFunctions()) {
+            writeFunctionDefinition(function);
+            w.writeSemicolon();
+        }
 
         // User code
         w.writeln("\n// User code\n");
 
         //     Structs
-        for (ProtoStruct struct : result.structs) {
-            w.write("struct ").write(struct.name().lexeme()).write(" {\n");
+        for (Struct struct : context.getStructs()) {
+            w.write("//     ").write(struct.name()).write("\n\n");
+
+            w.indent().write("struct ").write(struct.name()).write(" {\n");
             w.indentUp();
 
-            for (ProtoParameter field : struct.fields()) {
-                w.indent().write(field.type().toString()).write(' ').write(field.name().lexeme()).writeSemicolon();
+            // Fields
+            for (Field field : struct.fields()) {
+                w.indent().write(field.type()).write(' ').write(field.name()).writeSemicolon();
             }
 
             w.indentDown();
-            w.indent().write("}").writeSemicolon();
+            w.indent().write('}').writeSemicolon();
 
             w.write('\n');
 
-            for (ProtoMethod method : struct.methods()) {
-                writeFunction(method, "_" + struct.name() + "__" + method.name);
-            }
+            // Methods
+            for (Method method : struct.methods()) writeFunction(method);
         }
 
         //     Functions
-        for (ProtoFunction function : result.functions) {
-            writeFunction(function, function.name.lexeme());
-        }
+        w.write("//     Functions\n\n");
+        for (Function function : context.getFunctions()) writeFunction(function);
 
         w.close();
     }
 
-    private void writeFunctionTypedef(Function function) {
-        w.write(function.returnType.name).write(' ').write(function.getOutputName()).write('(');
+    private void writeFunctionDefinition(Function function) {
+        w.write(function.returnType).write(' ').write(function.getOutputName()).write('(');
 
         for (int i = 0; i < function.params.size(); i++) {
             Function.Param param = function.params.get(i);
 
             if (i > 0) w.write(", ");
-            w.write(param.type().name).write(' ').write(param.name().lexeme());
+            w.write(param.type()).write(' ').write(param.name());
         }
 
-        w.writeln(");");
+        w.write(")");
     }
 
-    private void writeFunction(ProtoFunction function, String name) {
-        w.write(function.returnType.toString()).write(' ').write(name).write('(');
+    private void writeFunction(Function function) {
+        writeFunctionDefinition(function);
+        w.write(' ');
 
-        for (int i = 0; i < function.params.size(); i++) {
-            ProtoParameter param = function.params.get(i);
-
-            if (i > 0) w.write(", ");
-            w.write(param.type().toString()).write(' ').write(param.name().lexeme());
-        }
-
-        w.write(") ");
         function.accept(this);
         w.write('\n');
     }
@@ -146,7 +139,7 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitVariableStmt(Stmt.Variable stmt) {
-        w.write(stmt.getType(context).name).write(' ').write(stmt.name.lexeme());
+        w.write(stmt.getType(context)).write(' ').write(stmt.name);
 
         if (stmt.initializer != null) {
             w.write(" = ");
@@ -263,31 +256,31 @@ public class Compiler extends AstPass {
     @Override
     public void visitBinaryExpr(Expr.Binary expr) {
         acceptE(expr.left);
-        w.write(' ').write(expr.operator.lexeme()).write(' ');
+        w.write(' ').write(expr.operator).write(' ');
         acceptE(expr.right);
     }
 
     @Override
     public void visitUnaryExpr(Expr.Unary expr) {
-        w.write(expr.operator.lexeme());
+        w.write(expr.operator);
         acceptE(expr.right);
     }
 
     @Override
     public void visitLogicalExpr(Expr.Logical expr) {
         acceptE(expr.left);
-        w.write(' ').write(expr.operator.lexeme()).write(' ');
+        w.write(' ').write(expr.operator).write(' ');
         acceptE(expr.right);
     }
 
     @Override
     public void visitVariableExpr(Expr.Variable expr) {
-        w.write(expr.name.lexeme());
+        w.write(expr.name);
     }
 
     @Override
     public void visitAssignExpr(Expr.Assign expr) {
-        w.write(expr.name.lexeme()).write(" = ");
+        w.write(expr.name).write(" = ");
         acceptE(expr.value);
     }
 
@@ -327,13 +320,13 @@ public class Compiler extends AstPass {
     @Override
     public void visitGetExpr(Expr.Get expr) {
         acceptE(expr.object);
-        w.write(expr.object.getType().isPointer() ? "->" : ".").write(expr.name.lexeme());
+        w.write(expr.object.getType().isPointer() ? "->" : ".").write(expr.name);
     }
 
     @Override
     public void visitSetExpr(Expr.Set expr) {
         acceptE(expr.object);
-        w.write(expr.object.getType().isPointer() ? "->" : ".").write(expr.name.lexeme()).write(" = ");
+        w.write(expr.object.getType().isPointer() ? "->" : ".").write(expr.name).write(" = ");
         acceptE(expr.value);
     }
 

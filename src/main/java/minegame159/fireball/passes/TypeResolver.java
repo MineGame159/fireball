@@ -3,10 +3,12 @@ package minegame159.fireball.passes;
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
 import minegame159.fireball.context.*;
-import minegame159.fireball.parser.*;
+import minegame159.fireball.parser.Expr;
+import minegame159.fireball.parser.Parser;
+import minegame159.fireball.parser.Stmt;
+import minegame159.fireball.parser.Token;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
-import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -18,7 +20,7 @@ public class TypeResolver extends AstPass {
     private final Context context;
 
     private final Stack<Map<String, Type>> scopes = new Stack<>();
-    private boolean skipBlockScopes, hasTopLevelReturn;
+    private boolean skipBlockScopes;
 
     private TypeResolver(Context context) {
         this.context = context;
@@ -32,19 +34,19 @@ public class TypeResolver extends AstPass {
 
     @Override
     public void visitFunctionStart(ProtoFunction proto) {
+        // Begin function
         scopes.push(new HashMap<>());
         skipBlockScopes = proto.body instanceof Stmt.Block;
-        hasTopLevelReturn = false;
 
+        // Declare and define parameters
         for (ProtoParameter param : proto.params) {
-            scopes.peek().put(param.name().lexeme(), context.getType(param.type()));
+            declare(param.name(), context.getType(param.type()));
         }
     }
 
     @Override
     public void visitFunctionEnd(ProtoFunction proto) {
-        if (!hasTopLevelReturn && context.getType(proto.returnType) != PrimitiveTypes.Void.type) errors.add(Errors.missingReturn(proto.name));
-
+        // End function
         scopes.pop();
         skipBlockScopes = false;
     }
@@ -58,8 +60,13 @@ public class TypeResolver extends AstPass {
 
     @Override
     public void visitBlockStmt(Stmt.Block stmt) {
+        // Begin scope
         if (!skipBlockScopes) scopes.push(new HashMap<>());
+
+        // Resolve statements inside the block
         acceptS(stmt.statements);
+
+        // End scope
         if (!skipBlockScopes) scopes.pop();
     }
 
@@ -67,10 +74,11 @@ public class TypeResolver extends AstPass {
     public void visitVariableStmt(Stmt.Variable stmt) {
         acceptE(stmt.initializer);
 
+        // Declare variable
         Type type = stmt.getType(context);
-        if (type == null) errors.add(Errors.unknownType(stmt.type.name(), stmt.type.name()));
+        if (type == null) errors.add(Errors.unknownType(stmt.type.name(), stmt.type));
 
-        scopes.peek().put(stmt.name.lexeme(), type);
+        declare(stmt.name, type);
     }
 
     @Override
@@ -97,8 +105,6 @@ public class TypeResolver extends AstPass {
     @Override
     public void visitReturnStmt(Stmt.Return stmt) {
         acceptE(stmt.value);
-
-        if (scopes.size() <= 1) hasTopLevelReturn = true;
     }
 
     @Override
@@ -138,11 +144,6 @@ public class TypeResolver extends AstPass {
     @Override
     public void visitUnaryExpr(Expr.Unary expr) {
         acceptE(expr.right);
-
-        if (expr.operator.type() == TokenType.Ampersand) {
-            if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) errors.add(Errors.invalidPointerTarget(expr.operator));
-            else if (expr.right.getType().isPointer()) errors.add(Errors.invalidPointerTarget(expr.operator));
-        }
     }
 
     @Override
@@ -153,14 +154,16 @@ public class TypeResolver extends AstPass {
 
     @Override
     public void visitVariableExpr(Expr.Variable expr) {
-        expr.type = resolveType(expr.name);
+        // Resolve variable type
+        expr.type = resolveIdentifierType(expr.name);
     }
 
     @Override
     public void visitAssignExpr(Expr.Assign expr) {
-        expr.type = resolveType(expr.name);
-
         acceptE(expr.value);
+
+        // Resolve variable type
+        expr.type = resolveIdentifierType(expr.name);
     }
 
     @Override
@@ -173,6 +176,7 @@ public class TypeResolver extends AstPass {
     public void visitGetExpr(Expr.Get expr) {
         acceptE(expr.object);
 
+        // Resolve field type
         expr.type = resolveFieldType(expr.object, expr.name);
     }
 
@@ -181,7 +185,23 @@ public class TypeResolver extends AstPass {
         acceptE(expr.object);
         acceptE(expr.value);
 
+        // Resolve field type
         expr.type = resolveFieldType(expr.object, expr.name);
+    }
+
+    // Scope
+
+    private void declare(Token name, Type type) {
+        scopes.peek().put(name.lexeme(), type);
+    }
+
+    private Type getLocal(Token name) {
+        for (int i = scopes.size() - 1; i >= 0; i--) {
+            Type type = scopes.get(i).get(name.lexeme());
+            if (type != null) return type;
+        }
+
+        return null;
     }
 
     // Utils
@@ -204,27 +224,20 @@ public class TypeResolver extends AstPass {
         return null;
     }
 
-    private Type resolveType(Token name) {
-        Type type = getLocalType(name);
+    private Type resolveIdentifierType(Token name) {
+        // Local variable
+        Type type = getLocal(name);
 
-        if (type == null) {
-            Function function = context.getFunction(name);
-            if (function != null) type = function.returnType;
+        if (type != null) return type;
+
+        // Function
+        Function function = context.getFunction(name);
+        if (function != null) {
+            if (function.returnType == null) errors.add(Errors.couldNotGetType(name));
+            return function.returnType;
         }
 
-        if (type == null) {
-            errors.add(Errors.couldNotGetType(name));
-        }
-
-        return type;
-    }
-
-    private Type getLocalType(Token name) {
-        for (int i = scopes.size() - 1; i >= 0; i--) {
-            Type type = scopes.get(i).get(name.lexeme());
-            if (type != null) return type;
-        }
-
+        errors.add(Errors.couldNotGetType(name));
         return null;
     }
 }

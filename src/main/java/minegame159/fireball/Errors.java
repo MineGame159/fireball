@@ -1,12 +1,13 @@
 package minegame159.fireball;
 
 import minegame159.fireball.parser.Token;
+import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.Type;
 
 public class Errors {
     // Types
 
-    public static Error unknownType(Token token, Token type) {
+    public static Error unknownType(Token token, ProtoType type) {
         return new Error(token, "Unknown type '" + type + "'.");
     }
 
@@ -44,10 +45,6 @@ public class Errors {
 
     // Structs
 
-    public static Error duplicateField(Token name) {
-        return new Error(name, "Duplicate field '" + name + "'.");
-    }
-
     public static Error invalidFieldTarget(Token token) {
         return new Error(token, "Can only use fields on structs.");
     }
@@ -57,6 +54,10 @@ public class Errors {
     }
 
     // Other
+
+    public static Error duplicate(Token name, String construct) {
+        return new Error(name, "Duplicate " + construct + " '" + name + "'.");
+    }
 
     public static Error wrongOperands(Token token, String operation, String expected, boolean plural) {
         if (plural) return new Error(token, "Operands of " + operation + " operation must be " + expected + "s.");

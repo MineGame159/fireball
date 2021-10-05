@@ -2,6 +2,7 @@ package minegame159.fireball.context;
 
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
+import minegame159.fireball.IFunction2;
 import minegame159.fireball.parser.Parser;
 import minegame159.fireball.parser.Token;
 import minegame159.fireball.parser.prototypes.*;
@@ -53,7 +54,7 @@ public class Context {
     public List<Error> apply(Parser.Result result) {
         List<Error> errors = new ArrayList<>();
 
-        // Structs
+        // Register structs as types
         for (ProtoStruct proto : result.structs) {
             Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()), new ArrayList<>(proto.methods().size()));
 
@@ -61,71 +62,70 @@ public class Context {
             structs.put(proto.name().lexeme(), struct);
         }
 
-        for (ProtoStruct proto : result.structs) {
-            Struct struct = structs.get(proto.name().lexeme());
-            Set<String> fieldNames = new HashSet<>(proto.fields().size());
+        // Apply structs
+        for (ProtoStruct protoStruct : result.structs) {
+            Struct struct = structs.get(protoStruct.name().lexeme());
 
-            for (ProtoParameter field : proto.fields()) {
-                Type fieldType = getType(field.type());
-                if (fieldType == null) errors.add(Errors.unknownType(field.type().name(), field.type().name()));
+            // Fields
+            List<Field> fields = applyParams(errors, protoStruct.fields(), "field", Field::new);
+            if (fields != null) struct.fields().addAll(fields);
 
-                if (fieldNames.contains(field.name().lexeme())) errors.add(Errors.duplicateField(field.name()));
-                else fieldNames.add(field.name().lexeme());
-
-                struct.fields().add(new Field(fieldType, field.name()));
-            }
-
-            for (ProtoMethod method : proto.methods()) {
-                // Return type
-                Type returnType = getType(method.returnType);
-                if (returnType == null) {
-                    errors.add(Errors.unknownType(method.returnType.name(), method.returnType.name()));
-                    continue;
-                }
-
-                // Parameters
-                List<Function.Param> params = new ArrayList<>();
-
-                for (ProtoParameter param : method.params) {
-                    Type type = getType(param.type());
-                    if (type == null) {
-                        errors.add(Errors.unknownType(param.type().name(), method.returnType.name()));
-                        continue;
-                    }
-
-                    params.add(new Function.Param(type, param.name()));
-                }
-
-                struct.methods().add(new Method(struct, method.name, returnType, params));
+            // Methods
+            for (ProtoMethod protoMethod : protoStruct.methods()) {
+                Method method = applyFunction(errors, protoMethod, (first, second) -> new Method(struct, protoMethod.name, first, second, protoMethod.body));
+                if (method != null) struct.methods().add(method);
             }
         }
 
-        // Functions
-        for (ProtoFunction proto : result.functions) {
-            // Return type
-            Type returnType = getType(proto.returnType);
-            if (returnType == null) {
-                errors.add(Errors.unknownType(proto.returnType.name(), proto.returnType.name()));
-                continue;
-            }
-
-            // Parameters
-            List<Function.Param> params = new ArrayList<>();
-
-            for (ProtoParameter param : proto.params) {
-                Type type = getType(param.type());
-                if (type == null) {
-                    errors.add(Errors.unknownType(param.type().name(), proto.returnType.name()));
-                    continue;
-                }
-
-                params.add(new Function.Param(type, param.name()));
-            }
-
-            // Create
-            functions.put(proto.name.lexeme(), new Function(proto.name, returnType, params));
+        // Apply functions
+        for (ProtoFunction protoFunc : result.functions) {
+            Function func = applyFunction(errors, protoFunc, (first, second) -> new Function(protoFunc.name, first, second, protoFunc.body));
+            if (func != null) functions.put(func.name.lexeme(), func);
         }
 
         return errors;
+    }
+
+    private <T> List<T> applyParams(List<Error> errors, List<ProtoParameter> proto, String construct, IFunction2<Type, Token, T> func) {
+        boolean hadError = false;
+        List<T> params = new ArrayList<>(proto.size());
+        Set<String> names = new HashSet<>(proto.size());
+
+        // Params
+        for (ProtoParameter param : proto) {
+            Type type = getType(param.type());
+            if (type == null) {
+                errors.add(Errors.unknownType(param.type().name(), param.type()));
+                hadError = true;
+            }
+
+            if (names.contains(param.name().lexeme())) errors.add(Errors.duplicate(param.name(), construct));
+            else names.add(param.name().lexeme());
+
+            params.add(func.run(type, param.name()));
+        }
+
+        // Create
+        if (hadError) return null;
+        return params;
+    }
+
+    private <T> T applyFunction(List<Error> errors, ProtoFunction proto, IFunction2<Type, List<Function.Param>, T> func) {
+        boolean hadError = false;
+
+        // Return type
+        Type returnType = getType(proto.returnType);
+        if (returnType == null) {
+            errors.add(Errors.unknownType(proto.returnType.name(), proto.returnType));
+            hadError = true;
+        }
+
+        // Parameters
+        List<Function.Param> params = applyParams(errors, proto.params, "parameter", Function.Param::new);
+        if (params == null) hadError = true;
+
+        // Create
+        if (hadError) return null;
+        return func.run(returnType, params);
     }
 }

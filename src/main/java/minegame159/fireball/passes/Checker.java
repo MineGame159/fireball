@@ -9,6 +9,7 @@ import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.*;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
+import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -30,7 +31,9 @@ public class Checker extends AstPass {
 
     private final Stack<Map<String, Variable>> scopes = new Stack<>();
     private boolean skipBlockScopes;
+
     private Function currentFunction;
+    private boolean hasTopLevelReturn;
 
     private Checker(Context context) {
         this.context = context;
@@ -44,10 +47,13 @@ public class Checker extends AstPass {
 
     @Override
     public void visitFunctionStart(ProtoFunction proto) {
+        // Begin function
         beginScope();
         skipBlockScopes = proto.body instanceof Stmt.Block;
         currentFunction = context.getFunction(proto.name);
+        hasTopLevelReturn = false;
 
+        // Declare and define parameters
         for (ProtoParameter param : proto.params) {
             declare(param.name(), context.getType(param.type()));
             define(param.name());
@@ -56,6 +62,10 @@ public class Checker extends AstPass {
 
     @Override
     public void visitFunctionEnd(ProtoFunction proto) {
+        // Check for return statement if function returns something
+        if (!hasTopLevelReturn && context.getType(proto.returnType) != PrimitiveTypes.Void.type) errors.add(Errors.missingReturn(proto.name));
+
+        // End function
         endScope();
         skipBlockScopes = false;
         currentFunction = null;
@@ -70,8 +80,13 @@ public class Checker extends AstPass {
 
     @Override
     public void visitBlockStmt(Stmt.Block stmt) {
+        // Begin scope
         if (!skipBlockScopes) beginScope();
+
+        // Check statements inside the block
         acceptS(stmt.statements);
+
+        // End scope
         if (!skipBlockScopes) endScope();
     }
 
@@ -79,14 +94,20 @@ public class Checker extends AstPass {
     public void visitVariableStmt(Stmt.Variable stmt) {
         Type type = stmt.getType(context);
 
+        // Declare variable
+        declare(stmt.name, type);
+
+        // Check initializer
+        acceptE(stmt.initializer);
+
+        // Define variable
+        if (stmt.initializer != null || context.getType(stmt.type) instanceof StructType) define(stmt.name);
+
+        // Check expected initializer type
         if (stmt.initializer != null) {
             Type valueType = stmt.initializer.getType();
             if (!type.equals(valueType)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
         }
-
-        declare(stmt.name, type);
-        acceptE(stmt.initializer);
-        if (stmt.initializer != null || context.getType(stmt.type) instanceof StructType) define(stmt.name);
     }
 
     @Override
@@ -112,10 +133,14 @@ public class Checker extends AstPass {
 
     @Override
     public void visitReturnStmt(Stmt.Return stmt) {
+        // Check expected return type
         Type valueType = stmt.value.getType();
         if (!currentFunction.returnType.equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
 
+        // Check function body
         acceptE(stmt.value);
+
+        if (scopes.size() <= 1) hasTopLevelReturn = true;
     }
 
     @Override
@@ -148,54 +173,71 @@ public class Checker extends AstPass {
 
     @Override
     public void visitBinaryExpr(Expr.Binary expr) {
-        if (!expr.left.getType().isNumber() || !expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "binary", "number", true));
-
         acceptE(expr.left);
         acceptE(expr.right);
+
+        // Can only apply binary operations to numbers
+        if (!expr.left.getType().isNumber() || !expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "binary", "number", true));
     }
 
     @Override
     public void visitUnaryExpr(Expr.Unary expr) {
+        acceptE(expr.right);
+
+        // Can only invert booleans
         if (expr.operator.type() == TokenType.Bang) {
             if (!expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "invert", "boolean", false));
         }
+        // Can only negate numbers
         else if (expr.operator.type() == TokenType.Minus) {
             if (!expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "negate", "number", false));
         }
-
-        acceptE(expr.right);
+        // Check invalid pointer target
+        else if (expr.operator.type() == TokenType.Ampersand) {
+            // Can only take address of a variable or a field
+            if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) errors.add(Errors.invalidPointerTarget(expr.operator));
+                // Cannot take address of a pointer
+            else if (expr.right.getType().isPointer()) errors.add(Errors.invalidPointerTarget(expr.operator));
+        }
     }
 
     @Override
     public void visitLogicalExpr(Expr.Logical expr) {
-        if (!expr.left.getType().isBool() || !expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "logical", "boolean", true));
-
         acceptE(expr.left);
         acceptE(expr.right);
+
+        // Can only apply logical operations to booleans
+        if (!expr.left.getType().isBool() || !expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "logical", "boolean", true));
     }
 
     @Override
     public void visitVariableExpr(Expr.Variable expr) {
+        // If variable is local variable check if it's defined
         Variable var = getLocal(expr.name);
-
-        if (var == null) {
-            if (context.getFunction(expr.name) == null) errors.add(Errors.undeclared(expr.name));
-        }
-        else if (!var.defined) errors.add(Errors.undefined(expr.name));
+        if (var != null && !var.defined) errors.add(Errors.undefined(expr.name));
     }
 
     @Override
     public void visitAssignExpr(Expr.Assign expr) {
+        // Check value
+        acceptE(expr.value);
+
+        // Check expected type
         Variable var = getLocal(expr.name);
 
         if (var == null) errors.add(Errors.undeclared(expr.name));
         else if (!var.type.equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, var.type, expr.value.getType()));
 
-        acceptE(expr.value);
+        // Define variable
+        define(expr.name);
     }
 
     @Override
     public void visitCallExpr(Expr.Call expr) {
+        acceptE(expr.callee);
+        acceptE(expr.arguments);
+
+        // This is horrible but i cba to clean it up now
         if (!(expr.callee instanceof Expr.Variable || expr.callee instanceof Expr.Get)) errors.add(Errors.invalidCallTarget(expr.token));
         else {
             Function function = null;
@@ -236,9 +278,6 @@ public class Checker extends AstPass {
                 }
             }
         }
-
-        acceptE(expr.callee);
-        acceptE(expr.arguments);
     }
 
     @Override
@@ -251,7 +290,10 @@ public class Checker extends AstPass {
         acceptE(expr.object);
         acceptE(expr.value);
 
-        if (!expr.getType().equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
+        if (expr.getType() != null) {
+            // Check if expression can be assigned to the field
+            if (!expr.getType().equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
+        }
     }
 
     // Scope
@@ -269,7 +311,8 @@ public class Checker extends AstPass {
     }
 
     private void define(Token name) {
-        scopes.peek().get(name.lexeme()).defined = true;
+        Variable var = getLocal(name);
+        if (var != null) var.defined = true;
     }
 
     private Variable getLocal(Token name) {
