@@ -7,7 +7,7 @@ import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
-import java.io.Writer;
+import java.io.*;
 import java.util.List;
 
 public class Compiler extends AstPass {
@@ -25,21 +25,15 @@ public class Compiler extends AstPass {
 
     private void compile(Parser.Result result) {
         // Standard library
-        w.writeln("\n// Standard library\n");
-        w.writeln("#include <stdbool.h>");
-        w.writeln("#include <stdint.h>");
-        w.writeln("#include <stdio.h>\n");
-
-        w.writeln("typedef uint8_t u8;");
-        w.writeln("typedef uint16_t u16;");
-        w.writeln("typedef uint32_t u32;");
-        w.writeln("typedef uint64_t u64;");
-        w.writeln("typedef int8_t i8;");
-        w.writeln("typedef int16_t i16;");
-        w.writeln("typedef int32_t i32;");
-        w.writeln("typedef int64_t i64;");
-        w.writeln("typedef float f32;");
-        w.writeln("typedef double f64;");
+        try (BufferedReader br = new BufferedReader(new FileReader("scripts/standard-lib.c"))) {
+            String line;
+            while ((line = br.readLine()) != null) w.writeln(line);
+        }
+        catch (Exception e) {
+            System.err.println("Error locating standard library, compile failed.");
+            e.printStackTrace();
+            return;
+        }
 
         // Forward declarations
         w.writeln("\n// Forward declarations\n");
