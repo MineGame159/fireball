@@ -35,11 +35,6 @@ i32 getNumber() {
     return 8;
 }
 
-void modify(Point* p) {
-    p.x = 6;
-    p.y = 9;
-}
-
 /*
  * C functions
  */

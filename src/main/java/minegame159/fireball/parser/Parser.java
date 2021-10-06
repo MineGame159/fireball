@@ -331,7 +331,7 @@ public class Parser {
     }
 
     private Expr factor() {
-        Expr expr = unary();
+        Expr expr = cast();
 
         while (match(TokenType.Slash, TokenType.Star, TokenType.Percentage)) {
             Token operator = previous();
@@ -340,6 +340,16 @@ public class Parser {
         }
 
         return expr;
+    }
+
+    private Expr cast() {
+        if (match(TokenType.LeftParen)) {
+            ProtoType type = consumeType("target");
+            consume(TokenType.RightParen, "Expected ')' after cast target.");
+            return new Expr.Cast(unary(), type);
+        }
+
+        return unary();
     }
 
     private Expr unary() {

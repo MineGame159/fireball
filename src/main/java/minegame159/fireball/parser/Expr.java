@@ -2,6 +2,7 @@
 
 package minegame159.fireball.parser;
 
+import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.Type;
 
@@ -17,6 +18,7 @@ public abstract class Expr {
         void visitStringExpr(String expr);
         void visitGroupingExpr(Grouping expr);
         void visitBinaryExpr(Binary expr);
+        void visitCastExpr(Cast expr);
         void visitUnaryExpr(Unary expr);
         void visitLogicalExpr(Logical expr);
         void visitVariableExpr(Variable expr);
@@ -183,6 +185,28 @@ public abstract class Expr {
         @Override
         public Type getType() {
             return left.getType();
+        }
+    }
+
+    public static class Cast extends Expr {
+        public final Expr expr;
+        public final ProtoType type;
+
+        public Type _type;
+
+        public Cast(Expr expr, ProtoType type) {
+            this.expr = expr;
+            this.type = type;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitCastExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return _type;
         }
     }
 

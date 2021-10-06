@@ -26,6 +26,8 @@ public class Context {
 
     public Type getType(ProtoType proto) {
         Type type = types.get(proto.name().lexeme());
+        if (type == null) return null;
+
         return proto.pointer() ? type.pointer() : type;
     }
 

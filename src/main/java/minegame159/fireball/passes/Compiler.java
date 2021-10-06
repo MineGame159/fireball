@@ -270,6 +270,12 @@ public class Compiler extends AstPass {
     }
 
     @Override
+    public void visitCastExpr(Expr.Cast expr) {
+        w.write('(').write(expr.getType()).write(") ");
+        acceptE(expr.expr);
+    }
+
+    @Override
     public void visitUnaryExpr(Expr.Unary expr) {
         w.write(expr.operator);
         acceptE(expr.right);

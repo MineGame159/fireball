@@ -180,6 +180,11 @@ public class Checker extends AstPass {
     }
 
     @Override
+    public void visitCastExpr(Expr.Cast expr) {
+        acceptE(expr.expr);
+    }
+
+    @Override
     public void visitUnaryExpr(Expr.Unary expr) {
         acceptE(expr.right);
 

@@ -143,6 +143,15 @@ public class TypeResolver extends AstPass {
     }
 
     @Override
+    public void visitCastExpr(Expr.Cast expr) {
+        acceptE(expr.expr);
+
+        // Resolve target type
+        expr._type = context.getType(expr.type);
+        if (expr._type == null) errors.add(Errors.unknownType(expr.type.name(), expr.type));
+    }
+
+    @Override
     public void visitUnaryExpr(Expr.Unary expr) {
         acceptE(expr.right);
     }
