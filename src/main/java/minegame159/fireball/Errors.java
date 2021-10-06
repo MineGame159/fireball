@@ -3,6 +3,7 @@ package minegame159.fireball;
 import minegame159.fireball.context.Struct;
 import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Token;
+import minegame159.fireball.parser.TokenType;
 import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.Type;
 
@@ -81,5 +82,9 @@ public class Errors {
 
     public static Error invalidPointerTarget(Token token) {
         return new Error(token, "Invalid pointer target.");
+    }
+
+    public static Error invalidUnaryPostTarget(Token operator) {
+        return new Error(operator, "Invalid " + (operator.type() == TokenType.PlusPlus ? "increment" : "decrement") + " target.");
     }
 }

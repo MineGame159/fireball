@@ -203,6 +203,22 @@ public class Checker extends AstPass {
                 // Cannot take address of a pointer
             else if (expr.right.getType().isPointer()) errors.add(Errors.invalidPointerTarget(expr.operator));
         }
+        // Check invalid ++ and -- target
+        else if (expr.operator.type() == TokenType.PlusPlus || expr.operator.type() == TokenType.MinusMinus) {
+            if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) {
+                errors.add(Errors.invalidUnaryPostTarget(expr.operator));
+            }
+        }
+    }
+
+    @Override
+    public void visitUnaryPostExpr(Expr.UnaryPost expr) {
+        acceptE(expr.left);
+
+        // Check for correct ++ and -- target
+        if (!(expr.left instanceof Expr.Variable) && !(expr.left instanceof Expr.Get)) {
+            errors.add(Errors.invalidUnaryPostTarget(expr.operator));
+        }
     }
 
     @Override

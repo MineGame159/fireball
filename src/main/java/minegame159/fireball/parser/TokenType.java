@@ -11,8 +11,8 @@ public enum TokenType {
     Greater, GreaterEqual,
     Less, LessEqual,
 
-    Plus, PlusEqual,
-    Minus, MinusEqual,
+    Plus, PlusPlus, PlusEqual,
+    Minus, MinusMinus, MinusEqual,
     Star, StarEqual,
     Slash, SlashEqual,
     Percentage, PercentageEqual,

@@ -346,20 +346,31 @@ public class Parser {
         if (match(TokenType.LeftParen)) {
             ProtoType type = consumeType("target");
             consume(TokenType.RightParen, "Expected ')' after cast target.");
-            return new Expr.Cast(unary(), type);
+            return new Expr.Cast(cast(), type);
         }
 
         return unary();
     }
 
     private Expr unary() {
-        if (match(TokenType.Bang, TokenType.Minus, TokenType.Ampersand)) {
+        if (match(TokenType.Bang, TokenType.Minus, TokenType.Ampersand, TokenType.PlusPlus, TokenType.MinusMinus)) {
             Token operator = previous();
             Expr right = unary();
             return new Expr.Unary(operator, right);
         }
 
-        return call();
+        return unaryPost();
+    }
+
+    private Expr unaryPost() {
+        Expr expr = call();
+
+        while (match(TokenType.PlusPlus, TokenType.MinusMinus)) {
+            Token operator = previous();
+            expr = new Expr.UnaryPost(operator, expr);
+        }
+
+        return expr;
     }
 
     private Expr call() {

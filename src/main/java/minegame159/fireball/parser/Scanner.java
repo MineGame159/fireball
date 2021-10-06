@@ -50,8 +50,8 @@ public class Scanner {
             case '>' -> token(match('=') ? TokenType.GreaterEqual : TokenType.Greater);
             case '<' -> token(match('=') ? TokenType.LessEqual : TokenType.Less);
 
-            case '+' -> token(match('=') ? TokenType.PlusEqual : TokenType.Plus);
-            case '-' -> token(match('=') ? TokenType.MinusEqual : TokenType.Minus);
+            case '+' -> token(match('+') ? TokenType.PlusPlus : (match('=') ? TokenType.PlusEqual : TokenType.Plus));
+            case '-' -> token(match('-') ? TokenType.MinusMinus : (match('=') ? TokenType.MinusEqual : TokenType.Minus));
             case '*' -> token(match('=') ? TokenType.StarEqual : TokenType.Star);
             case '/' -> token(match('=') ? TokenType.SlashEqual : TokenType.Slash);
             case '%' -> token(match('=') ? TokenType.PercentageEqual : TokenType.Percentage);

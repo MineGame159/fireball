@@ -20,6 +20,7 @@ public abstract class Expr {
         void visitBinaryExpr(Binary expr);
         void visitCastExpr(Cast expr);
         void visitUnaryExpr(Unary expr);
+        void visitUnaryPostExpr(UnaryPost expr);
         void visitLogicalExpr(Logical expr);
         void visitVariableExpr(Variable expr);
         void visitAssignExpr(Assign expr);
@@ -228,6 +229,26 @@ public abstract class Expr {
         public Type getType() {
             Type type = right.getType();
             return operator.type() == TokenType.Ampersand ? type.pointer() : type;
+        }
+    }
+
+    public static class UnaryPost extends Expr {
+        public final Token operator;
+        public final Expr left;
+
+        public UnaryPost(Token operator, Expr left) {
+            this.operator = operator;
+            this.left = left;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitUnaryPostExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return left.getType();
         }
     }
 

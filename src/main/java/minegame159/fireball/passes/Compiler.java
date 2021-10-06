@@ -282,6 +282,12 @@ public class Compiler extends AstPass {
     }
 
     @Override
+    public void visitUnaryPostExpr(Expr.UnaryPost expr) {
+        acceptE(expr.left);
+        w.write(expr.operator);
+    }
+
+    @Override
     public void visitLogicalExpr(Expr.Logical expr) {
         acceptE(expr.left);
         w.write(' ').write(expr.operator).write(' ');

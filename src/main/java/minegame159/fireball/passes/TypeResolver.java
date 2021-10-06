@@ -157,6 +157,11 @@ public class TypeResolver extends AstPass {
     }
 
     @Override
+    public void visitUnaryPostExpr(Expr.UnaryPost expr) {
+        acceptE(expr.left);
+    }
+
+    @Override
     public void visitLogicalExpr(Expr.Logical expr) {
         acceptE(expr.left);
         acceptE(expr.right);
