@@ -11,6 +11,10 @@ struct Point {
         this.x = this.x + x;
         this.y = this.y + y;
     }
+
+    void print() {
+        print2(this.x, this.y);
+    }
 }
 
 i32 main() {
@@ -18,15 +22,12 @@ i32 main() {
     var b = getNumber();
     b = 6 / 2;
 
-    if (true) {}
-    else {}
-
-    print(b);
+    if (b > 1) print(b);
 
     // Structs
     var p = Point(0, 10);
     for (i32 i = 0; i < 3; i++) p.add(i, 0);
-    print2(p.x, p.y);
+    p.print();
 
     return 0;
 }

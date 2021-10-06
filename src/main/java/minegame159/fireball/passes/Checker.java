@@ -235,7 +235,7 @@ public class Checker extends AstPass {
         // If variable is local variable check if it's defined
         Variable var = getLocal(expr.name);
         if (var != null && !var.defined) errors.add(Errors.undefined(expr.name));
-        else {
+        else if (var == null) {
             // If variable is constructor check if it exists
             if (callArguments != null && expr.getType() instanceof StructType structType) {
                 Constructor constructor = structType.struct.getConstructor(callArguments);
