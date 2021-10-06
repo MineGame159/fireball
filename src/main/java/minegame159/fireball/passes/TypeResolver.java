@@ -9,6 +9,7 @@ import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.parser.Token;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
+import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -235,6 +236,12 @@ public class TypeResolver extends AstPass {
         if (function != null) {
             if (function.returnType == null) errors.add(Errors.couldNotGetType(name));
             return function.returnType;
+        }
+
+        // Constructor
+        Struct struct = context.getStruct(name);
+        if (struct != null) {
+            return context.getType(new ProtoType(name));
         }
 
         errors.add(Errors.couldNotGetType(name));

@@ -62,20 +62,15 @@ public class Parser {
 
         consume(TokenType.LeftBrace, "Expected '{' after struct name.");
         List<ProtoParameter> fields = new ArrayList<>();
+        List<ProtoMethod> constructors = new ArrayList<>();
         List<ProtoMethod> methods = new ArrayList<>();
 
         while (!check(TokenType.RightBrace)) {
-            ProtoType type = consumeType("field or method");
-            Token name2 = consume(TokenType.Identifier, "Expected field or method name.");
+            Token identifier = consume(TokenType.Identifier, "Expected identifier.");
 
-            if (match(TokenType.Semicolon)) {
-                fields.add(new ProtoParameter(type, name2));
-            }
-            else {
-                consume(TokenType.LeftParen, "Expected '(' after method name");
+            if (identifier.lexeme().equals(name.lexeme()) && match(TokenType.LeftParen)) {
+                // Constructor
                 List<ProtoParameter> params = new ArrayList<>();
-
-                params.add(new ProtoParameter(new ProtoType(name, true), new Token(TokenType.Identifier, "this", 0, 0)));
 
                 boolean first = true;
                 while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
@@ -83,16 +78,55 @@ public class Parser {
                     first = false;
                 }
 
-                consume(TokenType.RightParen, "Expected ')' after method parameters.");
+                consume(TokenType.RightParen, "Expected ')' after constructor parameters.");
                 Stmt body = statement();
 
-                methods.add(new ProtoMethod(name2, type, params, body));
+                if (!(body instanceof Stmt.Block)) {
+                    Stmt.Block block = new Stmt.Block(new ArrayList<>(2));
+                    block.statements.add(body);
+                    body = block;
+                }
+
+                Token thisToken = new Token(TokenType.Identifier, "this", 0, 0);
+                ((Stmt.Block) body).statements.add(0, new Stmt.Variable(new ProtoType(identifier), thisToken, null));
+                ((Stmt.Block) body).statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
+
+                constructors.add(new ProtoMethod(identifier, new ProtoType(identifier), params, body));
+            }
+            else {
+                // Field or method
+                boolean pointer = match(TokenType.Star);
+                ProtoType type = new ProtoType(identifier, pointer);
+
+                Token name2 = consume(TokenType.Identifier, "Expected field or method name.");
+
+                if (match(TokenType.Semicolon)) {
+                    // Field
+                    fields.add(new ProtoParameter(type, name2));
+                } else {
+                    // Method
+                    consume(TokenType.LeftParen, "Expected '(' after method name");
+                    List<ProtoParameter> params = new ArrayList<>();
+
+                    params.add(new ProtoParameter(new ProtoType(name, true), new Token(TokenType.Identifier, "this", 0, 0)));
+
+                    boolean first = true;
+                    while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
+                        params.add(consumeParameter("parameter"));
+                        first = false;
+                    }
+
+                    consume(TokenType.RightParen, "Expected ')' after method parameters.");
+                    Stmt body = statement();
+
+                    methods.add(new ProtoMethod(name2, type, params, body));
+                }
             }
         }
 
         consume(TokenType.RightBrace, "Expected '}' after struct body.");
 
-        result.structs.add(new ProtoStruct(name, fields, methods));
+        result.structs.add(new ProtoStruct(name, fields, constructors, methods));
     }
 
     private void functionDeclaration() {

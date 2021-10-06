@@ -2,10 +2,7 @@ package minegame159.fireball.passes;
 
 import minegame159.fireball.Error;
 import minegame159.fireball.Errors;
-import minegame159.fireball.context.Context;
-import minegame159.fireball.context.Function;
-import minegame159.fireball.context.Method;
-import minegame159.fireball.context.Struct;
+import minegame159.fireball.context.*;
 import minegame159.fireball.parser.*;
 import minegame159.fireball.parser.prototypes.ProtoFunction;
 import minegame159.fireball.parser.prototypes.ProtoParameter;
@@ -34,6 +31,8 @@ public class Checker extends AstPass {
 
     private Function currentFunction;
     private boolean hasTopLevelReturn;
+
+    private List<Expr> callArguments;
 
     private Checker(Context context) {
         this.context = context;
@@ -135,7 +134,7 @@ public class Checker extends AstPass {
     public void visitReturnStmt(Stmt.Return stmt) {
         // Check expected return type
         Type valueType = stmt.value.getType();
-        if (!currentFunction.returnType.equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
+        if (currentFunction != null && !currentFunction.returnType.equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
 
         // Check function body
         acceptE(stmt.value);
@@ -215,6 +214,13 @@ public class Checker extends AstPass {
         // If variable is local variable check if it's defined
         Variable var = getLocal(expr.name);
         if (var != null && !var.defined) errors.add(Errors.undefined(expr.name));
+        else {
+            // If variable is constructor check if it exists
+            if (callArguments != null && expr.getType() instanceof StructType structType) {
+                Constructor constructor = structType.struct.getConstructor(callArguments);
+                if (constructor == null) errors.add(Errors.unknownConstructor(structType.struct, expr.name, callArguments));
+            }
+        }
     }
 
     @Override
@@ -234,7 +240,11 @@ public class Checker extends AstPass {
 
     @Override
     public void visitCallExpr(Expr.Call expr) {
+        List<Expr> preCallArguments = callArguments;
+        callArguments = expr.arguments;
         acceptE(expr.callee);
+        callArguments = preCallArguments;
+
         acceptE(expr.arguments);
 
         // This is horrible but i cba to clean it up now

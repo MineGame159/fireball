@@ -2,6 +2,11 @@ struct Point {
     i32 x;
     i32 y;
 
+    Point(i32 x, i32 y) {
+        this.x = x;
+        this.y = y;
+    }
+
     void add(i32 x, i32 y) {
         this.x = this.x + x;
         this.y = this.y + y;
@@ -19,11 +24,8 @@ i32 main() {
     print(b);
 
     // Structs
-    Point p;
-
-    modify(&p);
+    var p = Point(0, 10);
     p.add(1, 0);
-
     print2(p.x, p.y);
 
     return 0;

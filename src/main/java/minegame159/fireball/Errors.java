@@ -1,8 +1,12 @@
 package minegame159.fireball;
 
+import minegame159.fireball.context.Struct;
+import minegame159.fireball.parser.Expr;
 import minegame159.fireball.parser.Token;
 import minegame159.fireball.parser.prototypes.ProtoType;
 import minegame159.fireball.types.Type;
+
+import java.util.List;
 
 public class Errors {
     // Types
@@ -51,6 +55,17 @@ public class Errors {
 
     public static Error unknownField(Token struct, Token field) {
         return new Error(field, "Struct '" + struct + "' does not contain field '" + field + "'.");
+    }
+
+    public static Error unknownConstructor(Struct struct, Token name, List<Expr> arguments) {
+        StringBuilder sb = new StringBuilder("Struct '").append(struct.name()).append("' does not contain constructor with arguments '");
+
+        for (int i = 0; i < arguments.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(arguments.get(i).getType());
+        }
+
+        return new Error(name, sb.append("'.").toString());
     }
 
     // Other

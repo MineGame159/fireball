@@ -7,12 +7,16 @@ import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.Writer;
 import java.util.List;
 
 public class Compiler extends AstPass {
     private final Context context;
     private final CompilerWriter w;
+
+    private List<Expr> callArguments;
 
     private Compiler(Context context, Writer writer) {
         this.context = context;
@@ -40,8 +44,16 @@ public class Compiler extends AstPass {
 
         //     Structs
         for (Struct struct : context.getStructs()) {
+            // Struct
             w.write("typedef struct ").write(struct.name()).write(' ').write(struct.name()).writeSemicolon();
 
+            // Constructors
+            for (Constructor constructor : struct.constructors()) {
+                writeFunctionDefinition(constructor);
+                w.writeSemicolon();
+            }
+
+            // Methods
             for (Method method : struct.methods()) {
                 writeFunctionDefinition(method);
                 w.writeSemicolon();
@@ -74,6 +86,9 @@ public class Compiler extends AstPass {
             w.indent().write('}').writeSemicolon();
 
             w.write('\n');
+
+            // Constructors
+            for (Constructor constructor : struct.constructors()) writeFunction(constructor);
 
             // Methods
             for (Method method : struct.methods()) writeFunction(method);
@@ -269,7 +284,14 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitVariableExpr(Expr.Variable expr) {
-        w.write(expr.name);
+        String name = expr.name.lexeme();
+
+        if (callArguments != null && expr.getType() instanceof StructType structType) {
+            // getConstructor() should never return null because it was validated in previous AST pass
+            name = structType.struct.getConstructor(callArguments).getOutputName();
+        }
+
+        w.write(name);
     }
 
     @Override
@@ -281,7 +303,11 @@ public class Compiler extends AstPass {
     @Override
     public void visitCallExpr(Expr.Call expr) {
         if (expr.callee instanceof Expr.Variable) {
+            List<Expr> preCallArguments = callArguments;
+            callArguments = expr.arguments;
             acceptE(expr.callee);
+            callArguments = preCallArguments;
+
             w.write('(');
 
             for (int i = 0; i < expr.arguments.size(); i++) {

@@ -56,7 +56,7 @@ public class Context {
 
         // Register structs as types
         for (ProtoStruct proto : result.structs) {
-            Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()), new ArrayList<>(proto.methods().size()));
+            Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()), new ArrayList<>(proto.constructors().size()), new ArrayList<>(proto.methods().size()));
 
             types.put(proto.name().lexeme(), new StructType(proto.name().lexeme(), struct));
             structs.put(proto.name().lexeme(), struct);
@@ -69,6 +69,15 @@ public class Context {
             // Fields
             List<Field> fields = applyParams(errors, protoStruct.fields(), "field", Field::new);
             if (fields != null) struct.fields().addAll(fields);
+
+            // Constructors
+            for (int i = 0; i < protoStruct.constructors().size(); i++) {
+                ProtoMethod protoConstructor = protoStruct.constructors().get(i);
+                int index = i;
+
+                Constructor constr = applyFunction(errors, protoConstructor, (first, second) -> new Constructor(struct, protoConstructor.name, first, second, protoConstructor.body, index));
+                if (constr != null) struct.constructors().add(constr);
+            }
 
             // Methods
             for (ProtoMethod protoMethod : protoStruct.methods()) {
