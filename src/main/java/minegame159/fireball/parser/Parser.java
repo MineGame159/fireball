@@ -335,7 +335,7 @@ public class Parser {
 
         while (match(TokenType.Slash, TokenType.Star, TokenType.Percentage)) {
             Token operator = previous();
-            Expr right = unary();
+            Expr right = cast();
             expr = new Expr.Binary(expr, operator, right);
         }
 
