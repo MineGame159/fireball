@@ -58,23 +58,34 @@ public class Context {
 
         // Register structs as types
         for (ProtoStruct proto : result.structs) {
-            Struct struct = new Struct(proto.name(), new ArrayList<>(proto.fields().size()), new ArrayList<>(proto.constructors().size()), new ArrayList<>(proto.methods().size()));
+            // Check for duplicate type
+            if (types.containsKey(proto.name.lexeme())) {
+                errors.add(Errors.duplicate(proto.name, "type"));
+                proto.skip = true;
+                continue;
+            }
 
-            types.put(proto.name().lexeme(), new StructType(proto.name().lexeme(), struct));
-            structs.put(proto.name().lexeme(), struct);
+            // Register struct
+            Struct struct = new Struct(proto.name, new ArrayList<>(proto.fields.size()), new ArrayList<>(proto.constructors.size()), new ArrayList<>(proto.methods.size()));
+
+            types.put(proto.name.lexeme(), new StructType(proto.name.lexeme(), struct));
+            structs.put(proto.name.lexeme(), struct);
         }
 
         // Apply structs
         for (ProtoStruct protoStruct : result.structs) {
-            Struct struct = structs.get(protoStruct.name().lexeme());
+            // Skip if needed
+            if (protoStruct.skip) continue;
+
+            Struct struct = structs.get(protoStruct.name.lexeme());
 
             // Fields
-            List<Field> fields = applyParams(errors, protoStruct.fields(), "field", Field::new);
+            List<Field> fields = applyParams(errors, protoStruct.fields, "field", Field::new);
             if (fields != null) struct.fields().addAll(fields);
 
             // Constructors
-            for (int i = 0; i < protoStruct.constructors().size(); i++) {
-                ProtoMethod protoConstructor = protoStruct.constructors().get(i);
+            for (int i = 0; i < protoStruct.constructors.size(); i++) {
+                ProtoMethod protoConstructor = protoStruct.constructors.get(i);
                 int index = i;
 
                 Constructor constr = applyFunction(errors, protoConstructor, (first, second) -> new Constructor(struct, protoConstructor.name, first, second, protoConstructor.body, index));
@@ -82,7 +93,7 @@ public class Context {
             }
 
             // Methods
-            for (ProtoMethod protoMethod : protoStruct.methods()) {
+            for (ProtoMethod protoMethod : protoStruct.methods) {
                 Method method = applyFunction(errors, protoMethod, (first, second) -> new Method(struct, protoMethod.name, first, second, protoMethod.body));
                 if (method != null) struct.methods().add(method);
             }
