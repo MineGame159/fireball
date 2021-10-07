@@ -15,7 +15,7 @@ public class PrimitiveType extends Type {
 
     @Override
     public boolean equals(Type type) {
-        if (type instanceof PrimitiveType t) return this.type == t.type;
-        return false;
+        if (!super.equals(type)) return false;
+        return this.type == ((PrimitiveType) type).type;
     }
 }

@@ -17,7 +17,7 @@ public class StructType extends Type {
 
     @Override
     public boolean equals(Type type) {
-        if (type instanceof StructType t) return this.name.equals(t.name);
-        return false;
+        if (!super.equals(type)) return false;
+        return name.equals(type.name);
     }
 }

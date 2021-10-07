@@ -38,7 +38,9 @@ public abstract class Type implements Cloneable {
 
     protected abstract Type copy();
 
-    public abstract boolean equals(Type type);
+    public boolean equals(Type type) {
+        return getClass() == type.getClass() && pointer == type.pointer;
+    }
 
     @Override
     public String toString() {

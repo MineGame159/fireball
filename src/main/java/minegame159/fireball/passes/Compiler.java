@@ -315,7 +315,9 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitAssignExpr(Expr.Assign expr) {
+        if (expr.getType().isPointer()) w.write('*');
         w.write(expr.name).write(" = ");
+
         acceptE(expr.value);
     }
 

@@ -260,7 +260,10 @@ public class Checker extends AstPass {
         Variable var = getLocal(expr.name);
 
         if (var == null) errors.add(Errors.undeclared(expr.name));
-        else if (!var.type.equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, var.type, expr.value.getType()));
+        else if (!var.type.equals(expr.value.getType())) {
+            // Allow assigning non-pointer values to pointer variables
+            if (!var.type.isPointer() || expr.value.getType().isPointer()) errors.add(Errors.mismatchedType(expr.name, var.type, expr.value.getType()));
+        }
 
         // Define variable
         define(expr.name);
