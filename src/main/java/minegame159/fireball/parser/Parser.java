@@ -97,12 +97,6 @@ public class Parser {
                     consume(TokenType.RightParen, "Expected ')' after constructor parameters.");
                     Stmt body = statement();
 
-                    if (!(body instanceof Stmt.Block)) {
-                        Stmt.Block block = new Stmt.Block(new ArrayList<>(2));
-                        block.statements.add(body);
-                        body = block;
-                    }
-
                     Token thisToken = new Token(TokenType.Identifier, "this", 0, 0);
                     Token initToken = new Token(TokenType.Identifier, "_init_" + methods.size(), 0, 0);
 

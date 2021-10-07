@@ -125,7 +125,19 @@ public class Compiler extends AstPass {
         writeFunctionDefinition(function);
         w.write(' ');
 
+        if (!(function.body instanceof Stmt.Block)) {
+            w.writeln('{');
+            w.indentUp();
+            w.indent();
+        }
+
         function.accept(this);
+
+        if (!(function.body instanceof Stmt.Block)) {
+            w.indentDown();
+            w.indent().writeln('}');
+        }
+
         w.write('\n');
     }
 

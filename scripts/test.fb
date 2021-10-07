@@ -45,9 +45,7 @@ i32 main() {
     return 0;
 }
 
-i32 getNumber() {
-    return 8;
-}
+i32 getNumber() return 8;
 
 /*
  * C functions
