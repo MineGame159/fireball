@@ -44,6 +44,7 @@ public class Scanner {
             case ';' -> token(TokenType.Semicolon);
             case ',' -> token(TokenType.Comma);
             case '.' -> token(TokenType.Dot);
+            case '~' -> token(TokenType.Tilde);
 
             case '!' -> token(match('=') ? TokenType.BangEqual : TokenType.Bang);
             case '=' -> token(match('=') ? TokenType.EqualEqual : TokenType.Equal);

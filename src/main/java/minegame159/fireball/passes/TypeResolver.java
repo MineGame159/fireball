@@ -242,7 +242,7 @@ public class TypeResolver extends AstPass {
             if (field == null) {
                 Method method = struct.getMethod(name);
 
-                if (method == null) errors.add(Errors.unknownField(struct.name(), name));
+                if (method == null) errors.add(Errors.unknownField(struct.name, name));
                 else return method.returnType;
             }
             else return field.type();

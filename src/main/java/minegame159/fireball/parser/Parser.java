@@ -63,85 +63,30 @@ public class Parser {
         consume(TokenType.LeftBrace, "Expected '{' after struct name.");
         List<ProtoParameter> fields = new ArrayList<>();
         List<ProtoMethod> constructors = new ArrayList<>();
+        ProtoMethod destructor = null;
         List<ProtoMethod> methods = new ArrayList<>();
 
         while (!check(TokenType.RightBrace)) {
-            Token identifier = consume(TokenType.Identifier, "Expected identifier.");
+            if (match(TokenType.Tilde)) {
+                // Destructor
+                Token identifier = consume(TokenType.Identifier, "Expected struct name.");
 
-            if (identifier.lexeme().equals(name.lexeme()) && match(TokenType.LeftParen)) {
-                // Constructor
-                List<ProtoParameter> params = new ArrayList<>();
+                if (!identifier.lexeme().equals(name.lexeme())) throw error(identifier, "Destructor name must be the same as the struct name.");
+                if (destructor != null) throw error(identifier, "Struct '" + identifier + "' already contains a destructor.");
 
-                boolean first = true;
-                while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
-                    params.add(consumeParameter("parameter"));
-                    first = false;
-                }
+                consume(TokenType.LeftParen, "Expected '('  after destructor.");
+                consume(TokenType.RightParen, "Expected ')'  after '('.");
 
-                consume(TokenType.RightParen, "Expected ')' after constructor parameters.");
                 Stmt body = statement();
 
-                if (!(body instanceof Stmt.Block)) {
-                    Stmt.Block block = new Stmt.Block(new ArrayList<>(2));
-                    block.statements.add(body);
-                    body = block;
-                }
-
-                Token thisToken = new Token(TokenType.Identifier, "this", 0, 0);
-                Token initToken = new Token(TokenType.Identifier, "_init_" + methods.size(), 0, 0);
-
-                {
-                    // Hidden initialize function
-                    List<ProtoParameter> params2 = new ArrayList<>(params);
-                    params2.add(0, new ProtoParameter(new ProtoType(identifier, true), thisToken));
-                    methods.add(new ProtoMethod(initToken, new ProtoType(new Token(TokenType.Identifier, "void", 0, 0)), params2, body));
-                }
-
-                {
-                    // Malloc constructor
-                    Stmt.Block bod = new Stmt.Block(new ArrayList<>());
-
-                    List<Expr> args = new ArrayList<>(params.size());
-                    for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
-
-                    // TODO: Should somehow put the malloc call inside the initializer
-                    bod.statements.add(new Stmt.Variable(new ProtoType(identifier, true), thisToken, null));
-                    bod.statements.add(new Stmt.CBlock("this = malloc(sizeof(" + identifier + "));"));
-                    bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
-                    bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
-
-                    constructors.add(new ProtoMethod(identifier, new ProtoType(identifier, true), params, bod));
-                }
-                {
-                    // Stack constructor
-                    Stmt.Block bod = new Stmt.Block(new ArrayList<>());
-
-                    List<Expr> args = new ArrayList<>(params.size());
-                    for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
-
-                    bod.statements.add(new Stmt.Variable(new ProtoType(identifier), thisToken, null));
-                    bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
-                    bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
-
-                    constructors.add(new ProtoMethod(identifier, new ProtoType(identifier), params, bod));
-                }
+                destructor = new ProtoMethod(identifier, new ProtoType(new Token(TokenType.Identifier, "void", 0, 0)), new ArrayList<>(0), body);
             }
             else {
-                // Field or method
-                boolean pointer = match(TokenType.Star);
-                ProtoType type = new ProtoType(identifier, pointer);
+                Token identifier = consume(TokenType.Identifier, "Expected identifier.");
 
-                Token name2 = consume(TokenType.Identifier, "Expected field or method name.");
-
-                if (match(TokenType.Semicolon)) {
-                    // Field
-                    fields.add(new ProtoParameter(type, name2));
-                } else {
-                    // Method
-                    consume(TokenType.LeftParen, "Expected '(' after method name");
+                if (identifier.lexeme().equals(name.lexeme()) && match(TokenType.LeftParen)) {
+                    // Constructor
                     List<ProtoParameter> params = new ArrayList<>();
-
-                    params.add(new ProtoParameter(new ProtoType(name, true), new Token(TokenType.Identifier, "this", 0, 0)));
 
                     boolean first = true;
                     while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
@@ -149,17 +94,88 @@ public class Parser {
                         first = false;
                     }
 
-                    consume(TokenType.RightParen, "Expected ')' after method parameters.");
+                    consume(TokenType.RightParen, "Expected ')' after constructor parameters.");
                     Stmt body = statement();
 
-                    methods.add(new ProtoMethod(name2, type, params, body));
+                    if (!(body instanceof Stmt.Block)) {
+                        Stmt.Block block = new Stmt.Block(new ArrayList<>(2));
+                        block.statements.add(body);
+                        body = block;
+                    }
+
+                    Token thisToken = new Token(TokenType.Identifier, "this", 0, 0);
+                    Token initToken = new Token(TokenType.Identifier, "_init_" + methods.size(), 0, 0);
+
+                    {
+                        // Hidden initialize function
+                        List<ProtoParameter> params2 = new ArrayList<>(params);
+                        params2.add(0, new ProtoParameter(new ProtoType(identifier, true), thisToken));
+                        methods.add(new ProtoMethod(initToken, new ProtoType(new Token(TokenType.Identifier, "void", 0, 0)), params2, body));
+                    }
+
+                    {
+                        // Malloc constructor
+                        Stmt.Block bod = new Stmt.Block(new ArrayList<>());
+
+                        List<Expr> args = new ArrayList<>(params.size());
+                        for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
+
+                        // TODO: Should somehow put the malloc call inside the initializer
+                        bod.statements.add(new Stmt.Variable(new ProtoType(identifier, true), thisToken, null));
+                        bod.statements.add(new Stmt.CBlock("this = malloc(sizeof(" + identifier + "));"));
+                        bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
+                        bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
+
+                        constructors.add(new ProtoMethod(identifier, new ProtoType(identifier, true), params, bod));
+                    }
+                    {
+                        // Stack constructor
+                        Stmt.Block bod = new Stmt.Block(new ArrayList<>());
+
+                        List<Expr> args = new ArrayList<>(params.size());
+                        for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
+
+                        bod.statements.add(new Stmt.Variable(new ProtoType(identifier), thisToken, null));
+                        bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
+                        bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
+
+                        constructors.add(new ProtoMethod(identifier, new ProtoType(identifier), params, bod));
+                    }
+                } else {
+                    // Field or method
+                    boolean pointer = match(TokenType.Star);
+                    ProtoType type = new ProtoType(identifier, pointer);
+
+                    Token name2 = consume(TokenType.Identifier, "Expected field or method name.");
+
+                    if (match(TokenType.Semicolon)) {
+                        // Field
+                        fields.add(new ProtoParameter(type, name2));
+                    } else {
+                        // Method
+                        consume(TokenType.LeftParen, "Expected '(' after method name");
+                        List<ProtoParameter> params = new ArrayList<>();
+
+                        params.add(new ProtoParameter(new ProtoType(name, true), new Token(TokenType.Identifier, "this", 0, 0)));
+
+                        boolean first = true;
+                        while (!check(TokenType.RightParen) && (first || match(TokenType.Comma))) {
+                            params.add(consumeParameter("parameter"));
+                            first = false;
+                        }
+
+                        consume(TokenType.RightParen, "Expected ')' after method parameters.");
+                        Stmt body = statement();
+
+                        methods.add(new ProtoMethod(name2, type, params, body));
+                    }
                 }
             }
         }
 
         consume(TokenType.RightBrace, "Expected '}' after struct body.");
 
-        result.structs.add(new ProtoStruct(name, fields, constructors, methods));
+        result.structs.add(new ProtoStruct(name, fields, constructors, destructor, methods));
     }
 
     private void functionDeclaration() {

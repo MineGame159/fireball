@@ -1,9 +1,7 @@
 package minegame159.fireball.passes;
 
 import minegame159.fireball.context.*;
-import minegame159.fireball.parser.Expr;
-import minegame159.fireball.parser.Parser;
-import minegame159.fireball.parser.Stmt;
+import minegame159.fireball.parser.*;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
@@ -45,16 +43,22 @@ public class Compiler extends AstPass {
         //     Structs
         for (Struct struct : context.getStructs()) {
             // Struct
-            w.write("typedef struct ").write(struct.name()).write(' ').write(struct.name()).writeSemicolon();
+            w.write("typedef struct ").write(struct.name).write(' ').write(struct.name).writeSemicolon();
 
             // Constructors
-            for (Constructor constructor : struct.constructors()) {
+            for (Constructor constructor : struct.constructors) {
                 writeFunctionDefinition(constructor);
                 w.writeSemicolon();
             }
 
+            // Destructor
+            if (struct.destructor != null) {
+                writeFunctionDefinition(struct.destructor);
+                w.writeSemicolon();
+            }
+
             // Methods
-            for (Method method : struct.methods()) {
+            for (Method method : struct.methods) {
                 writeFunctionDefinition(method);
                 w.writeSemicolon();
             }
@@ -72,13 +76,13 @@ public class Compiler extends AstPass {
 
         //     Structs
         for (Struct struct : context.getStructs()) {
-            w.write("//     ").write(struct.name()).write("\n\n");
+            w.write("//     ").write(struct.name).write("\n\n");
 
-            w.indent().write("struct ").write(struct.name()).write(" {\n");
+            w.indent().write("struct ").write(struct.name).write(" {\n");
             w.indentUp();
 
             // Fields
-            for (Field field : struct.fields()) {
+            for (Field field : struct.fields) {
                 w.indent().write(field.type()).write(' ').write(field.name()).writeSemicolon();
             }
 
@@ -88,10 +92,13 @@ public class Compiler extends AstPass {
             w.write('\n');
 
             // Constructors
-            for (Constructor constructor : struct.constructors()) writeFunction(constructor);
+            for (Constructor constructor : struct.constructors) writeFunction(constructor);
+
+            // Destructor
+            if (struct.destructor != null) writeFunction(struct.destructor);
 
             // Methods
-            for (Method method : struct.methods()) writeFunction(method);
+            for (Method method : struct.methods) writeFunction(method);
         }
 
         //     Functions
@@ -225,6 +232,18 @@ public class Compiler extends AstPass {
 
     @Override
     public void visitDeleteStmt(Stmt.Delete stmt) {
+        Struct struct = ((StructType) stmt.expr.getType()).struct;
+
+        // Run destructor
+        if (struct.destructor != null) {
+            w.write(struct.destructor.getOutputName()).write('(');
+            acceptE(stmt.expr);
+            w.write(')').writeSemicolon();
+
+            w.indent();
+        }
+
+        // Free
         w.write("free(");
         acceptE(stmt.expr);
         w.write(')').writeSemicolon();

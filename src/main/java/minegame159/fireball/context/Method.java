@@ -17,6 +17,6 @@ public class Method extends Function {
 
     @Override
     public String getOutputName() {
-        return "_" + owner.name() + "__" + name;
+        return "_" + owner.name + "__" + name;
     }
 }

@@ -66,7 +66,7 @@ public class Context {
             }
 
             // Register struct
-            Struct struct = new Struct(proto.name, new ArrayList<>(proto.fields.size()), new ArrayList<>(proto.constructors.size()), new ArrayList<>(proto.methods.size()));
+            Struct struct = new Struct(proto.name, proto.constructors.size(), proto.methods.size());
 
             types.put(proto.name.lexeme(), new StructType(proto.name.lexeme(), struct));
             structs.put(proto.name.lexeme(), struct);
@@ -81,7 +81,7 @@ public class Context {
 
             // Fields
             List<Field> fields = applyParams(errors, protoStruct.fields, "field", Field::new);
-            if (fields != null) struct.fields().addAll(fields);
+            if (fields != null) struct.fields = fields;
 
             // Constructors
             for (int i = 0; i < protoStruct.constructors.size(); i++) {
@@ -89,13 +89,19 @@ public class Context {
                 int index = i;
 
                 Constructor constr = applyFunction(errors, protoConstructor, (first, second) -> new Constructor(struct, protoConstructor.name, first, second, protoConstructor.body, index));
-                if (constr != null) struct.constructors().add(constr);
+                if (constr != null) struct.constructors.add(constr);
+            }
+
+            // Destructor
+            if (protoStruct.destructor != null) {
+                Destructor destructor = applyFunction(errors, protoStruct.destructor, (first, second) -> new Destructor(struct, protoStruct.destructor.name, first, second, protoStruct.destructor.body));
+                if (destructor != null) struct.destructor = destructor;
             }
 
             // Methods
             for (ProtoMethod protoMethod : protoStruct.methods) {
                 Method method = applyFunction(errors, protoMethod, (first, second) -> new Method(struct, protoMethod.name, first, second, protoMethod.body));
-                if (method != null) struct.methods().add(method);
+                if (method != null) struct.methods.add(method);
             }
         }
 

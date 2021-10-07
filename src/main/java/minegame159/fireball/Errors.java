@@ -63,7 +63,7 @@ public class Errors {
     }
 
     public static Error unknownConstructor(Struct struct, Token name, List<Expr> arguments) {
-        StringBuilder sb = new StringBuilder("Struct '").append(struct.name()).append("' does not contain constructor with arguments '");
+        StringBuilder sb = new StringBuilder("Struct '").append(struct.name).append("' does not contain constructor with arguments '");
 
         for (int i = 0; i < arguments.size(); i++) {
             if (i > 0) sb.append(", ");

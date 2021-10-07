@@ -29,6 +29,6 @@ public class Constructor extends Method {
 
     @Override
     public String getOutputName() {
-        return "_" + owner.name() + "__" + index;
+        return "_" + owner.name + "__" + index;
     }
 }

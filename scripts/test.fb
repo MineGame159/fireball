@@ -12,6 +12,10 @@ struct Point {
         this.y = 0;
     }
 
+    ~Point() {
+        c{ printf("Point destructor called\n"); }
+    }
+
     void add(i32 x, i32 y) {
         this.x = this.x + x;
         this.y = this.y + y;
