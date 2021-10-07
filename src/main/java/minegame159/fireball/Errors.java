@@ -54,6 +54,10 @@ public class Errors {
         return new Error(token, "Can only use fields on structs.");
     }
 
+    public static Error invalidNewTarget(Token token) {
+        return new Error(token, "Can only use new on structs.");
+    }
+
     public static Error unknownField(Token struct, Token field) {
         return new Error(field, "Struct '" + struct + "' does not contain field '" + field + "'.");
     }
@@ -86,5 +90,9 @@ public class Errors {
 
     public static Error invalidUnaryPostTarget(Token operator) {
         return new Error(operator, "Invalid " + (operator.type() == TokenType.PlusPlus ? "increment" : "decrement") + " target.");
+    }
+
+    public static Error cannotDelete(Token token, Type type) {
+        return new Error(token, "Can only delete struct pointers. Got '" + type + "'.");
     }
 }

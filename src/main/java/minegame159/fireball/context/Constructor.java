@@ -16,8 +16,9 @@ public class Constructor extends Method {
         this.index = index;
     }
 
-    public boolean canCall(List<Expr> arguments) {
+    public boolean canCall(boolean returnsPointer, List<Expr> arguments) {
         if (arguments.size() != params.size()) return false;
+        if (returnsPointer != returnType.isPointer()) return false;
 
         for (int i = 0; i < arguments.size(); i++) {
             if (!arguments.get(i).getType().equals(params.get(i).type())) return false;

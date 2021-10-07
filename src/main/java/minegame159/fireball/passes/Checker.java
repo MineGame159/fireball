@@ -145,6 +145,13 @@ public class Checker extends AstPass {
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
 
+    @Override
+    public void visitDeleteStmt(Stmt.Delete stmt) {
+        if (!(stmt.expr.getType() instanceof StructType) || !stmt.expr.getType().isPointer()) {
+            errors.add(Errors.cannotDelete(stmt.token, stmt.expr.getType()));
+        }
+    }
+
     // Expressions
 
     @Override
@@ -238,7 +245,7 @@ public class Checker extends AstPass {
         else if (var == null) {
             // If variable is constructor check if it exists
             if (callArguments != null && expr.getType() instanceof StructType structType) {
-                Constructor constructor = structType.struct.getConstructor(callArguments);
+                Constructor constructor = structType.struct.getConstructor(false, callArguments);
                 if (constructor == null) errors.add(Errors.unknownConstructor(structType.struct, expr.name, callArguments));
             }
         }
@@ -325,6 +332,20 @@ public class Checker extends AstPass {
             // Check if expression can be assigned to the field
             if (!expr.getType().equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
         }
+    }
+
+    @Override
+    public void visitNewExpr(Expr.New expr) {
+        acceptE(expr.arguments);
+
+        // Check if type is struct and matching constructor
+        if (expr.getType() instanceof StructType structType) {
+            Struct struct = structType.struct;
+            Constructor constructor = struct.getConstructor(true, expr.arguments);
+
+            if (constructor == null) errors.add(Errors.unknownConstructor(struct, expr.name, expr.arguments));
+        }
+        else errors.add(Errors.invalidNewTarget(expr.name));
     }
 
     // Scope

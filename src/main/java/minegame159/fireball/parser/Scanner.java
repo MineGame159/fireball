@@ -138,7 +138,14 @@ public class Scanner {
 
     private TokenType identifierType() {
         return switch (sb.charAt(0)) {
-            case 'n' -> checkKeyword(1, "ull", TokenType.Null);
+            case 'n' -> {
+                if (sb.length() > 1) yield switch (sb.charAt(1)) {
+                    case 'u' -> checkKeyword(2, "ll", TokenType.Null);
+                    case 'e' -> checkKeyword(2, "w", TokenType.New);
+                    default -> TokenType.Identifier;
+                };
+                yield TokenType.Identifier;
+            }
             case 't' -> checkKeyword(1, "rue", TokenType.True);
             case 'f' -> {
                 if (sb.length() > 1) yield switch (sb.charAt(1)) {
@@ -154,6 +161,7 @@ public class Scanner {
             case 'e' -> checkKeyword(1, "lse", TokenType.Else);
             case 'r' -> checkKeyword(1, "eturn", TokenType.Return);
             case 's' -> checkKeyword(1, "truct", TokenType.Struct);
+            case 'd' -> checkKeyword(1, "elete", TokenType.Delete);
 
             default -> TokenType.Identifier;
         };

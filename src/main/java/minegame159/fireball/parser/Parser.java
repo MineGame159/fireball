@@ -88,10 +88,43 @@ public class Parser {
                 }
 
                 Token thisToken = new Token(TokenType.Identifier, "this", 0, 0);
-                ((Stmt.Block) body).statements.add(0, new Stmt.Variable(new ProtoType(identifier), thisToken, null));
-                ((Stmt.Block) body).statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
+                Token initToken = new Token(TokenType.Identifier, "_init_" + methods.size(), 0, 0);
 
-                constructors.add(new ProtoMethod(identifier, new ProtoType(identifier), params, body));
+                {
+                    // Hidden initialize function
+                    List<ProtoParameter> params2 = new ArrayList<>(params);
+                    params2.add(0, new ProtoParameter(new ProtoType(identifier, true), thisToken));
+                    methods.add(new ProtoMethod(initToken, new ProtoType(new Token(TokenType.Identifier, "void", 0, 0)), params2, body));
+                }
+
+                {
+                    // Malloc constructor
+                    Stmt.Block bod = new Stmt.Block(new ArrayList<>());
+
+                    List<Expr> args = new ArrayList<>(params.size());
+                    for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
+
+                    // TODO: Should somehow put the malloc call inside the initializer
+                    bod.statements.add(new Stmt.Variable(new ProtoType(identifier, true), thisToken, null));
+                    bod.statements.add(new Stmt.CBlock("this = malloc(sizeof(" + identifier + "));"));
+                    bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
+                    bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
+
+                    constructors.add(new ProtoMethod(identifier, new ProtoType(identifier, true), params, bod));
+                }
+                {
+                    // Stack constructor
+                    Stmt.Block bod = new Stmt.Block(new ArrayList<>());
+
+                    List<Expr> args = new ArrayList<>(params.size());
+                    for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
+
+                    bod.statements.add(new Stmt.Variable(new ProtoType(identifier), thisToken, null));
+                    bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
+                    bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
+
+                    constructors.add(new ProtoMethod(identifier, new ProtoType(identifier), params, bod));
+                }
             }
             else {
                 // Field or method
@@ -175,6 +208,7 @@ public class Parser {
         if (match(TokenType.For)) return forStatement();
         if (match(TokenType.Return)) return returnStatement();
         if (match(TokenType.CBlock)) return cBlockStatement();
+        if (match(TokenType.Delete)) return deleteStatement();
 
         return expressionStatement();
     }
@@ -235,6 +269,14 @@ public class Parser {
 
     private Stmt cBlockStatement() {
         return new Stmt.CBlock(previous().lexeme().replace("\n", "\\n"));
+    }
+
+    private Stmt deleteStatement() {
+        Token token = previous();
+        Expr expr = expression();
+
+        consume(TokenType.Semicolon, "Expected ';' after expression.");
+        return new Stmt.Delete(token, expr);
     }
 
     private Stmt expressionStatement() {
@@ -331,15 +373,34 @@ public class Parser {
     }
 
     private Expr factor() {
-        Expr expr = cast();
+        Expr expr = newE();
 
         while (match(TokenType.Slash, TokenType.Star, TokenType.Percentage)) {
             Token operator = previous();
-            Expr right = cast();
+            Expr right = newE();
             expr = new Expr.Binary(expr, operator, right);
         }
 
         return expr;
+    }
+
+    private Expr newE() {
+        if (match(TokenType.New)) {
+            Token name = consume(TokenType.Identifier, "Expected type.");
+            List<Expr> arguments = new ArrayList<>();
+
+            consume(TokenType.LeftParen, "Expected '(' before arguments.");
+            if (!check(TokenType.RightParen)) {
+                do {
+                    arguments.add(expression());
+                } while (match(TokenType.Comma));
+            }
+
+            consume(TokenType.RightParen, "Expected ')' after arguments.");
+            return new Expr.New(name, arguments);
+        }
+
+        return cast();
     }
 
     private Expr cast() {

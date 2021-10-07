@@ -24,7 +24,7 @@ public enum TokenType {
     Null, Int, Float, String, Identifier,
 
     // Keywords
-    True, False, If, Else, While, For, Var, Return, CBlock, Struct,
+    True, False, If, Else, While, For, Var, Return, CBlock, Struct, New, Delete,
 
     Error, Eof
 }

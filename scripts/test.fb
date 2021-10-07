@@ -7,6 +7,11 @@ struct Point {
         this.y = y;
     }
 
+    Point() {
+        this.x = 0;
+        this.y = 0;
+    }
+
     void add(i32 x, i32 y) {
         this.x = this.x + x;
         this.y = this.y + y;
@@ -25,9 +30,13 @@ i32 main() {
     if (b > 1) print(b);
 
     // Structs
-    var p = Point(0, 10);
+    var p = Point(0, 10); // Stack allocation
     for (i32 i = 0; i < 3; i++) p.add(i, 0);
     p.print();
+
+    var p2 = new Point(); // Normal (malloc) allocation
+    p2.print();
+    delete p2;
 
     return 0;
 }

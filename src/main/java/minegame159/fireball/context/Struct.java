@@ -14,9 +14,9 @@ public record Struct(Token name, List<Field> fields, List<Constructor> construct
         return null;
     }
 
-    public Constructor getConstructor(List<Expr> arguments) {
+    public Constructor getConstructor(boolean returnsPointer, List<Expr> arguments) {
         for (Constructor constructor : constructors) {
-            if (constructor.canCall(arguments)) return constructor;
+            if (constructor.canCall(returnsPointer, arguments)) return constructor;
         }
 
         return null;

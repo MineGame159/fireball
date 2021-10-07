@@ -111,6 +111,11 @@ public class TypeResolver extends AstPass {
     @Override
     public void visitCBlockStmt(Stmt.CBlock stmt) {}
 
+    @Override
+    public void visitDeleteStmt(Stmt.Delete stmt) {
+        acceptE(stmt.expr);
+    }
+
     // Expressions
 
     @Override
@@ -202,6 +207,13 @@ public class TypeResolver extends AstPass {
 
         // Resolve field type
         expr.type = resolveFieldType(expr.object, expr.name);
+    }
+
+    @Override
+    public void visitNewExpr(Expr.New expr) {
+        // Resolve type
+        expr.type = resolveIdentifierType(expr.name);
+        if (expr.type != null) expr.type = expr.type.pointer();
     }
 
     // Scope

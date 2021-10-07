@@ -223,6 +223,13 @@ public class Compiler extends AstPass {
         w.write(stmt.code).write('\n');
     }
 
+    @Override
+    public void visitDeleteStmt(Stmt.Delete stmt) {
+        w.write("free(");
+        acceptE(stmt.expr);
+        w.write(')').writeSemicolon();
+    }
+
     // Expressions
 
     @Override
@@ -300,7 +307,7 @@ public class Compiler extends AstPass {
 
         if (callArguments != null && expr.getType() instanceof StructType structType) {
             // getConstructor() should never return null because it was validated in previous AST pass
-            name = structType.struct.getConstructor(callArguments).getOutputName();
+            name = structType.struct.getConstructor(false, callArguments).getOutputName();
         }
 
         w.write(name);
@@ -362,8 +369,22 @@ public class Compiler extends AstPass {
         acceptE(expr.value);
     }
 
-    // Accept
+    @Override
+    public void visitNewExpr(Expr.New expr) {
+        Struct struct = ((StructType) expr.getType()).struct;
+        Constructor constructor = struct.getConstructor(true, expr.arguments);
 
+        w.write(constructor.getOutputName()).write('(');
+
+        for (int i = 0; i < expr.arguments.size(); i++) {
+            if (i > 0) w.write(", ");
+            acceptE(expr.arguments.get(i));
+        }
+
+        w.write(')');
+    }
+
+    // Accept
 
     @Override
     protected void acceptS(Stmt stmt) {

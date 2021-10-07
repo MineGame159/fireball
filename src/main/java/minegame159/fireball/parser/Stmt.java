@@ -20,6 +20,7 @@ public abstract class Stmt {
         void visitForStmt(For stmt);
         void visitReturnStmt(Return stmt);
         void visitCBlockStmt(CBlock stmt);
+        void visitDeleteStmt(Delete stmt);
     }
 
     public static class Expression extends Stmt {
@@ -145,6 +146,21 @@ public abstract class Stmt {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitCBlockStmt(this);
+        }
+    }
+
+    public static class Delete extends Stmt {
+        public final Token token;
+        public final Expr expr;
+
+        public Delete(Token token, Expr expr) {
+            this.token = token;
+            this.expr = expr;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitDeleteStmt(this);
         }
     }
 

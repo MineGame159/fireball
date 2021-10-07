@@ -27,6 +27,7 @@ public abstract class Expr {
         void visitCallExpr(Call expr);
         void visitGetExpr(Get expr);
         void visitSetExpr(Set expr);
+        void visitNewExpr(New expr);
     }
 
     public static class Null extends Expr {
@@ -372,6 +373,28 @@ public abstract class Expr {
         @Override
         public void accept(Visitor visitor) {
             visitor.visitSetExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return type;
+        }
+    }
+
+    public static class New extends Expr {
+        public final Token name;
+        public final List<Expr> arguments;
+
+        public Type type;
+
+        public New(Token name, List<Expr> arguments) {
+            this.name = name;
+            this.arguments = arguments;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitNewExpr(this);
         }
 
         @Override
