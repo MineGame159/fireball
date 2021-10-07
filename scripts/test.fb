@@ -17,8 +17,8 @@ struct Point {
     }
 
     void add(i32 x, i32 y) {
-        this.x = this.x + x;
-        this.y = this.y + y;
+        this.x += x;
+        this.y += y;
     }
 
     void print() {

@@ -296,11 +296,13 @@ public abstract class Expr {
 
     public static class Assign extends Expr {
         public final Token name;
+        public final Token operator;
         public final Expr value;
         public Type type;
 
-        public Assign(Token name, Expr value) {
+        public Assign(Token name, Token operator, Expr value) {
             this.name = name;
+            this.operator = operator;
             this.value = value;
         }
 
@@ -361,12 +363,14 @@ public abstract class Expr {
     public static class Set extends Expr {
         public final Expr object;
         public final Token name;
+        public final Token operator;
         public final Expr value;
         public Type type;
 
-        public Set(Expr object, Token name, Expr value) {
+        public Set(Expr object, Token name, Token operator, Expr value) {
             this.object = object;
             this.name = name;
+            this.operator = operator;
             this.value = value;
         }
 

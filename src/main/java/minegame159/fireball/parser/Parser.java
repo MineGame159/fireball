@@ -310,19 +310,19 @@ public class Parser {
     private Expr assignment() {
         Expr expr = or();
 
-        if (match(TokenType.Equal)) {
-            Token equals = previous();
+        if (match(TokenType.Equal, TokenType.PlusEqual, TokenType.MinusEqual, TokenType.StarEqual, TokenType.SlashEqual, TokenType.PercentageEqual)) {
+            Token operator = previous();
             Expr value = assignment();
 
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable)expr).name;
-                return new Expr.Assign(name, value);
+                return new Expr.Assign(name, operator, value);
             }
             else if (expr instanceof Expr.Get get) {
-                return new Expr.Set(get.object, get.name, value);
+                return new Expr.Set(get.object, get.name, operator, value);
             }
 
-            throw error(equals, "Invalid assignment target.");
+            throw error(operator, "Invalid assignment target.");
         }
 
         return expr;
