@@ -114,9 +114,7 @@ public class Parser {
                         List<Expr> args = new ArrayList<>(params.size());
                         for (ProtoParameter param : params) args.add(new Expr.Variable(param.name()));
 
-                        // TODO: Should somehow put the malloc call inside the initializer
-                        bod.statements.add(new Stmt.Variable(new ProtoType(identifier, true), thisToken, null));
-                        bod.statements.add(new Stmt.CBlock("this = malloc(sizeof(" + identifier + "));"));
+                        bod.statements.add(new Stmt.Variable(new ProtoType(identifier, true), thisToken, new Expr.CBlock("malloc(sizeof(" + identifier + "))")));
                         bod.statements.add(new Stmt.Expression(new Expr.Call(thisToken, new Expr.Get(new Expr.Variable(thisToken), initToken), args)));
                         bod.statements.add(new Stmt.Return(thisToken, new Expr.Variable(thisToken)));
 

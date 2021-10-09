@@ -351,6 +351,9 @@ public class Checker extends AstPass {
         else errors.add(Errors.invalidNewTarget(expr.name));
     }
 
+    @Override
+    public void visitCBlockExpr(Expr.CBlock expr) {}
+
     // Scope
 
     private void beginScope() {

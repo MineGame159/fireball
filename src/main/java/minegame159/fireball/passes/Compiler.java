@@ -417,6 +417,11 @@ public class Compiler extends AstPass {
         w.write(')');
     }
 
+    @Override
+    public void visitCBlockExpr(Expr.CBlock expr) {
+        w.write(expr.code);
+    }
+
     // Accept
 
     @Override

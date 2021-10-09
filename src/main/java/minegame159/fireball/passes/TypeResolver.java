@@ -216,6 +216,9 @@ public class TypeResolver extends AstPass {
         if (expr.type != null) expr.type = expr.type.pointer();
     }
 
+    @Override
+    public void visitCBlockExpr(Expr.CBlock expr) {}
+
     // Scope
 
     private void declare(Token name, Type type) {

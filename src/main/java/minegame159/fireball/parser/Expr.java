@@ -3,6 +3,7 @@
 package minegame159.fireball.parser;
 
 import minegame159.fireball.parser.prototypes.ProtoType;
+import minegame159.fireball.types.MagicType;
 import minegame159.fireball.types.PrimitiveTypes;
 import minegame159.fireball.types.Type;
 
@@ -28,6 +29,7 @@ public abstract class Expr {
         void visitGetExpr(Get expr);
         void visitSetExpr(Set expr);
         void visitNewExpr(New expr);
+        void visitCBlockExpr(CBlock expr);
     }
 
     public static class Null extends Expr {
@@ -404,6 +406,24 @@ public abstract class Expr {
         @Override
         public Type getType() {
             return type;
+        }
+    }
+
+    public static class CBlock extends Expr {
+        public final java.lang.String code;
+
+        public CBlock(java.lang.String code) {
+            this.code = code;
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visitCBlockExpr(this);
+        }
+
+        @Override
+        public Type getType() {
+            return MagicType.INSTANCE;
         }
     }
 
