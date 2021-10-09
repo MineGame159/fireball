@@ -4,8 +4,8 @@ import minegame159.fireball.parser.Parser;
 import minegame159.fireball.passes.Checker;
 import minegame159.fireball.passes.Compiler;
 import minegame159.fireball.passes.TypeResolver;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -27,16 +27,16 @@ public class CompilerTest {
 
         // Parse
         Parser.Result result = Parser.parse(new StringReader(source));
-        Assert.assertTrue(reportErrors(result.error));
+        Assertions.assertTrue(reportErrors(result.error));
 
         // Resolve types
         Context context = new Context();
 
-        Assert.assertTrue(reportErrors(context.apply(result)));
-        Assert.assertTrue(reportErrors(TypeResolver.resolve(result, context)));
+        Assertions.assertTrue(reportErrors(context.apply(result)));
+        Assertions.assertTrue(reportErrors(TypeResolver.resolve(result, context)));
 
         // Check
-        Assert.assertTrue(reportErrors(Checker.check(result, context)));
+        Assertions.assertTrue(reportErrors(Checker.check(result, context)));
 
         // Compile
         Compiler.compile(result, context, "out");
@@ -47,7 +47,7 @@ public class CompilerTest {
             new ProcessBuilder().command("out/test.exe").inheritIO().start().waitFor();
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
-            Assert.fail();
+            Assertions.fail();
         }
     }
 

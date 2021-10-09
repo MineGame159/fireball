@@ -3,8 +3,8 @@ plugins {
     id "application"
 }
 
-group "minegame159"
-version "0.1"
+group = "minegame159"
+version = "0.1"
 mainClassName = group + ".fireball.Fireball"
 
 repositories {
@@ -12,9 +12,16 @@ repositories {
 }
 
 dependencies {
-    testImplementation 'junit:junit:4.13.2'
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.8.1"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.8.1"
 }
 
 test {
-    useJUnit()
+    useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes('Main-Class': mainClassName)
+    }
 }
