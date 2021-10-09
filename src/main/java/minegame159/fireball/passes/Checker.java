@@ -22,8 +22,6 @@ public class Checker extends AstPass {
         }
     }
 
-    private final List<Error> errors = new ArrayList<>();
-
     private final Context context;
 
     private final Stack<Map<String, Variable>> scopes = new Stack<>();
@@ -40,8 +38,11 @@ public class Checker extends AstPass {
 
     public static List<Error> check(Parser.Result result, Context context) {
         Checker checker = new Checker(context);
+        Errors.clear();
+
         result.accept(checker);
-        return checker.errors;
+
+        return Errors.get();
     }
 
     @Override
@@ -62,7 +63,7 @@ public class Checker extends AstPass {
     @Override
     public void visitFunctionEnd(ProtoFunction proto) {
         // Check for return statement if function returns something
-        if (!hasTopLevelReturn && context.getType(proto.returnType) != PrimitiveTypes.Void.type) errors.add(Errors.missingReturn(proto.name));
+        if (!hasTopLevelReturn && context.getType(proto.returnType) != PrimitiveTypes.Void.type) Errors.missingReturn(proto.name);
 
         // End function
         endScope();
@@ -105,7 +106,7 @@ public class Checker extends AstPass {
         // Check expected initializer type
         if (stmt.initializer != null) {
             Type valueType = stmt.initializer.getType();
-            if (!valueType.canBeAssignedTo(type)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
+            if (!valueType.canBeAssignedTo(type)) Errors.mismatchedType(stmt.name, type, valueType);
         }
     }
 
@@ -134,7 +135,7 @@ public class Checker extends AstPass {
     public void visitReturnStmt(Stmt.Return stmt) {
         // Check expected return type
         Type valueType = stmt.value.getType();
-        if (currentFunction != null && !valueType.canBeAssignedTo(currentFunction.returnType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
+        if (currentFunction != null && !valueType.canBeAssignedTo(currentFunction.returnType)) Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType);
 
         // Check function body
         acceptE(stmt.value);
@@ -148,7 +149,7 @@ public class Checker extends AstPass {
     @Override
     public void visitDeleteStmt(Stmt.Delete stmt) {
         if (!(stmt.expr.getType() instanceof StructType) || !stmt.expr.getType().isPointer()) {
-            errors.add(Errors.cannotDelete(stmt.token, stmt.expr.getType()));
+            Errors.cannotDelete(stmt.token, stmt.expr.getType());
         }
     }
 
@@ -183,7 +184,7 @@ public class Checker extends AstPass {
         acceptE(expr.right);
 
         // Can only apply binary operations to numbers
-        if (!expr.left.getType().isNumber() || !expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "binary", "number", true));
+        if (!expr.left.getType().isNumber() || !expr.right.getType().isNumber()) Errors.wrongOperands(expr.operator, "binary", "number", true);
     }
 
     @Override
@@ -197,23 +198,23 @@ public class Checker extends AstPass {
 
         // Can only invert booleans
         if (expr.operator.type() == TokenType.Bang) {
-            if (!expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "invert", "boolean", false));
+            if (!expr.right.getType().isBool()) Errors.wrongOperands(expr.operator, "invert", "boolean", false);
         }
         // Can only negate numbers
         else if (expr.operator.type() == TokenType.Minus) {
-            if (!expr.right.getType().isNumber()) errors.add(Errors.wrongOperands(expr.operator, "negate", "number", false));
+            if (!expr.right.getType().isNumber()) Errors.wrongOperands(expr.operator, "negate", "number", false);
         }
         // Check invalid pointer target
         else if (expr.operator.type() == TokenType.Ampersand) {
             // Can only take address of a variable or a field
-            if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) errors.add(Errors.invalidPointerTarget(expr.operator));
+            if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) Errors.invalidPointerTarget(expr.operator);
                 // Cannot take address of a pointer
-            else if (expr.right.getType().isPointer()) errors.add(Errors.invalidPointerTarget(expr.operator));
+            else if (expr.right.getType().isPointer()) Errors.invalidPointerTarget(expr.operator);
         }
         // Check invalid ++ and -- target
         else if (expr.operator.type() == TokenType.PlusPlus || expr.operator.type() == TokenType.MinusMinus) {
             if (!(expr.right instanceof Expr.Variable) && !(expr.right instanceof Expr.Get)) {
-                errors.add(Errors.invalidUnaryPostTarget(expr.operator));
+                Errors.invalidUnaryPostTarget(expr.operator);
             }
         }
     }
@@ -224,7 +225,7 @@ public class Checker extends AstPass {
 
         // Check for correct ++ and -- target
         if (!(expr.left instanceof Expr.Variable) && !(expr.left instanceof Expr.Get)) {
-            errors.add(Errors.invalidUnaryPostTarget(expr.operator));
+            Errors.invalidUnaryPostTarget(expr.operator);
         }
     }
 
@@ -234,19 +235,19 @@ public class Checker extends AstPass {
         acceptE(expr.right);
 
         // Can only apply logical operations to booleans
-        if (!expr.left.getType().isBool() || !expr.right.getType().isBool()) errors.add(Errors.wrongOperands(expr.operator, "logical", "boolean", true));
+        if (!expr.left.getType().isBool() || !expr.right.getType().isBool()) Errors.wrongOperands(expr.operator, "logical", "boolean", true);
     }
 
     @Override
     public void visitVariableExpr(Expr.Variable expr) {
         // If variable is local variable check if it's defined
         Variable var = getLocal(expr.name);
-        if (var != null && !var.defined) errors.add(Errors.undefined(expr.name));
+        if (var != null && !var.defined) Errors.undefined(expr.name);
         else if (var == null) {
             // If variable is constructor check if it exists
             if (callArguments != null && expr.getType() instanceof StructType structType) {
                 Constructor constructor = structType.struct.getConstructor(false, callArguments);
-                if (constructor == null) errors.add(Errors.unknownConstructor(structType.struct, expr.name, callArguments));
+                if (constructor == null) Errors.unknownConstructor(structType.struct, expr.name, callArguments);
             }
         }
     }
@@ -259,10 +260,10 @@ public class Checker extends AstPass {
         // Check expected type
         Variable var = getLocal(expr.name);
 
-        if (var == null) errors.add(Errors.undeclared(expr.name));
+        if (var == null) Errors.undeclared(expr.name);
         else if (!expr.value.getType().canBeAssignedTo(var.type)) {
             // Allow assigning non-pointer values to pointer variables
-            if (!var.type.isPointer() || expr.value.getType().isPointer()) errors.add(Errors.mismatchedType(expr.name, var.type, expr.value.getType()));
+            if (!var.type.isPointer() || expr.value.getType().isPointer()) Errors.mismatchedType(expr.name, var.type, expr.value.getType());
         }
 
         // Define variable
@@ -279,7 +280,7 @@ public class Checker extends AstPass {
         acceptE(expr.arguments);
 
         // This is horrible but i cba to clean it up now
-        if (!(expr.callee instanceof Expr.Variable || expr.callee instanceof Expr.Get)) errors.add(Errors.invalidCallTarget(expr.token));
+        if (!(expr.callee instanceof Expr.Variable || expr.callee instanceof Expr.Get)) Errors.invalidCallTarget(expr.token);
         else {
             Function function = null;
             boolean check = true;
@@ -289,7 +290,7 @@ public class Checker extends AstPass {
                 Type type = ((Expr.Get) expr.callee).object.getType();
 
                 if (!(type instanceof StructType)) {
-                    errors.add(Errors.invalidCallTarget(expr.token));
+                    Errors.invalidCallTarget(expr.token);
                     check = false;
                 }
                 else {
@@ -302,7 +303,7 @@ public class Checker extends AstPass {
                 boolean isMethod = function instanceof Method;
                 int argCount = expr.arguments.size() + (isMethod ? 1 : 0);
 
-                if (function.params.size() != argCount) errors.add(Errors.wrongArgumentCount(expr.token, function.params.size(), argCount));
+                if (function.params.size() != argCount) Errors.wrongArgumentCount(expr.token, function.params.size(), argCount);
                 else {
                     for (int i = 0; i < function.params.size(); i++) {
                         Function.Param param = function.params.get(i);
@@ -314,7 +315,7 @@ public class Checker extends AstPass {
                         }
                         else argType = expr.arguments.get(i).getType();
 
-                        if (!argType.canBeAssignedTo(param.type())) errors.add(Errors.mismatchedType(expr.token, param.type(), argType));
+                        if (!argType.canBeAssignedTo(param.type())) Errors.mismatchedType(expr.token, param.type(), argType);
                     }
                 }
             }
@@ -333,7 +334,7 @@ public class Checker extends AstPass {
 
         if (expr.getType() != null) {
             // Check if expression can be assigned to the field
-            if (!expr.value.getType().canBeAssignedTo(expr.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
+            if (!expr.value.getType().canBeAssignedTo(expr.getType())) Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType());
         }
     }
 
@@ -346,9 +347,9 @@ public class Checker extends AstPass {
             Struct struct = structType.struct;
             Constructor constructor = struct.getConstructor(true, expr.arguments);
 
-            if (constructor == null) errors.add(Errors.unknownConstructor(struct, expr.name, expr.arguments));
+            if (constructor == null) Errors.unknownConstructor(struct, expr.name, expr.arguments);
         }
-        else errors.add(Errors.invalidNewTarget(expr.name));
+        else Errors.invalidNewTarget(expr.name);
     }
 
     @Override

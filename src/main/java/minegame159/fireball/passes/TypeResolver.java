@@ -16,8 +16,6 @@ import minegame159.fireball.types.Type;
 import java.util.*;
 
 public class TypeResolver extends AstPass {
-    private final List<Error> errors = new ArrayList<>();
-
     private final Context context;
 
     private final Stack<Map<String, Type>> scopes = new Stack<>();
@@ -29,8 +27,11 @@ public class TypeResolver extends AstPass {
 
     public static List<Error> resolve(Parser.Result result, Context context) {
         TypeResolver resolver = new TypeResolver(context);
+        Errors.clear();
+
         result.accept(resolver);
-        return resolver.errors;
+
+        return Errors.get();
     }
 
     @Override
@@ -77,7 +78,7 @@ public class TypeResolver extends AstPass {
 
         // Declare variable
         Type type = stmt.getType(context);
-        if (type == null) errors.add(Errors.unknownType(stmt.type.name(), stmt.type));
+        if (type == null) Errors.unknownType(stmt.type.name(), stmt.type);
 
         declare(stmt.name, type);
     }
@@ -153,7 +154,7 @@ public class TypeResolver extends AstPass {
 
         // Resolve target type
         expr._type = context.getType(expr.type);
-        if (expr._type == null) errors.add(Errors.unknownType(expr.type.name(), expr.type));
+        if (expr._type == null) Errors.unknownType(expr.type.name(), expr.type);
     }
 
     @Override
@@ -237,7 +238,7 @@ public class TypeResolver extends AstPass {
     // Utils
 
     private Type resolveFieldType(Expr object, Token name) {
-        if (!(object.getType() instanceof StructType)) errors.add(Errors.invalidFieldTarget(name));
+        if (!(object.getType() instanceof StructType)) Errors.invalidFieldTarget(name);
         else {
             Struct struct = ((StructType) object.getType()).struct;
             Field field = struct.getField(name);
@@ -245,7 +246,7 @@ public class TypeResolver extends AstPass {
             if (field == null) {
                 Method method = struct.getMethod(name);
 
-                if (method == null) errors.add(Errors.unknownField(struct.name, name));
+                if (method == null) Errors.unknownField(struct.name, name);
                 else return method.returnType;
             }
             else return field.type();
@@ -263,7 +264,7 @@ public class TypeResolver extends AstPass {
         // Function
         Function function = context.getFunction(name);
         if (function != null) {
-            if (function.returnType == null) errors.add(Errors.couldNotGetType(name));
+            if (function.returnType == null) Errors.couldNotGetType(name);
             return function.returnType;
         }
 
@@ -273,7 +274,7 @@ public class TypeResolver extends AstPass {
             return context.getType(new ProtoType(name));
         }
 
-        errors.add(Errors.couldNotGetType(name));
+        Errors.couldNotGetType(name);
         return null;
     }
 }

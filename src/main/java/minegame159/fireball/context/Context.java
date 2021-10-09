@@ -54,13 +54,13 @@ public class Context {
     // Apply
 
     public List<Error> apply(Parser.Result result) {
-        List<Error> errors = new ArrayList<>();
+        Errors.clear();
 
         // Register structs as types
         for (ProtoStruct proto : result.structs) {
             // Check for duplicate type
             if (types.containsKey(proto.name.lexeme())) {
-                errors.add(Errors.duplicate(proto.name, "type"));
+                Errors.duplicate(proto.name, "type");
                 proto.skip = true;
                 continue;
             }
@@ -80,7 +80,7 @@ public class Context {
             Struct struct = structs.get(protoStruct.name.lexeme());
 
             // Fields
-            List<Field> fields = applyParams(errors, protoStruct.fields, "field", Field::new);
+            List<Field> fields = applyParams(protoStruct.fields, "field", Field::new);
             if (fields != null) struct.fields = fields;
 
             // Constructors
@@ -88,33 +88,33 @@ public class Context {
                 ProtoMethod protoConstructor = protoStruct.constructors.get(i);
                 int index = i;
 
-                Constructor constr = applyFunction(errors, protoConstructor, (first, second) -> new Constructor(struct, protoConstructor.name, first, second, protoConstructor.body, index));
+                Constructor constr = applyFunction(protoConstructor, (first, second) -> new Constructor(struct, protoConstructor.name, first, second, protoConstructor.body, index));
                 if (constr != null) struct.constructors.add(constr);
             }
 
             // Destructor
             if (protoStruct.destructor != null) {
-                Destructor destructor = applyFunction(errors, protoStruct.destructor, (first, second) -> new Destructor(struct, protoStruct.destructor.name, first, second, protoStruct.destructor.body));
+                Destructor destructor = applyFunction(protoStruct.destructor, (first, second) -> new Destructor(struct, protoStruct.destructor.name, first, second, protoStruct.destructor.body));
                 if (destructor != null) struct.destructor = destructor;
             }
 
             // Methods
             for (ProtoMethod protoMethod : protoStruct.methods) {
-                Method method = applyFunction(errors, protoMethod, (first, second) -> new Method(struct, protoMethod.name, first, second, protoMethod.body));
+                Method method = applyFunction(protoMethod, (first, second) -> new Method(struct, protoMethod.name, first, second, protoMethod.body));
                 if (method != null) struct.methods.add(method);
             }
         }
 
         // Apply functions
         for (ProtoFunction protoFunc : result.functions) {
-            Function func = applyFunction(errors, protoFunc, (first, second) -> new Function(protoFunc.name, first, second, protoFunc.body));
+            Function func = applyFunction(protoFunc, (first, second) -> new Function(protoFunc.name, first, second, protoFunc.body));
             if (func != null) functions.put(func.name.lexeme(), func);
         }
 
-        return errors;
+        return Errors.get();
     }
 
-    private <T> List<T> applyParams(List<Error> errors, List<ProtoParameter> proto, String construct, IFunction2<Type, Token, T> func) {
+    private <T> List<T> applyParams(List<ProtoParameter> proto, String construct, IFunction2<Type, Token, T> func) {
         boolean hadError = false;
         List<T> params = new ArrayList<>(proto.size());
         Set<String> names = new HashSet<>(proto.size());
@@ -123,11 +123,11 @@ public class Context {
         for (ProtoParameter param : proto) {
             Type type = getType(param.type());
             if (type == null) {
-                errors.add(Errors.unknownType(param.type().name(), param.type()));
+                Errors.unknownType(param.type().name(), param.type());
                 hadError = true;
             }
 
-            if (names.contains(param.name().lexeme())) errors.add(Errors.duplicate(param.name(), construct));
+            if (names.contains(param.name().lexeme())) Errors.duplicate(param.name(), construct);
             else names.add(param.name().lexeme());
 
             params.add(func.run(type, param.name()));
@@ -138,18 +138,18 @@ public class Context {
         return params;
     }
 
-    private <T> T applyFunction(List<Error> errors, ProtoFunction proto, IFunction2<Type, List<Function.Param>, T> func) {
+    private <T> T applyFunction(ProtoFunction proto, IFunction2<Type, List<Function.Param>, T> func) {
         boolean hadError = false;
 
         // Return type
         Type returnType = getType(proto.returnType);
         if (returnType == null) {
-            errors.add(Errors.unknownType(proto.returnType.name(), proto.returnType));
+            Errors.unknownType(proto.returnType.name(), proto.returnType);
             hadError = true;
         }
 
         // Parameters
-        List<Function.Param> params = applyParams(errors, proto.params, "parameter", Function.Param::new);
+        List<Function.Param> params = applyParams(proto.params, "parameter", Function.Param::new);
         if (params == null) hadError = true;
 
         // Create
