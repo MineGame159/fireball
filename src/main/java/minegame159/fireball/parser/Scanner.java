@@ -111,6 +111,7 @@ public class Scanner {
 
             while (isDigit(peek())) advance();
 
+            if (peek() == 'f' || peek() == 'F') advance();
             return token(TokenType.Float);
         }
 

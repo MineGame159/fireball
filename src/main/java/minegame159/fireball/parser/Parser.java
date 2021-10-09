@@ -475,7 +475,10 @@ public class Parser {
         if (match(TokenType.True)) return new Expr.Bool(true);
         if (match(TokenType.False)) return new Expr.Bool(false);
         if (match(TokenType.Int)) return new Expr.Int(4, Integer.parseInt(previous().lexeme()));
-        if (match(TokenType.Float)) return new Expr.Float(true, Double.parseDouble(previous().lexeme()));
+        if (match(TokenType.Float)) {
+            char c = previous().lexeme().charAt(previous().lexeme().length() - 1);
+            return new Expr.Float(c != 'f' && c != 'F', Double.parseDouble(previous().lexeme()));
+        }
         if (match(TokenType.String)) return new Expr.String(previous.lexeme().substring(1, previous.lexeme().length() - 1));
 
         if (match(TokenType.LeftParen)) {
