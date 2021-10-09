@@ -38,7 +38,7 @@ public abstract class Expr {
 
         @Override
         public Type getType() {
-            throw new RuntimeException("No type for null."); // TODO
+            return PrimitiveTypes.Void.type.pointer();
         }
     }
 

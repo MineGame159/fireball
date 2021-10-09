@@ -10,10 +10,16 @@ public class PrimitiveType extends Type {
 
     @Override
     public boolean canBeAssignedTo(Type to) {
-        if (!(to instanceof PrimitiveType)) return false;
-        PrimitiveTypes toType = ((PrimitiveType) to).type;
+        // Assigning to primitive type
+        if (to instanceof PrimitiveType primitiveType) {
+            return primitiveType.type.size >= type.size;
+        }
+        // Assigning to struct type
+        else if (to instanceof StructType) {
+            return to.isPointer() && type == PrimitiveTypes.Void && isPointer();
+        }
 
-        return toType.size >= type.size;
+        return false;
     }
 
     @Override
