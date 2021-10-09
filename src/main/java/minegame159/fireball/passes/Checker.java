@@ -105,7 +105,7 @@ public class Checker extends AstPass {
         // Check expected initializer type
         if (stmt.initializer != null) {
             Type valueType = stmt.initializer.getType();
-            if (!type.equals(valueType)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
+            if (!valueType.canBeAssignedTo(type)) errors.add(Errors.mismatchedType(stmt.name, type, valueType));
         }
     }
 
@@ -134,7 +134,7 @@ public class Checker extends AstPass {
     public void visitReturnStmt(Stmt.Return stmt) {
         // Check expected return type
         Type valueType = stmt.value.getType();
-        if (currentFunction != null && !currentFunction.returnType.equals(valueType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
+        if (currentFunction != null && !valueType.canBeAssignedTo(currentFunction.returnType)) errors.add(Errors.mismatchedType(stmt.token, currentFunction.returnType, valueType));
 
         // Check function body
         acceptE(stmt.value);
@@ -260,7 +260,7 @@ public class Checker extends AstPass {
         Variable var = getLocal(expr.name);
 
         if (var == null) errors.add(Errors.undeclared(expr.name));
-        else if (!var.type.equals(expr.value.getType())) {
+        else if (!expr.value.getType().canBeAssignedTo(var.type)) {
             // Allow assigning non-pointer values to pointer variables
             if (!var.type.isPointer() || expr.value.getType().isPointer()) errors.add(Errors.mismatchedType(expr.name, var.type, expr.value.getType()));
         }
@@ -314,7 +314,7 @@ public class Checker extends AstPass {
                         }
                         else argType = expr.arguments.get(i).getType();
 
-                        if (!param.type().equals(argType)) errors.add(Errors.mismatchedType(expr.token, param.type(), argType));
+                        if (!argType.canBeAssignedTo(param.type())) errors.add(Errors.mismatchedType(expr.token, param.type(), argType));
                     }
                 }
             }
@@ -333,7 +333,7 @@ public class Checker extends AstPass {
 
         if (expr.getType() != null) {
             // Check if expression can be assigned to the field
-            if (!expr.getType().equals(expr.value.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
+            if (!expr.value.getType().canBeAssignedTo(expr.getType())) errors.add(Errors.mismatchedType(expr.name, expr.getType(), expr.value.getType()));
         }
     }
 

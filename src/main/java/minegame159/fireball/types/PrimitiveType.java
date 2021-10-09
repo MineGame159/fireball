@@ -9,6 +9,14 @@ public class PrimitiveType extends Type {
     }
 
     @Override
+    public boolean canBeAssignedTo(Type to) {
+        if (!(to instanceof PrimitiveType)) return false;
+        PrimitiveTypes toType = ((PrimitiveType) to).type;
+
+        return toType.size >= type.size;
+    }
+
+    @Override
     protected Type copy() {
         return new PrimitiveType(name, type);
     }

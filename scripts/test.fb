@@ -51,8 +51,8 @@ i32 getNumber() return 8;
  * C functions
  */
 
-void print2(i32 x, i32 y) {
-    c{ printf("[%d, %d]\n", x, y); }
+void print2(f64 x, f64 y) {
+    c{ printf("[%.1f, %.1f]\n", x, y); }
 }
 
 void print(i32 number) {

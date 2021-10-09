@@ -8,6 +8,8 @@ public abstract class Type implements Cloneable {
         this.name = name;
     }
 
+    public abstract boolean canBeAssignedTo(Type to);
+
     public boolean isBool() {
         return this instanceof PrimitiveType t && t.type == PrimitiveTypes.Bool;
     }

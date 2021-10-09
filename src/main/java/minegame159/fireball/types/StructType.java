@@ -11,6 +11,11 @@ public class StructType extends Type {
     }
 
     @Override
+    public boolean canBeAssignedTo(Type to) {
+        return to instanceof StructType structType && struct == structType.struct;
+    }
+
+    @Override
     protected Type copy() {
         return new StructType(name, struct);
     }
