@@ -1,32 +1,45 @@
 package minegame159.fireball.passes;
 
 import minegame159.fireball.context.*;
-import minegame159.fireball.parser.*;
+import minegame159.fireball.parser.Expr;
+import minegame159.fireball.parser.Parser;
+import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.Writer;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
 
 public class Compiler extends AstPass {
     private final Context context;
-    private final CompilerWriter w;
+    private final String outputFolder;
+
+    private CompilerWriter w;
 
     private List<Expr> callArguments;
 
-    private Compiler(Context context, Writer writer) {
+    private Compiler(Context context, String outputFolder) {
         this.context = context;
-        this.w = new CompilerWriter(writer);
+        this.outputFolder = outputFolder;
     }
 
-    public static void compile(Parser.Result result, Context context, Writer writer) {
-        new Compiler(context, writer).compile(result);
+    public static void compile(Parser.Result result, Context context, String outputFolder) {
+        new Compiler(context, outputFolder).compile(result);
     }
 
     private void compile(Parser.Result result) {
-        // Standard library
+        // Header file
+
+        try {
+            w = new CompilerWriter(new FileWriter(outputFolder + "/test.h"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        //     Standard library
         try (BufferedReader br = new BufferedReader(new FileReader("scripts/standard-lib.c"))) {
             String line;
             while ((line = br.readLine()) != null) w.writeln(line);
@@ -37,12 +50,12 @@ public class Compiler extends AstPass {
             return;
         }
 
-        // Forward declarations
-        w.writeln("\n// Forward declarations\n");
-
         //     Structs
+        w.writeln("\n// Structs\n");
+
         for (Struct struct : context.getStructs()) {
             // Struct
+            w.write("//     ").write(struct.name).write("\n");
             w.write("typedef struct ").write(struct.name).write(' ').write(struct.name).writeSemicolon();
 
             // Constructors
@@ -66,17 +79,32 @@ public class Compiler extends AstPass {
         if (context.getStructs().size() > 0) w.write('\n');
 
         //     Functions
+        w.write("// Functions\n\n");
+
         for (Function function : context.getFunctions()) {
             writeFunctionDefinition(function);
             w.writeSemicolon();
         }
 
-        // User code
-        w.writeln("\n// User code\n");
+        w.close();
+
+
+
+        // Source file
+
+        try {
+            w = new CompilerWriter(new FileWriter(outputFolder + "/test.c"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        w.write("#include \"test.h\"\n");
 
         //     Structs
+        w.write("\n// Structs\n\n");
+
         for (Struct struct : context.getStructs()) {
-            w.write("//     ").write(struct.name).write("\n\n");
+            w.write("//     ").write(struct.name).write("\n");
 
             w.indent().write("struct ").write(struct.name).write(" {\n");
             w.indentUp();
@@ -102,7 +130,7 @@ public class Compiler extends AstPass {
         }
 
         //     Functions
-        w.write("//     Functions\n\n");
+        w.write("// Functions\n\n");
         for (Function function : context.getFunctions()) writeFunction(function);
 
         w.close();

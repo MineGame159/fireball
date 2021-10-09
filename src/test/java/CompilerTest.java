@@ -7,7 +7,6 @@ import minegame159.fireball.passes.TypeResolver;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
@@ -40,11 +39,7 @@ public class CompilerTest {
         Assert.assertTrue(reportErrors(Checker.check(result, context)));
 
         // Compile
-        try {
-            Compiler.compile(result, context, new FileWriter("out/test.c"));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        Compiler.compile(result, context, "out");
 
         // Run
         try {
