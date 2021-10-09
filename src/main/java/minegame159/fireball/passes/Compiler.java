@@ -7,10 +7,7 @@ import minegame159.fireball.parser.Stmt;
 import minegame159.fireball.types.StructType;
 import minegame159.fireball.types.Type;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 
 public class Compiler extends AstPass {
@@ -32,15 +29,14 @@ public class Compiler extends AstPass {
 
     private void compile(Parser.Result result) {
         // Header file
-
         try {
             w = new CompilerWriter(new FileWriter(outputFolder + "/test.h"));
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        //     Standard library
-        try (BufferedReader br = new BufferedReader(new FileReader("scripts/standard-lib.c"))) {
+        // Standard library
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(Compiler.class.getClassLoader().getResourceAsStream("standard-lib.c")))) {
             String line;
             while ((line = br.readLine()) != null) w.writeln(line);
         }
@@ -87,8 +83,6 @@ public class Compiler extends AstPass {
         }
 
         w.close();
-
-
 
         // Source file
 
