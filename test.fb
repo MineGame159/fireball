@@ -1,0 +1,13 @@
+func main() i32 {
+    var a = add(5, 9);
+    a += 2;
+
+    var b = 1.5;
+    b += 0.0009;
+
+    return a;
+}
+
+func add(a i32, b i32) i32 {
+    return a + b;
+}
