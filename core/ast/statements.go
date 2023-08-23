@@ -6,8 +6,10 @@ import "fireball/core/types"
 //go:generate go run ../../gen/ast.go
 
 type StmtVisitor interface {
+	VisitBlock(stmt *Block)
 	VisitExpression(stmt *Expression)
 	VisitVariable(stmt *Variable)
+	VisitIf(stmt *If)
 	VisitReturn(stmt *Return)
 }
 
@@ -15,6 +17,19 @@ type Stmt interface {
 	Node
 
 	Accept(visitor StmtVisitor)
+}
+
+type Block struct {
+	Token_ scanner.Token
+	Stmts  []Stmt
+}
+
+func (b *Block) Token() scanner.Token {
+	return b.Token_
+}
+
+func (b *Block) Accept(visitor StmtVisitor) {
+	visitor.VisitBlock(b)
 }
 
 type Expression struct {
@@ -42,6 +57,21 @@ func (v *Variable) Token() scanner.Token {
 
 func (v *Variable) Accept(visitor StmtVisitor) {
 	visitor.VisitVariable(v)
+}
+
+type If struct {
+	Token_    scanner.Token
+	Condition Expr
+	Then      Stmt
+	Else      Stmt
+}
+
+func (i *If) Token() scanner.Token {
+	return i.Token_
+}
+
+func (i *If) Accept(visitor StmtVisitor) {
+	visitor.VisitIf(i)
 }
 
 type Return struct {

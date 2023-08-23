@@ -12,6 +12,7 @@ import (
 
 type codegen struct {
 	globals values
+	blocks  values
 	locals  values
 
 	types     map[types.Type]value
@@ -45,6 +46,7 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 	// Init codegen
 	c := &codegen{
 		globals: values{char: "@"},
+		blocks:  values{char: "bb_"},
 		locals:  values{char: "%"},
 
 		types: make(map[types.Type]value),
@@ -102,7 +104,7 @@ func (c *codegen) getType(type_ types.Type) value {
 
 		switch v.Kind {
 		case types.Bool:
-			name = "i8"
+			name = "i1"
 		case types.F32:
 			name = "float"
 		case types.F64:
@@ -276,12 +278,15 @@ func (v *values) named(identifier string, type_ types.Type) value {
 }
 
 func (v *values) unnamed(type_ types.Type) value {
-	v.unnamedCount++
-
 	return value{
-		identifier: v.char + strconv.Itoa(v.unnamedCount-1),
+		identifier: v.unnamedRaw(),
 		type_:      type_,
 	}
+}
+
+func (v *values) unnamedRaw() string {
+	v.unnamedCount++
+	return v.char + strconv.Itoa(v.unnamedCount-1)
 }
 
 func (v *values) constant(constant string, type_ types.Type) value {

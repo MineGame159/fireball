@@ -59,6 +59,14 @@ func (p *printer) VisitFunc(decl *Func) {
 
 // Statements
 
+func (p *printer) VisitBlock(stmt *Block) {
+	p.print("{}")
+
+	for _, s := range stmt.Stmts {
+		p.acceptStmt(s)
+	}
+}
+
 func (p *printer) VisitExpression(stmt *Expression) {
 	p.print("expr")
 	p.acceptExpr(stmt.Expr)
@@ -67,6 +75,14 @@ func (p *printer) VisitExpression(stmt *Expression) {
 func (p *printer) VisitVariable(stmt *Variable) {
 	p.print("%s %s", stmt.Type.String(), stmt.Name.Lexeme)
 	p.acceptExpr(stmt.Initializer)
+}
+
+func (p *printer) VisitIf(stmt *If) {
+	p.print("if")
+	p.acceptExpr(stmt.Condition)
+
+	p.acceptStmt(stmt.Then)
+	p.acceptStmt(stmt.Else)
 }
 
 func (p *printer) VisitReturn(stmt *Return) {

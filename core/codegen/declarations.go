@@ -20,7 +20,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	}
 
 	c.writeStr(") {\n")
-	c.writeRaw("entry:\n")
+	c.writeRaw(c.blocks.unnamedRaw() + ":\n")
 
 	for _, param := range decl.Params {
 		c.addVariable(param.Name, c.locals.named(param.Name.Lexeme, param.Type))

@@ -42,6 +42,15 @@ var decls = []item{
 
 var stmts = []item{
 	{
+		name: "Block",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Stmts", type_: "[]Stmt"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
+	{
 		name: "Expression",
 		fields: []field{
 			{name: "Token_", type_: "Token"},
@@ -58,6 +67,17 @@ var stmts = []item{
 			{name: "Initializer", type_: "Expr"},
 		},
 		token: "Name",
+		ast:   true,
+	},
+	{
+		name: "If",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Condition", type_: "Expr"},
+			{name: "Then", type_: "Stmt"},
+			{name: "Else", type_: "Stmt"},
+		},
+		token: "Token_",
 		ast:   true,
 	},
 	{

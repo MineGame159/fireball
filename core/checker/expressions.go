@@ -63,20 +63,42 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 }
 
 func (c *checker) VisitBinary(expr *ast.Binary) {
+	// Accept
 	c.acceptExpr(expr.Left)
 	c.acceptExpr(expr.Right)
 
-	if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
-		if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
-			if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left == right {
-				expr.SetType(expr.Left.Type())
-				return
+	if scanner.IsArithmetic(expr.Op.Kind) {
+		// Arithmetic
+		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
+			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
+				if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left == right {
+					expr.SetType(expr.Left.Type())
+					return
+				}
 			}
 		}
-	}
 
-	expr.SetType(types.Primitive(types.I32))
-	c.error(expr, "Expected two number types.")
+		expr.SetType(types.Primitive(types.I32))
+		c.error(expr, "Expected two number types.")
+	} else if scanner.IsEquality(expr.Op.Kind) {
+		// Equality
+		expr.SetType(types.Primitive(types.Bool))
+	} else if scanner.IsComparison(expr.Op.Kind) {
+		// Comparison
+		expr.SetType(types.Primitive(types.Bool))
+
+		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
+			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
+				if !types.IsNumber(left.Kind) || !types.IsNumber(right.Kind) || left != right {
+					c.error(expr, "Expected two number types.")
+				}
+			}
+		}
+	} else {
+		// Error
+		expr.SetType(types.Primitive(types.Void))
+		c.error(expr, "Invalid operator.")
+	}
 }
 
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {

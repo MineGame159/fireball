@@ -108,11 +108,13 @@ func (c *codegen) binary(op scanner.TokenKind, left value, right value) value {
 	left = c.load(left)
 	right = c.load(right)
 
-	// Check for floating point numbers
+	// Check for floating point numbers and sign
 	floating := false
+	signed := false
 
 	if v, ok := left.type_.(*types.PrimitiveType); ok {
 		floating = types.IsFloating(v.Kind)
+		signed = types.IsSigned(v.Kind)
 	}
 
 	// Select correct instruction
@@ -127,6 +129,20 @@ func (c *codegen) binary(op scanner.TokenKind, left value, right value) value {
 		inst = ternary(floating, "fmul", "mul")
 	case scanner.Slash, scanner.SlashEqual:
 		inst = ternary(floating, "fdiv", "div")
+
+	case scanner.EqualEqual:
+		inst = ternary(floating, "fcmp oeq", "icmp eq")
+	case scanner.BangEqual:
+		inst = ternary(floating, "fcmp one", "icmp ne")
+
+	case scanner.Less:
+		inst = ternary(floating, "fcmp olt", ternary(signed, "icmp slt", "icmp ult"))
+	case scanner.LessEqual:
+		inst = ternary(floating, "fcmp ole", ternary(signed, "icmp sle", "icmp ule"))
+	case scanner.Greater:
+		inst = ternary(floating, "fcmp ogt", ternary(signed, "icmp sgt", "icmp ugt"))
+	case scanner.GreaterEqual:
+		inst = ternary(floating, "fcmp oge", ternary(signed, "icmp sge", "icmp uge"))
 
 	default:
 		log.Fatalln("Invalid operator kind")

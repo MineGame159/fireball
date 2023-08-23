@@ -74,3 +74,27 @@ func (t Token) IsError() bool {
 func (t Token) String() string {
 	return t.Lexeme
 }
+
+func IsEquality(kind TokenKind) bool {
+	return kind == EqualEqual || kind == BangEqual
+}
+
+func IsComparison(kind TokenKind) bool {
+	switch kind {
+	case Less, LessEqual, Greater, GreaterEqual:
+		return true
+
+	default:
+		return false
+	}
+}
+
+func IsArithmetic(kind TokenKind) bool {
+	switch kind {
+	case Plus, Minus, Star, Slash, Percentage:
+		return true
+
+	default:
+		return false
+	}
+}

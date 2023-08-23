@@ -8,14 +8,43 @@ import (
 )
 
 func (p *parser) statement() (ast.Stmt, *core.Error) {
+	if p.match(scanner.LeftBrace) {
+		return p.block()
+	}
 	if p.match(scanner.Var) {
 		return p.variable()
+	}
+	if p.match(scanner.If) {
+		return p.if_()
 	}
 	if p.match(scanner.Return) {
 		return p.return_()
 	}
 
 	return p.expressionStmt()
+}
+
+func (p *parser) block() (ast.Stmt, *core.Error) {
+	token := p.current
+	stmts := make([]ast.Stmt, 0, 4)
+
+	for !p.check(scanner.RightBrace) {
+		stmt, err := p.statement()
+		if err != nil {
+			return nil, err
+		}
+
+		stmts = append(stmts, stmt)
+	}
+
+	if _, err := p.consume(scanner.RightBrace, "Expected '}'."); err != nil {
+		return nil, err
+	}
+
+	return &ast.Block{
+		Token_: token,
+		Stmts:  stmts,
+	}, nil
 }
 
 func (p *parser) expressionStmt() (ast.Stmt, *core.Error) {
@@ -85,6 +114,42 @@ func (p *parser) variable() (ast.Stmt, *core.Error) {
 		Type:        type_,
 		Name:        name,
 		Initializer: expr,
+	}, nil
+}
+
+func (p *parser) if_() (ast.Stmt, *core.Error) {
+	token := p.current
+
+	// Condition
+	condition, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	// Then
+	then, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Else
+	var else_ ast.Stmt = nil
+
+	if p.match(scanner.Else) {
+		else__, err := p.statement()
+		if err != nil {
+			return nil, err
+		}
+
+		else_ = else__
+	}
+
+	// Return
+	return &ast.If{
+		Token_:    token,
+		Condition: condition,
+		Then:      then,
+		Else:      else_,
 	}, nil
 }
 
