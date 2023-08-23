@@ -1,16 +1,6 @@
 func main() i32 {
-    var a = add(5, 9);
-    a += 2;
-
-    if 1 > 0 {
-        a -= 1;
-    }
-    else
-        a += 1;
-
-    return a;
+    return lrint(pow(2.0, 6.0));
 }
 
-func add(a i32, b i32) i32 {
-    return a + b;
-}
+extern func pow(base f64, exponent f64) f64
+extern func lrint(x f64) i32

@@ -103,7 +103,14 @@ func (s *Scanner) identifierKind() TokenKind {
 	case 'c':
 		return s.checkKeyword(1, "ontinue", Continue)
 	case 'e':
-		return s.checkKeyword(1, "lse", Else)
+		if s.currentI-s.startI > 1 {
+			switch s.text[s.startI+1] {
+			case 'l':
+				return s.checkKeyword(2, "se", Else)
+			case 'x':
+				return s.checkKeyword(2, "tern", Extern)
+			}
+		}
 	case 'f':
 		if s.currentI-s.startI > 1 {
 			switch s.text[s.startI+1] {

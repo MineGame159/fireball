@@ -22,6 +22,7 @@ var decls = []item{
 	{
 		name: "Func",
 		fields: []field{
+			{name: "Extern", type_: "bool"},
 			{name: "Name", type_: "Token"},
 			{name: "Params", type_: "[]Param"},
 			{name: "Returns", type_: "Type"},

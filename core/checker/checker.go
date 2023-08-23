@@ -12,6 +12,8 @@ type checker struct {
 	scopes    []scope
 	variables []variable
 
+	function *ast.Func
+
 	reporter core.ErrorReporter
 	decls    []ast.Decl
 }

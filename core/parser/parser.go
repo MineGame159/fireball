@@ -15,6 +15,8 @@ type parser struct {
 	current  scanner.Token
 	next     scanner.Token
 
+	extern bool
+
 	reporter core.ErrorReporter
 }
 

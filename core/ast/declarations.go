@@ -16,6 +16,7 @@ type Decl interface {
 }
 
 type Func struct {
+	Extern  bool
 	Name    scanner.Token
 	Params  []Param
 	Returns types.Type

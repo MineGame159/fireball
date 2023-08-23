@@ -46,6 +46,7 @@ const (
 	Else
 	While
 	For
+	Extern
 	Func
 	Continue
 	Break

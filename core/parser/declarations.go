@@ -7,8 +7,18 @@ import (
 )
 
 func (p *parser) declaration() ast.Decl {
+	p.extern = false
+
 	if p.match(scanner.Func) {
 		return p.function()
+	}
+
+	if p.match(scanner.Extern) {
+		p.extern = true
+
+		if p.match(scanner.Func) {
+			return p.function()
+		}
 	}
 
 	// Error
@@ -93,40 +103,45 @@ func (p *parser) function() ast.Decl {
 	}
 
 	// Body
-	if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
-		p.error2(p.next, "Expected '{' before function body.")
-		if !p.syncToDecl() {
-			return nil
-		}
-		return nil
-	}
+	var body []ast.Stmt
 
-	body := make([]ast.Stmt, 0, 8)
+	if !p.extern {
+		body = make([]ast.Stmt, 0, 8)
 
-	for !p.check(scanner.RightBrace) {
-		stmt, err := p.statement()
-
-		if err != nil {
-			p.reporter.Report(*err)
-
-			if !p.syncToStmt() {
+		if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
+			p.error2(p.next, "Expected '{' before function body.")
+			if !p.syncToDecl() {
 				return nil
 			}
-		} else {
-			body = append(body, stmt)
-		}
-	}
-
-	if brace := p.consume2(scanner.RightBrace); brace.IsError() {
-		p.error2(p.next, "Expected '}' after function body.")
-		if !p.syncToDecl() {
 			return nil
 		}
-		return nil
+
+		for !p.check(scanner.RightBrace) {
+			stmt, err := p.statement()
+
+			if err != nil {
+				p.reporter.Report(*err)
+
+				if !p.syncToStmt() {
+					return nil
+				}
+			} else {
+				body = append(body, stmt)
+			}
+		}
+
+		if brace := p.consume2(scanner.RightBrace); brace.IsError() {
+			p.error2(p.next, "Expected '}' after function body.")
+			if !p.syncToDecl() {
+				return nil
+			}
+			return nil
+		}
 	}
 
 	// Return
 	return &ast.Func{
+		Extern:  p.extern,
 		Name:    name,
 		Params:  params,
 		Returns: returns,
@@ -144,7 +159,7 @@ func (p *parser) syncToDecl() bool {
 
 		// Check token
 		switch p.next.Kind {
-		case scanner.Func:
+		case scanner.Extern, scanner.Func:
 			return true
 
 		default:

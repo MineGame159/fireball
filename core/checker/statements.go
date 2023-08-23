@@ -53,4 +53,14 @@ func (c *checker) VisitIf(stmt *ast.If) {
 
 func (c *checker) VisitReturn(stmt *ast.Return) {
 	c.acceptExpr(stmt.Expr)
+
+	var type_ types.Type = types.Primitive(types.Void)
+
+	if stmt.Expr != nil {
+		type_ = stmt.Expr.Type()
+	}
+
+	if !type_.CanAssignTo(c.function.Returns) {
+		c.error(stmt, "Cannot return type '%s' from a function with return type '%s'.", type_, c.function.Returns)
+	}
 }
