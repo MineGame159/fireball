@@ -33,6 +33,32 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 }
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
+	c.acceptExpr(expr.Right)
+	val := c.load(c.exprValue)
+
+	res := c.locals.unnamed(expr.Right.Type())
+	c.exprValue = res
+
+	switch expr.Op.Kind {
+	case scanner.Bang:
+		c.writeFmt("%s = xor i1 %s, true\n", res, val)
+
+	case scanner.Minus:
+		if v, ok := expr.Right.Type().(*types.PrimitiveType); ok {
+			if types.IsFloating(v.Kind) {
+				// floating
+				c.writeFmt("%s = fneg %s %s\n", res, c.getType(expr.Right.Type()), val)
+			} else {
+				// signed
+				c.writeFmt("%s = sub nsw %s 0, %s\n", res, c.getType(expr.Right.Type()), val)
+			}
+		} else {
+			log.Fatalln("Invalid type")
+		}
+
+	default:
+		log.Fatalln("Invalid unary operator")
+	}
 }
 
 func (c *codegen) VisitBinary(expr *ast.Binary) {
