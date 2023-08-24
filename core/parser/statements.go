@@ -92,16 +92,18 @@ func (p *parser) variable() (ast.Stmt, *core.Error) {
 	}
 
 	// Initializer
-	if _, err := p.consume(scanner.Equal, "Expected '='."); err != nil {
-		return nil, err
-	}
-
-	var expr ast.Expr = nil
+	var initializer ast.Expr = nil
 
 	if !p.check(scanner.Semicolon) {
-		expr, err = p.expression()
-		if err != nil {
+		if _, err := p.consume(scanner.Equal, "Expected '='."); err != nil {
 			return nil, err
+		}
+
+		if !p.check(scanner.Semicolon) {
+			initializer, err = p.expression()
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -113,7 +115,7 @@ func (p *parser) variable() (ast.Stmt, *core.Error) {
 	return &ast.Variable{
 		Type:        type_,
 		Name:        name,
-		Initializer: expr,
+		Initializer: initializer,
 	}, nil
 }
 
