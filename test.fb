@@ -1,6 +1,5 @@
 func main() i32 {
-    return lrint(pow(2.0, 6.0));
+    return pow(2.0, 6.0) as i32;
 }
 
 extern func pow(base f64, exponent f64) f64
-extern func lrint(x f64) i32

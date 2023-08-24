@@ -12,6 +12,7 @@ type ExprVisitor interface {
 	VisitBinary(expr *Binary)
 	VisitIdentifier(expr *Identifier)
 	VisitAssignment(expr *Assignment)
+	VisitCast(expr *Cast)
 	VisitCall(expr *Call)
 }
 
@@ -160,6 +161,29 @@ func (a *Assignment) Type() types.Type {
 
 func (a *Assignment) SetType(type_ types.Type) {
 	a.type_ = type_
+}
+
+type Cast struct {
+	type_ types.Type
+
+	Token_ scanner.Token
+	Expr   Expr
+}
+
+func (c *Cast) Token() scanner.Token {
+	return c.Token_
+}
+
+func (c *Cast) Accept(visitor ExprVisitor) {
+	visitor.VisitCast(c)
+}
+
+func (c *Cast) Type() types.Type {
+	return c.type_
+}
+
+func (c *Cast) SetType(type_ types.Type) {
+	c.type_ = type_
 }
 
 type Call struct {

@@ -136,6 +136,21 @@ func (p *parser) call() (ast.Expr, *core.Error) {
 			if err != nil {
 				return nil, err
 			}
+		} else if p.match(scanner.As) {
+			token := p.current
+
+			type_, err := p.parseType()
+			if err != nil {
+				return nil, err
+			}
+
+			cast := &ast.Cast{
+				Token_: token,
+				Expr:   expr,
+			}
+
+			cast.SetType(type_)
+			expr = cast
 		} else if p.match(scanner.LeftParen) {
 			expr, err = p.finishCall(expr)
 			if err != nil {

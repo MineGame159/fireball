@@ -21,12 +21,10 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 		kind = types.Bool
 
 	case scanner.Number:
-		if strings.ContainsRune(expr.Value.Lexeme, '.') {
-			if strings.HasSuffix(expr.Value.Lexeme, "f") {
-				kind = types.F32
-			} else {
-				kind = types.F64
-			}
+		if strings.HasSuffix(expr.Value.Lexeme, "f") {
+			kind = types.F32
+		} else if strings.ContainsRune(expr.Value.Lexeme, '.') {
+			kind = types.F64
 		} else {
 			kind = types.I32
 		}
@@ -135,6 +133,14 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	c.acceptExpr(expr.Assignee)
 	c.acceptExpr(expr.Value)
+}
+
+func (c *checker) VisitCast(expr *ast.Cast) {
+	c.acceptExpr(expr.Expr)
+
+	if types.IsPrimitive(expr.Expr.Type(), types.Void) || types.IsPrimitive(expr.Type(), types.Void) {
+		c.error(expr, "Cannot cast to or from type 'void'.")
+	}
 }
 
 func (c *checker) VisitCall(expr *ast.Call) {

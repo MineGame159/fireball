@@ -122,6 +122,11 @@ func (p *printer) VisitAssignment(expr *Assignment) {
 	p.acceptExpr(expr.Value)
 }
 
+func (p *printer) VisitCast(expr *Cast) {
+	p.print("as %s", expr.Type())
+	p.acceptExpr(expr.Expr)
+}
+
 func (p *printer) VisitCall(expr *Call) {
 	p.print("call")
 	p.acceptExpr(expr.Callee)

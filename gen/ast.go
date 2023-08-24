@@ -148,6 +148,15 @@ var exprs = []item{
 		ast:   true,
 	},
 	{
+		name: "Cast",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Expr", type_: "Expr"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
+	{
 		name: "Call",
 		fields: []field{
 			{name: "Token_", type_: "Token"},

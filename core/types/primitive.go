@@ -117,3 +117,11 @@ func IsFloating(kind PrimitiveKind) bool {
 func IsSigned(kind PrimitiveKind) bool {
 	return kind == I8 || kind == I16 || kind == I32 || kind == I64
 }
+
+func IsUnsigned(kind PrimitiveKind) bool {
+	return kind == U8 || kind == U16 || kind == U32 || kind == U64
+}
+
+func IsInteger(kind PrimitiveKind) bool {
+	return IsSigned(kind) || IsUnsigned(kind)
+}

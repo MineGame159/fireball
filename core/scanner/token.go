@@ -46,6 +46,7 @@ const (
 	Else
 	While
 	For
+	As
 	Extern
 	Func
 	Continue

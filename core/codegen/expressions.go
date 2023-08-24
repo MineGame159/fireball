@@ -76,6 +76,67 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	c.exprValue = assignee
 }
 
+func (c *codegen) VisitCast(expr *ast.Cast) {
+	c.acceptExpr(expr.Expr)
+	val := c.load(c.exprValue)
+
+	res := c.locals.unnamed(expr.Type())
+	c.exprValue = res
+
+	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
+		if to, ok := expr.Type().(*types.PrimitiveType); ok {
+			if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsInteger(to.Kind) {
+				// integer / bool to integer
+				if from.Size() > to.Size() {
+					c.writeFmt("%s = trunc %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				} else {
+					c.writeFmt("%s = zext %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				}
+
+				return
+			} else if types.IsFloating(from.Kind) && types.IsFloating(to.Kind) {
+				// floating to floating
+				if from.Size() > to.Size() {
+					c.writeFmt("%s = fptrunc %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				} else {
+					c.writeFmt("%s = fpext %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				}
+
+				return
+			} else if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsFloating(to.Kind) {
+				// integer / bool to floating
+				if types.IsSigned(from.Kind) {
+					c.writeFmt("%s = sitofp %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				} else {
+					c.writeFmt("%s = uitofp %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				}
+
+				return
+			} else if types.IsFloating(from.Kind) && types.IsInteger(to.Kind) {
+				// floating to integer
+				if types.IsSigned(to.Kind) {
+					c.writeFmt("%s = fptosi %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				} else {
+					c.writeFmt("%s = fptoui %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+				}
+
+				return
+			} else if types.IsInteger(from.Kind) && to.Kind == types.Bool {
+				// integer to bool
+				c.writeFmt("%s = icmp ne %s %s, 0\n", res, c.getType(from), val)
+				return
+			} else if types.IsFloating(from.Kind) && to.Kind == types.Bool {
+				// floating to bool
+				c.writeFmt("%s = fcmp une %s %s, 0\n", res, c.getType(from), val)
+				return
+			}
+		}
+	}
+
+	// Error
+	log.Fatalln("Invalid cast")
+}
+
 func (c *codegen) VisitCall(expr *ast.Call) {
 	args := make([]value, len(expr.Args))
 

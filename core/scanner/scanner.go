@@ -97,7 +97,14 @@ func (s *Scanner) identifier() Token {
 func (s *Scanner) identifierKind() TokenKind {
 	switch s.text[s.startI] {
 	case 'a':
-		return s.checkKeyword(1, "nd", And)
+		if s.currentI-s.startI > 1 {
+			switch s.text[s.startI+1] {
+			case 'n':
+				return s.checkKeyword(2, "d", And)
+			case 's':
+				return As
+			}
+		}
 	case 'b':
 		return s.checkKeyword(1, "reak", Break)
 	case 'c':
