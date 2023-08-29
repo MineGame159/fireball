@@ -101,3 +101,11 @@ func IsArithmetic(kind TokenKind) bool {
 		return false
 	}
 }
+
+func IsKeyword(kind TokenKind) bool {
+	return kind >= 29 && kind <= 44
+}
+
+func IsOperator(kind TokenKind) bool {
+	return kind >= 10 && kind <= 28
+}

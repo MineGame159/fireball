@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fireball/cmd/lsp"
 	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/checker"
@@ -8,11 +9,49 @@ import (
 	"fireball/core/parser"
 	"fireball/core/scanner"
 	"fmt"
+	"log"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func main() {
-	b, _ := os.ReadFile("test.fb")
+	if len(os.Args) < 2 {
+		log.Fatalln("Invalid sub-command, use either build or lsp")
+	}
+
+	switch os.Args[1] {
+	case "build":
+		if len(os.Args) < 3 {
+			log.Fatalln("Invalid path")
+		}
+
+		build(os.Args[2])
+
+	case "lsp":
+		port := uint16(0)
+
+		if len(os.Args) > 2 && strings.HasPrefix(os.Args[2], "-p=") {
+			num, err := strconv.Atoi(os.Args[2][3:])
+
+			if err == nil {
+				port = uint16(num)
+			}
+		}
+
+		lsp.Start(port)
+
+	default:
+		log.Fatalln("Invalid sub-command, use either build or lsp")
+	}
+}
+
+func build(path string) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalln("Invalid file")
+	}
+
 	text := string(b)
 
 	reporter := &consoleReporter{}
