@@ -51,6 +51,15 @@ func (c *checker) VisitIf(stmt *ast.If) {
 	}
 }
 
+func (c *checker) VisitFor(stmt *ast.For) {
+	c.acceptExpr(stmt.Condition)
+	c.acceptStmt(stmt.Body)
+
+	if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
+		c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
+	}
+}
+
 func (c *checker) VisitReturn(stmt *ast.Return) {
 	c.acceptExpr(stmt.Expr)
 

@@ -83,6 +83,16 @@ var stmts = []item{
 		ast:   true,
 	},
 	{
+		name: "For",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Condition", type_: "Expr"},
+			{name: "Body", type_: "Stmt"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
+	{
 		name: "Return",
 		fields: []field{
 			{name: "Token_", type_: "Token"},

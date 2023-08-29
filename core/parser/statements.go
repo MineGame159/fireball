@@ -17,6 +17,9 @@ func (p *parser) statement() (ast.Stmt, *core.Error) {
 	if p.match(scanner.If) {
 		return p.if_()
 	}
+	if p.match(scanner.For) {
+		return p.for_()
+	}
 	if p.match(scanner.Return) {
 		return p.return_()
 	}
@@ -80,7 +83,7 @@ func (p *parser) variable() (ast.Stmt, *core.Error) {
 	}
 
 	// Type
-	var type_ types.Type = nil
+	var type_ types.Type
 
 	if !p.check(scanner.Equal) {
 		type__, err := p.parseType()
@@ -92,7 +95,7 @@ func (p *parser) variable() (ast.Stmt, *core.Error) {
 	}
 
 	// Initializer
-	var initializer ast.Expr = nil
+	var initializer ast.Expr
 
 	if !p.check(scanner.Semicolon) {
 		if _, err := p.consume(scanner.Equal, "Expected '='."); err != nil {
@@ -135,7 +138,7 @@ func (p *parser) if_() (ast.Stmt, *core.Error) {
 	}
 
 	// Else
-	var else_ ast.Stmt = nil
+	var else_ ast.Stmt
 
 	if p.match(scanner.Else) {
 		else__, err := p.statement()
@@ -155,9 +158,40 @@ func (p *parser) if_() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
+func (p *parser) for_() (ast.Stmt, *core.Error) {
+	token := p.current
+
+	// Condition
+	var condition ast.Expr
+
+	if !p.check(scanner.LeftBrace) {
+		expr, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
+
+		condition = expr
+	}
+
+	// Body
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Return
+	return &ast.For{
+		Token_:    token,
+		Condition: condition,
+		Body:      body,
+	}, nil
+}
+
 func (p *parser) return_() (ast.Stmt, *core.Error) {
 	token := p.current
-	var expr ast.Expr = nil
+
+	// Value
+	var expr ast.Expr
 
 	if !p.check(scanner.Semicolon) {
 		expr_, err := p.expression()
@@ -172,6 +206,7 @@ func (p *parser) return_() (ast.Stmt, *core.Error) {
 		return nil, err
 	}
 
+	// Return
 	return &ast.Return{
 		Token_: token,
 		Expr:   expr,

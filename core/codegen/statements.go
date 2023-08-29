@@ -64,6 +64,39 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	c.writeRaw(end + ":\n")
 }
 
+func (c *codegen) VisitFor(stmt *ast.For) {
+	// Get basic block names
+	start := c.blocks.unnamedRaw()
+	body := start
+	end := ""
+
+	c.writeFmt("br label %%%s\n", start)
+
+	// Condition
+	c.writeRaw(start + ":\n")
+
+	if stmt.Condition != nil {
+		body = c.blocks.unnamedRaw()
+		end = c.blocks.unnamedRaw()
+
+		condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
+		c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, body, end)
+	} else {
+		end = c.blocks.unnamedRaw()
+	}
+
+	// Body
+	if start != body {
+		c.writeRaw(body + ":\n")
+	}
+
+	c.acceptStmt(stmt.Body)
+	c.writeFmt("br label %%%s\n", start)
+
+	// End
+	c.writeRaw(end + ":\n")
+}
+
 func (c *codegen) VisitReturn(stmt *ast.Return) {
 	if stmt.Expr == nil {
 		// Void

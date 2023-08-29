@@ -125,7 +125,8 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 
 func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	// Assignee
-	assignee := c.load(c.acceptExpr(expr.Assignee), expr.Assignee.Type())
+	assigneePtr := c.acceptExpr(expr.Assignee)
+	assignee := c.load(assigneePtr, expr.Assignee.Type())
 
 	// Value
 	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
@@ -135,7 +136,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	}
 
 	// Store
-	c.writeFmt("store %s %s, ptr %s\n", c.getType(expr.Value.Type()), val, assignee)
+	c.writeFmt("store %s %s, ptr %s\n", c.getType(expr.Value.Type()), val, assigneePtr)
 	c.exprValue = assignee
 }
 

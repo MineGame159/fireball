@@ -10,6 +10,7 @@ type StmtVisitor interface {
 	VisitExpression(stmt *Expression)
 	VisitVariable(stmt *Variable)
 	VisitIf(stmt *If)
+	VisitFor(stmt *For)
 	VisitReturn(stmt *Return)
 }
 
@@ -72,6 +73,20 @@ func (i *If) Token() scanner.Token {
 
 func (i *If) Accept(visitor StmtVisitor) {
 	visitor.VisitIf(i)
+}
+
+type For struct {
+	Token_    scanner.Token
+	Condition Expr
+	Body      Stmt
+}
+
+func (f *For) Token() scanner.Token {
+	return f.Token_
+}
+
+func (f *For) Accept(visitor StmtVisitor) {
+	visitor.VisitFor(f)
 }
 
 type Return struct {

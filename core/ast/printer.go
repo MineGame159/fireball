@@ -85,6 +85,13 @@ func (p *printer) VisitIf(stmt *If) {
 	p.acceptStmt(stmt.Else)
 }
 
+func (p *printer) VisitFor(stmt *For) {
+	p.print("for")
+
+	p.acceptExpr(stmt.Condition)
+	p.acceptStmt(stmt.Body)
+}
+
 func (p *printer) VisitReturn(stmt *Return) {
 	p.print("return")
 	p.acceptExpr(stmt.Expr)
