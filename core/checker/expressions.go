@@ -55,6 +55,9 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		expr.SetType(types.Primitive(types.I32))
 		c.error(expr, "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Type())
 
+	case scanner.Ampersand:
+		expr.SetType(types.PointerType{Pointee: expr.Right.Type()})
+
 	default:
 		log.Fatalln("Invalid unary operator")
 	}

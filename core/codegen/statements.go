@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fireball/core/ast"
-	"fireball/core/types"
 )
 
 func (c *codegen) VisitBlock(stmt *ast.Block) {
@@ -21,7 +20,7 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 
 func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Variable
-	c.addVariable(stmt.Name, c.locals.named(stmt.Name.Lexeme, types.PointerType{Pointee: stmt.Type}))
+	c.addVariable(stmt.Name, c.locals.named(stmt.Name.Lexeme, stmt.Type))
 	c.writeFmt("%%%s = alloca %s\n", stmt.Name, c.getType(stmt.Type))
 
 	// Initializer
@@ -46,7 +45,7 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	}
 
 	// Condition
-	condition := c.load(c.acceptExpr(stmt.Condition))
+	condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
 	c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, then, else_)
 
 	// Then
@@ -71,7 +70,7 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		c.writeStr("ret void\n")
 	} else {
 		// Other
-		val := c.load(c.acceptExpr(stmt.Expr))
+		val := c.load(c.acceptExpr(stmt.Expr), stmt.Expr.Type())
 		c.writeFmt("ret %s %s\n", c.getType(stmt.Expr.Type()), val)
 	}
 }

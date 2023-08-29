@@ -14,6 +14,7 @@ const (
 	Comma
 	Colon
 	Semicolon
+	Ampersand
 
 	Plus
 	Minus

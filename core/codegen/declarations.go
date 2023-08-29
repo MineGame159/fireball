@@ -29,7 +29,13 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 		c.writeRaw(c.blocks.unnamedRaw() + ":\n")
 
 		for _, param := range decl.Params {
-			c.addVariable(param.Name, c.locals.named(param.Name.Lexeme, param.Type))
+			val := c.locals.named(param.Name.Lexeme+".var", param.Type)
+			type_ := c.getType(param.Type)
+
+			c.writeFmt("%s = alloca %s\n", val, type_)
+			c.writeFmt("store %s %%%s, ptr %s\n", type_, param.Name, val)
+
+			c.addVariable(param.Name, val)
 		}
 
 		for _, stmt := range decl.Body {

@@ -79,12 +79,12 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 
 // IR
 
-func (c *codegen) load(val value) value {
-	if v, ok := val.type_.(types.PointerType); ok {
-		pointee := c.locals.unnamed(v.Pointee)
-		c.writeFmt("%s = load %s, ptr %s\n", pointee, c.getType(v.Pointee), val)
+func (c *codegen) load(val value, type_ types.Type) value {
+	if val.needsLoading {
+		res := c.locals.unnamed(val.type_)
+		c.writeFmt("%s = load %s, ptr %s\n", res, c.getType(type_), val)
 
-		return pointee
+		return res
 	}
 
 	return val
@@ -96,6 +96,14 @@ func (c *codegen) getType(type_ types.Type) value {
 	// Try cache
 	if v, ok := c.types[type_]; ok {
 		return v
+	}
+
+	// Pointer
+	if _, ok := type_.(types.PointerType); ok {
+		val := c.globals.constant("ptr", type_)
+		c.types[type_] = val
+
+		return val
 	}
 
 	// Primitive
@@ -156,6 +164,8 @@ func (c *codegen) getVariable(name scanner.Token) *variable {
 }
 
 func (c *codegen) addVariable(name scanner.Token, val value) *variable {
+	val.needsLoading = true
+
 	c.variables = append(c.variables, variable{
 		name: name,
 		val:  val,
@@ -253,8 +263,9 @@ func ternary[T any](cond bool, true T, false T) T {
 // Value
 
 type value struct {
-	identifier string
-	type_      types.Type
+	identifier   string
+	type_        types.Type
+	needsLoading bool
 }
 
 func (v value) String() string {

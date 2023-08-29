@@ -34,17 +34,18 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
 	c.acceptExpr(expr.Right)
-	val := c.load(c.exprValue)
-
-	res := c.locals.unnamed(expr.Right.Type())
-	c.exprValue = res
 
 	switch expr.Op.Kind {
 	case scanner.Bang:
-		c.writeFmt("%s = xor i1 %s, true\n", res, val)
+		res := c.locals.unnamed(expr.Right.Type())
+		c.writeFmt("%s = xor i1 %s, true\n", res, c.load(c.exprValue, expr.Right.Type()))
+		c.exprValue = res
 
 	case scanner.Minus:
 		if v, ok := expr.Right.Type().(*types.PrimitiveType); ok {
+			res := c.locals.unnamed(expr.Right.Type())
+			val := c.load(c.exprValue, expr.Right.Type())
+
 			if types.IsFloating(v.Kind) {
 				// floating
 				c.writeFmt("%s = fneg %s %s\n", res, c.getType(expr.Right.Type()), val)
@@ -52,8 +53,16 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 				// signed
 				c.writeFmt("%s = sub nsw %s 0, %s\n", res, c.getType(expr.Right.Type()), val)
 			}
+
+			c.exprValue = res
 		} else {
 			log.Fatalln("Invalid type")
+		}
+
+	case scanner.Ampersand:
+		c.exprValue = value{
+			identifier: c.exprValue.identifier,
+			type_:      types.PointerType{Pointee: c.exprValue.type_},
 		}
 
 	default:
@@ -65,7 +74,7 @@ func (c *codegen) VisitBinary(expr *ast.Binary) {
 	left := c.acceptExpr(expr.Left)
 	right := c.acceptExpr(expr.Right)
 
-	c.exprValue = c.binary(expr.Op.Kind, left, right)
+	c.exprValue = c.binary(expr.Op.Kind, left, expr.Left.Type(), right, expr.Right.Type())
 }
 
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
@@ -91,11 +100,14 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 
 func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	// Assignee
-	assignee := c.acceptExpr(expr.Assignee)
+	assignee := c.load(c.acceptExpr(expr.Assignee), expr.Assignee.Type())
 
 	// Value
-	val := c.load(c.acceptExpr(expr.Value))
-	val = c.binary(expr.Op.Kind, assignee, val)
+	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
+
+	if expr.Op.Kind != scanner.Equal {
+		val = c.binary(expr.Op.Kind, assignee, expr.Assignee.Type(), val, expr.Value.Type())
+	}
 
 	// Store
 	c.writeFmt("store %s %s, ptr %s\n", c.getType(val.type_), val, assignee)
@@ -104,7 +116,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
 	c.acceptExpr(expr.Expr)
-	val := c.load(c.exprValue)
+	val := c.load(c.exprValue, expr.Type())
 
 	res := c.locals.unnamed(expr.Type())
 	c.exprValue = res
@@ -164,36 +176,54 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 }
 
 func (c *codegen) VisitCall(expr *ast.Call) {
+	var f types.FunctionType
+
+	if v, ok := expr.Callee.Type().(types.FunctionType); ok {
+		f = v
+	}
+
 	args := make([]value, len(expr.Args))
 
 	for i, arg := range expr.Args {
-		args[i] = c.acceptExpr(arg)
+		args[i] = c.load(c.acceptExpr(arg), arg.Type())
 	}
 
-	val := c.locals.unnamed(expr.Type())
 	builder := strings.Builder{}
-	builder.WriteString(fmt.Sprintf("%s = call %s %s(", val, c.getType(expr.Type()), c.acceptExpr(expr.Callee)))
+
+	type_ := c.getType(expr.Type())
+	callee := c.acceptExpr(expr.Callee)
+
+	if types.IsPrimitive(f.Returns, types.Void) {
+		builder.WriteString(fmt.Sprintf("call %s %s(", type_, callee))
+
+		c.exprValue = value{
+			identifier: "",
+			type_:      types.Primitive(types.Void),
+		}
+	} else {
+		val := c.locals.unnamed(expr.Type())
+		builder.WriteString(fmt.Sprintf("%s = call %s %s(", val, type_, callee))
+		c.exprValue = val
+	}
 
 	for i, arg := range args {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
 
-		builder.WriteString(fmt.Sprintf("%s %s", c.getType(arg.type_), arg))
+		builder.WriteString(fmt.Sprintf("%s %s", c.getType(expr.Args[i].Type()), arg))
 	}
 
 	builder.WriteString(")\n")
 	c.writeStr(builder.String())
-
-	c.exprValue = val
 }
 
 // Utils
 
-func (c *codegen) binary(op scanner.TokenKind, left value, right value) value {
+func (c *codegen) binary(op scanner.TokenKind, left value, leftType types.Type, right value, rightType types.Type) value {
 	// Load arguments in case they are pointers
-	left = c.load(left)
-	right = c.load(right)
+	left = c.load(left, leftType)
+	right = c.load(right, rightType)
 
 	// Check for floating point numbers and sign
 	floating := false

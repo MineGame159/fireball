@@ -44,43 +44,62 @@ func Parse(reporter core.ErrorReporter, scanner *scanner.Scanner) []ast.Decl {
 }
 
 func (p *parser) parseType() (types.Type, *core.Error) {
+	// Pointer
+	pointer := false
+
+	if p.match(scanner.Star) {
+		pointer = true
+	}
+
+	// Primitive
 	ident, err := p.consume(scanner.Identifier, "Expected type name.")
 	if err != nil {
 		return nil, err
 	}
 
+	var kind types.PrimitiveKind
+
 	switch ident.Lexeme {
 	case "void":
-		return types.Primitive(types.Void), nil
+		kind = types.Void
 	case "bool":
-		return types.Primitive(types.Bool), nil
+		kind = types.Bool
 
 	case "u8":
-		return types.Primitive(types.U8), nil
+		kind = types.U8
 	case "u16":
-		return types.Primitive(types.U16), nil
+		kind = types.U16
 	case "u32":
-		return types.Primitive(types.U32), nil
+		kind = types.U32
 	case "u64":
-		return types.Primitive(types.U64), nil
+		kind = types.U64
 
 	case "i8":
-		return types.Primitive(types.I8), nil
+		kind = types.I8
 	case "i16":
-		return types.Primitive(types.I16), nil
+		kind = types.I16
 	case "i32":
-		return types.Primitive(types.I32), nil
+		kind = types.I32
 	case "i64":
-		return types.Primitive(types.I64), nil
+		kind = types.I64
 
 	case "f32":
-		return types.Primitive(types.F32), nil
+		kind = types.F32
 	case "f64":
-		return types.Primitive(types.F64), nil
+		kind = types.F64
 
 	default:
 		return nil, p.error(ident, "Unknown type '%s'.", ident)
 	}
+
+	// Return
+	var type_ types.Type = types.Primitive(kind)
+
+	if pointer {
+		type_ = types.PointerType{Pointee: type_}
+	}
+
+	return type_, nil
 }
 
 func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *core.Error) {

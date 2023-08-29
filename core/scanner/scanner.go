@@ -58,6 +58,8 @@ func (s *Scanner) Next() Token {
 		return s.make(Colon)
 	case ';':
 		return s.make(Semicolon)
+	case '&':
+		return s.make(Ampersand)
 
 	case '+':
 		return s.matchToken('=', PlusEqual, Plus)

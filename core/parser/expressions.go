@@ -107,7 +107,7 @@ func (p *parser) factor() (ast.Expr, *core.Error) {
 }
 
 func (p *parser) unary() (ast.Expr, *core.Error) {
-	if p.match(scanner.Bang, scanner.Minus) {
+	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand) {
 		op := p.current
 		right, err := p.unary()
 
