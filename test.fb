@@ -1,8 +1,8 @@
 func main() i32 {
     var a = "Hello";
-    puts(a);
+    printf("%s: %d\n", a, 5);
 
     return 0;
 }
 
-extern func puts(str *u8) void
+extern func printf(format *u8, ...) void

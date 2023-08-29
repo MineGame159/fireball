@@ -16,11 +16,12 @@ type Decl interface {
 }
 
 type Func struct {
-	Extern  bool
-	Name    scanner.Token
-	Params  []Param
-	Returns types.Type
-	Body    []Stmt
+	Extern   bool
+	Name     scanner.Token
+	Params   []Param
+	Variadic bool
+	Returns  types.Type
+	Body     []Stmt
 }
 
 func (f *Func) Token() scanner.Token {

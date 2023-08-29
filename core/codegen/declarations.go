@@ -21,6 +21,14 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 		c.writeFmt("%s %%%s", c.getType(param.Type), param.Name)
 	}
 
+	if decl.Variadic {
+		if len(decl.Params) > 0 {
+			c.writeStr(", ")
+		}
+
+		c.writeStr("...")
+	}
+
 	// Body
 	if decl.Extern {
 		c.writeStr(")\n\n")

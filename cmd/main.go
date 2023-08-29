@@ -3,7 +3,6 @@ package main
 import (
 	"fireball/cmd/lsp"
 	"fireball/core"
-	"fireball/core/ast"
 	"fireball/core/checker"
 	"fireball/core/codegen"
 	"fireball/core/parser"
@@ -63,11 +62,11 @@ func build(path string) {
 		os.Exit(1)
 	}
 
-	for _, decl := range decls {
+	/*for _, decl := range decls {
 		fmt.Println()
 		ast.Print(decl, os.Stdout)
 		fmt.Println()
-	}
+	}*/
 
 	_ = os.Mkdir("build", 0750)
 	file, _ := os.Create("build/test.ll")

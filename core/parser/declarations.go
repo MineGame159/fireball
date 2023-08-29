@@ -50,8 +50,9 @@ func (p *parser) function() ast.Decl {
 	}
 
 	params := make([]ast.Param, 0, 4)
+	variadic := false
 
-	for !p.check(scanner.RightParen) {
+	for !p.check(scanner.RightParen) && !p.check(scanner.Dot) {
 		name := p.consume2(scanner.Identifier)
 		if name.IsError() {
 			p.error2(p.next, "Expected parameter name.")
@@ -76,6 +77,22 @@ func (p *parser) function() ast.Decl {
 			Name: name,
 			Type: type_,
 		})
+	}
+
+	if dot := p.consume2(scanner.Dot); !dot.IsError() {
+		if dot := p.consume2(scanner.Dot); !dot.IsError() {
+			if dot := p.consume2(scanner.Dot); !dot.IsError() {
+				variadic = true
+
+				if !p.extern {
+					p.error2(dot, "Only extern functions can be variadic.")
+					if !p.syncToDecl() {
+						return nil
+					}
+					return nil
+				}
+			}
+		}
 	}
 
 	if paren := p.consume2(scanner.RightParen); paren.IsError() {
@@ -141,11 +158,12 @@ func (p *parser) function() ast.Decl {
 
 	// Return
 	return &ast.Func{
-		Extern:  p.extern,
-		Name:    name,
-		Params:  params,
-		Returns: returns,
-		Body:    body,
+		Extern:   p.extern,
+		Name:     name,
+		Params:   params,
+		Variadic: variadic,
+		Returns:  returns,
+		Body:     body,
 	}
 }
 

@@ -113,8 +113,9 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		}
 
 		expr.SetType(types.FunctionType{
-			Params:  params,
-			Returns: function.Returns,
+			Params:   params,
+			Variadic: function.Variadic,
+			Returns:  function.Returns,
 		})
 		return
 	}
@@ -153,14 +154,22 @@ func (c *checker) VisitCall(expr *ast.Call) {
 	}
 
 	if v, ok := expr.Callee.Type().(types.FunctionType); ok {
-		if len(v.Params) == len(expr.Args) {
-			for i, arg := range expr.Args {
-				if !arg.Type().CanAssignTo(v.Params[i]) {
-					c.error(expr, "Argument with type '%s' cannot be assigned to a parameter wth type '%s'.", arg.Type(), v.Params[i])
-				}
+		toCheck := min(len(v.Params), len(expr.Args))
+
+		if v.Variadic {
+			if len(expr.Args) < len(v.Params) {
+				c.error(expr, "Got '%d' arguments but function takes at least '%d'.", len(expr.Args), len(v.Params))
 			}
 		} else {
-			c.error(expr, "Got '%d' arguments but function only takes '%d'.", len(expr.Args), len(v.Params))
+			if len(v.Params) != len(expr.Args) {
+				c.error(expr, "Got '%d' arguments but function only takes '%d'.", len(expr.Args), len(v.Params))
+			}
+		}
+
+		for i := 0; i < toCheck; i++ {
+			if !expr.Args[i].Type().CanAssignTo(v.Params[i]) {
+				c.error(expr, "Argument with type '%s' cannot be assigned to a parameter wth type '%s'.", expr.Args[i].Type(), v.Params[i])
+			}
 		}
 
 		expr.SetType(v.Returns)

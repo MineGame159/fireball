@@ -25,6 +25,7 @@ var decls = []item{
 			{name: "Extern", type_: "bool"},
 			{name: "Name", type_: "Token"},
 			{name: "Params", type_: "[]Param"},
+			{name: "Variadic", type_: "bool"},
 			{name: "Returns", type_: "Type"},
 			{name: "Body", type_: "[]Stmt"},
 		},

@@ -3,8 +3,9 @@ package types
 import "strings"
 
 type FunctionType struct {
-	Params  []Type
-	Returns Type
+	Params   []Type
+	Variadic bool
+	Returns  Type
 }
 
 func (f FunctionType) Size() int {

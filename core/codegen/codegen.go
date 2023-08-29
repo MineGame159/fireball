@@ -74,8 +74,9 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 			}
 
 			c.addFunction(f.Name, types.FunctionType{
-				Params:  params,
-				Returns: f.Returns,
+				Params:   params,
+				Variadic: f.Variadic,
+				Returns:  f.Returns,
 			})
 		}
 	}

@@ -1,3 +1,6 @@
+go build -o fireball fireball/cmd
+fireball build test.fb
+
 cd build || exit
 
 llc --filetype=obj -o=test.o test.ll
