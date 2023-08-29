@@ -6,6 +6,7 @@ import (
 	"fireball/core/scanner"
 	"fireball/core/types"
 	"fmt"
+	"strconv"
 )
 
 type parser struct {
@@ -44,14 +45,59 @@ func Parse(reporter core.ErrorReporter, scanner *scanner.Scanner) []ast.Decl {
 }
 
 func (p *parser) parseType() (types.Type, *core.Error) {
-	// Pointer
-	pointer := false
-
+	if p.match(scanner.LeftBracket) {
+		return p.parseArrayType()
+	}
 	if p.match(scanner.Star) {
-		pointer = true
+		return p.parsePointerType()
 	}
 
-	// Primitive
+	return p.parsePrimitiveType()
+}
+
+func (p *parser) parseArrayType() (types.Type, *core.Error) {
+	// Count
+	token, err := p.consume(scanner.Number, "Expected array size.")
+	if err != nil {
+		return nil, err
+	}
+
+	count, err_ := strconv.Atoi(token.Lexeme)
+
+	if err_ != nil {
+		return nil, p.error(token, "Invalid array size.")
+	}
+	if count < 0 {
+		return nil, p.error(token, "Invalid array size.")
+	}
+
+	// Right bracket
+	if _, err := p.consume(scanner.RightBracket, "Expected ']' after array size."); err != nil {
+		return nil, err
+	}
+
+	// Base
+	base, err := p.parseType()
+	if err != nil {
+		return nil, err
+	}
+
+	return types.ArrayType{
+		Count: uint32(count),
+		Base:  base,
+	}, nil
+}
+
+func (p *parser) parsePointerType() (types.Type, *core.Error) {
+	pointee, err := p.parseType()
+	if err != nil {
+		return nil, err
+	}
+
+	return types.PointerType{Pointee: pointee}, nil
+}
+
+func (p *parser) parsePrimitiveType() (types.Type, *core.Error) {
 	ident, err := p.consume(scanner.Identifier, "Expected type name.")
 	if err != nil {
 		return nil, err
@@ -92,14 +138,7 @@ func (p *parser) parseType() (types.Type, *core.Error) {
 		return nil, p.error(ident, "Unknown type '%s'.", ident)
 	}
 
-	// Return
-	var type_ types.Type = types.Primitive(kind)
-
-	if pointer {
-		type_ = types.PointerType{Pointee: type_}
-	}
-
-	return type_, nil
+	return types.Primitive(kind), nil
 }
 
 func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *core.Error) {

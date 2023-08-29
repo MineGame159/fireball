@@ -21,6 +21,13 @@
         ],
         "configuration": "./language-configuration.json"
       }
+    ],
+    "grammars": [
+      {
+        "language": "fireball",
+        "scopeName": "source.fb",
+        "path": "./fireball.tmGrammar.json"
+      }
     ]
   },
   "scripts": {

@@ -127,18 +127,17 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 
 func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	// Assignee
-	assigneePtr := c.acceptExpr(expr.Assignee)
-	assignee := c.load(assigneePtr, expr.Assignee.Type())
+	assignee := c.acceptExpr(expr.Assignee)
 
 	// Value
 	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
 
 	if expr.Op.Kind != scanner.Equal {
-		val = c.binary(expr.Op.Kind, assignee, expr.Assignee.Type(), val, expr.Value.Type())
+		val = c.binary(expr.Op.Kind, c.load(assignee, expr.Assignee.Type()), expr.Assignee.Type(), val, expr.Value.Type())
 	}
 
 	// Store
-	c.writeFmt("store %s %s, ptr %s\n", c.getType(expr.Value.Type()), val, assigneePtr)
+	c.writeFmt("store %s %s, ptr %s\n", c.getType(expr.Value.Type()), val, assignee)
 	c.exprValue = assignee
 }
 
@@ -199,6 +198,13 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 		}
 	}
 
+	if _, ok := expr.Expr.Type().(types.PointerType); ok {
+		if _, ok := expr.Type().(types.PointerType); ok {
+			// pointer to pointer
+			return
+		}
+	}
+
 	// Error
 	log.Fatalln("Invalid cast")
 }
@@ -247,7 +253,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 }
 
 func (c *codegen) VisitIndex(expr *ast.Index) {
-	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
+	val := c.toPtrOrLoad(c.acceptExpr(expr.Value), expr.Value.Type())
 	index := c.load(c.acceptExpr(expr.Index), expr.Index.Type())
 
 	type_ := c.getType(expr.Type())
@@ -255,7 +261,7 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	res := c.locals.unnamed(expr.Type())
 	res.needsLoading = true
 
-	c.writeFmt("%s = getelementptr inbounds %s, ptr %s, %s %s\n", res, type_, val, c.getType(expr.Index.Type()), index)
+	c.writeFmt("%s = getelementptr inbounds %s, %s %s, %s %s\n", res, type_, c.getType(val.type_), val, c.getType(expr.Index.Type()), index)
 
 	c.exprValue = res
 }
@@ -288,6 +294,8 @@ func (c *codegen) binary(op scanner.TokenKind, left value, leftType types.Type, 
 		inst = ternary(floating, "fmul", "mul")
 	case scanner.Slash, scanner.SlashEqual:
 		inst = ternary(floating, "fdiv", "div")
+	case scanner.Percentage, scanner.PercentageEqual:
+		inst = ternary(floating, "frem", ternary(signed, "srem", "urem"))
 
 	case scanner.EqualEqual:
 		inst = ternary(floating, "fcmp oeq", "icmp eq")

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "source.fb",
+  "patterns": [
+    {
+      "include": "#comment"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "begin": "//",
+      "end": "\n",
+      "beginCaptures": {
+        "0": {
+          "name": "comment.line.double-slash.fb"
+        }
+      },
+      "name": "comment.line.fb"
+    }
+  }
+}

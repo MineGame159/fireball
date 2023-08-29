@@ -105,6 +105,17 @@ func (c *codegen) load(val value, type_ types.Type) value {
 	return val
 }
 
+func (c *codegen) toPtrOrLoad(val value, type_ types.Type) value {
+	if v, ok := val.type_.(types.ArrayType); ok && val.needsLoading {
+		return value{
+			identifier: val.identifier,
+			type_:      types.PointerType{Pointee: v.Base},
+		}
+	}
+
+	return c.load(val, type_)
+}
+
 // Constants
 
 func (c *codegen) getConstant(data string) string {
@@ -175,6 +186,14 @@ func (c *codegen) getType(type_ types.Type) value {
 	// Try cache
 	if v, ok := c.types[type_]; ok {
 		return v
+	}
+
+	// Array
+	if v, ok := type_.(types.ArrayType); ok {
+		val := c.globals.constant(fmt.Sprintf("[%d x %s]", v.Count, c.getType(v.Base)), type_)
+		c.types[type_] = val
+
+		return val
 	}
 
 	// Pointer

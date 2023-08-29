@@ -15,6 +15,9 @@ func (c *checker) VisitGroup(expr *ast.Group) {
 
 func (c *checker) VisitLiteral(expr *ast.Literal) {
 	switch expr.Value.Kind {
+	case scanner.Nil:
+		expr.SetType(types.PointerType{Pointee: types.Primitive(types.Void)})
+
 	case scanner.True, scanner.False:
 		expr.SetType(types.Primitive(types.Bool))
 
@@ -186,10 +189,12 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	c.acceptExpr(expr.Value)
 	c.acceptExpr(expr.Index)
 
-	if v, ok := expr.Value.Type().(types.PointerType); ok {
+	if v, ok := expr.Value.Type().(types.ArrayType); ok {
+		expr.SetType(v.Base)
+	} else if v, ok := expr.Value.Type().(types.PointerType); ok {
 		expr.SetType(v.Pointee)
 	} else {
-		c.error(expr, "Can only index into pointer types, not '%s'.", expr.Value.Type())
+		c.error(expr, "Can only index into array and pointer types, not '%s'.", expr.Value.Type())
 		expr.SetType(types.PointerType{Pointee: types.Primitive(types.Void)})
 	}
 }
