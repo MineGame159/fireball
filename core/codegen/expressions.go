@@ -144,7 +144,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
 	c.acceptExpr(expr.Expr)
-	val := c.load(c.exprValue, expr.Type())
+	val := c.load(c.exprValue, expr.Expr.Type())
 
 	res := c.locals.unnamed(expr.Type())
 	c.exprValue = res
@@ -252,11 +252,10 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 
 	type_ := c.getType(expr.Type())
 
-	offset := c.locals.unnamed(expr.Type())
-	c.writeFmt("%s = getelementptr inbounds %s, ptr %s, %s %s\n", offset, type_, val, c.getType(expr.Index.Type()), index)
-
 	res := c.locals.unnamed(expr.Type())
-	c.writeFmt("%s = load %s, ptr %s\n", res, type_, offset)
+	res.needsLoading = true
+
+	c.writeFmt("%s = getelementptr inbounds %s, ptr %s, %s %s\n", res, type_, val, c.getType(expr.Index.Type()), index)
 
 	c.exprValue = res
 }

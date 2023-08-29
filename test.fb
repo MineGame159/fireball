@@ -1,13 +1,35 @@
 func main() i32 {
-    var a = "Hello";
-    var i = 0;
+    var a = "12345";
+    var b = &a[1];
 
-    for i < 2 {
-        puts("Hello");
+    var num = parseInt(b);
+    printf("%d\n", num);
+
+    return 0;
+}
+
+func parseInt(str *u8) i32 {
+    var i = 0;
+    var num = 0;
+
+    for {
+        var ch = str[i];
+
+        if ch == '\0' {
+            return num;
+        }
+
+        if ch >= '0' {
+            if ch <= '9' {
+                num *= 10;
+                num += (ch - '0') as i32;
+            }
+        }
+
         i += 1;
     }
 
-    return (a[1] == 'e') as i32;
+    return num;
 }
 
-extern func puts(str *u8) void
+extern func printf(format *u8, ...) void
