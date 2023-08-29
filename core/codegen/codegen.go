@@ -56,7 +56,7 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 	c := &codegen{
 		globals: values{char: "@"},
 		blocks:  values{char: "bb_"},
-		locals:  values{char: "%"},
+		locals:  values{char: "%_"},
 
 		types: make(map[types.Type]value),
 
@@ -138,6 +138,11 @@ func (c *constant) escape() {
 			i++
 
 			switch c.original[i] {
+			case '0':
+				data = append(data, '\\')
+				data = append(data, '0')
+				data = append(data, '0')
+
 			case 'n':
 				data = append(data, '\\')
 				data = append(data, '0')

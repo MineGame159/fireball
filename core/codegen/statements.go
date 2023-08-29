@@ -21,12 +21,12 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Variable
 	c.addVariable(stmt.Name, c.locals.named(stmt.Name.Lexeme, stmt.Type))
-	c.writeFmt("%%%s = alloca %s\n", stmt.Name, c.getType(stmt.Type))
+	c.writeFmt("%%_%s = alloca %s\n", stmt.Name, c.getType(stmt.Type))
 
 	// Initializer
 	if stmt.Initializer != nil {
 		val := c.acceptExpr(stmt.Initializer)
-		c.writeFmt("store %s %s, ptr %%%s\n", c.getType(stmt.Initializer.Type()), val, stmt.Name)
+		c.writeFmt("store %s %s, ptr %%_%s\n", c.getType(stmt.Initializer.Type()), val, stmt.Name)
 	}
 }
 

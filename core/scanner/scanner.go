@@ -203,7 +203,7 @@ func (s *Scanner) character() Token {
 	if s.advance() == '\\' && !s.isAtEnd() {
 		c := s.advance()
 
-		if c != '\'' && c != 'n' && c != 'r' && c != 't' {
+		if c != '\'' && c != '0' && c != 'n' && c != 'r' && c != 't' {
 			return s.error("Unexpected character.")
 		}
 	}

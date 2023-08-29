@@ -32,6 +32,8 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 		switch c {
 		case "'":
 			char = '\''
+		case "\\0":
+			char = '\000'
 
 		case "\n":
 			char = '\n'
