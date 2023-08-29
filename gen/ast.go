@@ -167,6 +167,16 @@ var exprs = []item{
 		token: "Token_",
 		ast:   true,
 	},
+	{
+		name: "Index",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Value", type_: "Expr"},
+			{name: "Index", type_: "Expr"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
 }
 
 func main() {

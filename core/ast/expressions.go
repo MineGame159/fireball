@@ -14,6 +14,7 @@ type ExprVisitor interface {
 	VisitAssignment(expr *Assignment)
 	VisitCast(expr *Cast)
 	VisitCall(expr *Call)
+	VisitIndex(expr *Index)
 }
 
 type Expr interface {
@@ -208,4 +209,28 @@ func (c *Call) Type() types.Type {
 
 func (c *Call) SetType(type_ types.Type) {
 	c.type_ = type_
+}
+
+type Index struct {
+	type_ types.Type
+
+	Token_ scanner.Token
+	Value  Expr
+	Index  Expr
+}
+
+func (i *Index) Token() scanner.Token {
+	return i.Token_
+}
+
+func (i *Index) Accept(visitor ExprVisitor) {
+	visitor.VisitIndex(i)
+}
+
+func (i *Index) Type() types.Type {
+	return i.type_
+}
+
+func (i *Index) SetType(type_ types.Type) {
+	i.type_ = type_
 }

@@ -1,6 +1,6 @@
 func main() i32 {
     var a = "Hello";
-    printf("%s: %d\n", a, 5);
+    printf("%s: %d\n", a, a[2]);
 
     return 0;
 }

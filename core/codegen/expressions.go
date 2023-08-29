@@ -221,6 +221,21 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	c.writeStr(builder.String())
 }
 
+func (c *codegen) VisitIndex(expr *ast.Index) {
+	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
+	index := c.load(c.acceptExpr(expr.Index), expr.Index.Type())
+
+	type_ := c.getType(expr.Type())
+
+	offset := c.locals.unnamed(expr.Type())
+	c.writeFmt("%s = getelementptr inbounds %s, ptr %s, %s %s\n", offset, type_, val, c.getType(expr.Index.Type()), index)
+
+	res := c.locals.unnamed(expr.Type())
+	c.writeFmt("%s = load %s, ptr %s\n", res, type_, offset)
+
+	c.exprValue = res
+}
+
 // Utils
 
 func (c *codegen) binary(op scanner.TokenKind, left value, leftType types.Type, right value, rightType types.Type) value {

@@ -136,6 +136,13 @@ func (p *printer) VisitCall(expr *Call) {
 	}
 }
 
+func (p *printer) VisitIndex(expr *Index) {
+	p.print("[]")
+
+	p.acceptExpr(expr.Value)
+	p.acceptExpr(expr.Index)
+}
+
 // Utils
 
 func (p *printer) acceptDecl(decl Decl) {

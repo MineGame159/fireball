@@ -187,10 +187,21 @@ func (c *codegen) getType(type_ types.Type) value {
 		switch v.Kind {
 		case types.Bool:
 			name = "i1"
+
+		case types.U8:
+			name = "i8"
+		case types.U16:
+			name = "i16"
+		case types.U32:
+			name = "i32"
+		case types.U64:
+			name = "i64"
+
 		case types.F32:
 			name = "float"
 		case types.F64:
 			name = "double"
+
 		default:
 			name = v.String()
 		}

@@ -178,3 +178,15 @@ func (c *checker) VisitCall(expr *ast.Call) {
 		c.error(expr, "Can't call type '%s'.", expr.Callee.Type())
 	}
 }
+
+func (c *checker) VisitIndex(expr *ast.Index) {
+	c.acceptExpr(expr.Value)
+	c.acceptExpr(expr.Index)
+
+	if v, ok := expr.Value.Type().(types.PointerType); ok {
+		expr.SetType(v.Pointee)
+	} else {
+		c.error(expr, "Can only index into pointer types, not '%s'.", expr.Value.Type())
+		expr.SetType(types.PointerType{Pointee: types.Primitive(types.Void)})
+	}
+}

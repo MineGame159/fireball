@@ -156,6 +156,11 @@ func (p *parser) call() (ast.Expr, *core.Error) {
 			if err != nil {
 				return nil, err
 			}
+		} else if p.match(scanner.LeftBracket) {
+			expr, err = p.finishIndex(expr)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			break
 		}
@@ -201,6 +206,25 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *core.Error) {
 		Token_: p.current,
 		Callee: callee,
 		Args:   args,
+	}, nil
+}
+
+func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Error) {
+	token := p.current
+
+	index, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.consume(scanner.RightBracket, "Expected ']' after index expression."); err != nil {
+		return nil, err
+	}
+
+	return &ast.Index{
+		Token_: token,
+		Value:  value,
+		Index:  index,
 	}, nil
 }
 
