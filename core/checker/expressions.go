@@ -14,23 +14,22 @@ func (c *checker) VisitGroup(expr *ast.Group) {
 }
 
 func (c *checker) VisitLiteral(expr *ast.Literal) {
-	kind := types.Void
-
 	switch expr.Value.Kind {
 	case scanner.True, scanner.False:
-		kind = types.Bool
+		expr.SetType(types.Primitive(types.Bool))
 
 	case scanner.Number:
 		if strings.HasSuffix(expr.Value.Lexeme, "f") {
-			kind = types.F32
+			expr.SetType(types.Primitive(types.F32))
 		} else if strings.ContainsRune(expr.Value.Lexeme, '.') {
-			kind = types.F64
+			expr.SetType(types.Primitive(types.F64))
 		} else {
-			kind = types.I32
+			expr.SetType(types.Primitive(types.I32))
 		}
-	}
 
-	expr.SetType(types.Primitive(kind))
+	case scanner.String:
+		expr.SetType(types.PointerType{Pointee: types.Primitive(types.U8)})
+	}
 }
 
 func (c *checker) VisitUnary(expr *ast.Unary) {

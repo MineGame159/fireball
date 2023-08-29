@@ -10,11 +10,20 @@ import (
 	"strconv"
 )
 
+type constant struct {
+	identifier string
+	original   string
+
+	data   []uint8
+	length int
+}
+
 type codegen struct {
 	globals values
 	blocks  values
 	locals  values
 
+	constants []constant
 	types     map[types.Type]value
 	functions []function
 
@@ -75,6 +84,11 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 	for _, decl := range decls {
 		c.acceptDecl(decl)
 	}
+
+	// Emit constants
+	for _, co := range c.constants {
+		c.writeFmt("%s = private unnamed_addr constant [%d x i8] c\"%s\\00\"\n", co.identifier, co.length+1, co.data)
+	}
 }
 
 // IR
@@ -88,6 +102,65 @@ func (c *codegen) load(val value, type_ types.Type) value {
 	}
 
 	return val
+}
+
+// Constants
+
+func (c *codegen) getConstant(data string) string {
+	// Get
+	for _, co := range c.constants {
+		if co.original == data {
+			return co.identifier
+		}
+	}
+
+	// Create
+	identifier := c.globals.unnamedRaw()
+
+	c.constants = append(c.constants, constant{
+		identifier: identifier,
+		original:   data,
+	})
+
+	c.constants[len(c.constants)-1].escape()
+
+	return identifier
+}
+
+func (c *constant) escape() {
+	data := make([]uint8, 0, len(c.original)+1)
+
+	for i := 0; i < len(c.original); i++ {
+		char := c.original[i]
+
+		if char == '\\' {
+			i++
+
+			switch c.original[i] {
+			case 'n':
+				data = append(data, '\\')
+				data = append(data, '0')
+				data = append(data, 'A')
+
+			case 'r':
+				data = append(data, '\\')
+				data = append(data, '0')
+				data = append(data, 'D')
+
+			case 't':
+				data = append(data, '\\')
+				data = append(data, '0')
+				data = append(data, '9')
+			}
+
+			c.length++
+		} else {
+			data = append(data, char)
+			c.length++
+		}
+	}
+
+	c.data = data
 }
 
 // Types

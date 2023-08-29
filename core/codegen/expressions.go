@@ -24,6 +24,9 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	case scanner.True, scanner.False, scanner.Number:
 		raw = expr.Value.Lexeme
 
+	case scanner.String:
+		raw = c.getConstant(expr.Value.Lexeme[1 : len(expr.Value.Lexeme)-1])
+
 	default:
 		log.Fatalln("Invalid literal kind")
 	}
@@ -110,7 +113,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	}
 
 	// Store
-	c.writeFmt("store %s %s, ptr %s\n", c.getType(val.type_), val, assignee)
+	c.writeFmt("store %s %s, ptr %s\n", c.getType(expr.Value.Type()), val, assignee)
 	c.exprValue = assignee
 }
 

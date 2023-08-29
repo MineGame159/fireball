@@ -26,7 +26,7 @@ func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Initializer
 	if stmt.Initializer != nil {
 		val := c.acceptExpr(stmt.Initializer)
-		c.writeFmt("store %s %s, ptr %%%s\n", c.getType(val.type_), val, stmt.Name)
+		c.writeFmt("store %s %s, ptr %%%s\n", c.getType(stmt.Initializer.Type()), val, stmt.Name)
 	}
 }
 
