@@ -55,6 +55,7 @@ const (
 	Return
 
 	Number
+	Character
 	String
 	Identifier
 

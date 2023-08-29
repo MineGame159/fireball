@@ -311,7 +311,7 @@ func (h *handler) SemanticTokensFull(ctx context.Context, params *protocol.Seman
 			case scanner.Number:
 				kind = 3
 
-			case scanner.String:
+			case scanner.Character, scanner.String:
 				kind = 4
 
 			case scanner.Identifier:

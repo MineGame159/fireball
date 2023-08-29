@@ -27,6 +27,9 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 			expr.SetType(types.Primitive(types.I32))
 		}
 
+	case scanner.Character:
+		expr.SetType(types.Primitive(types.U8))
+
 	case scanner.String:
 		expr.SetType(types.PointerType{Pointee: types.Primitive(types.U8)})
 	}

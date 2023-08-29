@@ -1,8 +1,5 @@
 func main() i32 {
     var a = "Hello";
-    printf("%s: %d\n", a, a[2]);
 
-    return 0;
+    return (a[1] == 'e') as i32;
 }
-
-extern func printf(format *u8, ...) void

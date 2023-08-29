@@ -81,6 +81,8 @@ func (s *Scanner) Next() Token {
 	case '>':
 		return s.matchToken('=', GreaterEqual, Greater)
 
+	case '\'':
+		return s.character()
 	case '"':
 		return s.string()
 	}
@@ -191,6 +193,27 @@ func (s *Scanner) string() Token {
 
 	s.advance()
 	return s.make(String)
+}
+
+func (s *Scanner) character() Token {
+	if s.isAtEnd() || s.peek() == '\'' {
+		return s.error("Empty character.")
+	}
+
+	if s.advance() == '\\' && !s.isAtEnd() {
+		c := s.advance()
+
+		if c != '\'' && c != 'n' && c != 'r' && c != 't' {
+			return s.error("Unexpected character.")
+		}
+	}
+
+	if s.peek() != '\'' {
+		return s.error("Unterminated character.")
+	}
+
+	s.advance()
+	return s.make(Character)
 }
 
 func (s *Scanner) matchToken(expected uint8, kindTrue TokenKind, kindFalse TokenKind) Token {

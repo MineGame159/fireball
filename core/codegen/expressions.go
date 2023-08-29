@@ -6,6 +6,7 @@ import (
 	"fireball/core/types"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 )
 
@@ -23,6 +24,27 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 
 	case scanner.True, scanner.False, scanner.Number:
 		raw = expr.Value.Lexeme
+
+	case scanner.Character:
+		c := expr.Value.Lexeme[1 : len(expr.Value.Lexeme)-1]
+		var char uint8
+
+		switch c {
+		case "'":
+			char = '\''
+
+		case "\n":
+			char = '\n'
+		case "\r":
+			char = '\r'
+		case "\t":
+			char = '\t'
+
+		default:
+			char = c[0]
+		}
+
+		raw = strconv.Itoa(int(char))
 
 	case scanner.String:
 		raw = c.getConstant(expr.Value.Lexeme[1 : len(expr.Value.Lexeme)-1])

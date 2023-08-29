@@ -229,7 +229,7 @@ func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Error) {
 }
 
 func (p *parser) primary() (ast.Expr, *core.Error) {
-	if p.match(scanner.Nil, scanner.True, scanner.False, scanner.Number, scanner.String) {
+	if p.match(scanner.Nil, scanner.True, scanner.False, scanner.Number, scanner.Character, scanner.String) {
 		return &ast.Literal{
 			Value: p.current,
 		}, nil
