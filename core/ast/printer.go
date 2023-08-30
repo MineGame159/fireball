@@ -105,6 +105,14 @@ func (p *printer) VisitReturn(stmt *Return) {
 	p.acceptExpr(stmt.Expr)
 }
 
+func (p *printer) VisitBreak(stmt *Break) {
+	p.print("break")
+}
+
+func (p *printer) VisitContinue(stmt *Continue) {
+	p.print("continue")
+}
+
 // Expressions
 
 func (p *printer) VisitGroup(expr *Group) {

@@ -23,6 +23,12 @@ func (p *parser) statement() (ast.Stmt, *core.Error) {
 	if p.match(scanner.Return) {
 		return p.return_()
 	}
+	if p.match(scanner.Break) {
+		return p.break_()
+	}
+	if p.match(scanner.Continue) {
+		return p.continue_()
+	}
 
 	return p.expressionStmt()
 }
@@ -210,5 +216,29 @@ func (p *parser) return_() (ast.Stmt, *core.Error) {
 	return &ast.Return{
 		Token_: token,
 		Expr:   expr,
+	}, nil
+}
+
+func (p *parser) break_() (ast.Stmt, *core.Error) {
+	token := p.current
+
+	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
+		return nil, err
+	}
+
+	return &ast.Break{
+		Token_: token,
+	}, nil
+}
+
+func (p *parser) continue_() (ast.Stmt, *core.Error) {
+	token := p.current
+
+	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
+		return nil, err
+	}
+
+	return &ast.Continue{
+		Token_: token,
 	}, nil
 }

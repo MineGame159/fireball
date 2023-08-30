@@ -27,3 +27,11 @@ func (r *resolver) VisitFor(stmt *ast.For) {
 func (r *resolver) VisitReturn(stmt *ast.Return) {
 	stmt.AcceptChildren(r)
 }
+
+func (r *resolver) VisitBreak(stmt *ast.Break) {
+	stmt.AcceptChildren(r)
+}
+
+func (r *resolver) VisitContinue(stmt *ast.Continue) {
+	stmt.AcceptChildren(r)
+}

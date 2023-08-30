@@ -66,35 +66,39 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 
 func (c *codegen) VisitFor(stmt *ast.For) {
 	// Get basic block names
-	start := c.blocks.unnamedRaw()
-	body := start
-	end := ""
+	c.loopStart = c.blocks.unnamedRaw()
+	body := c.loopStart
+	c.loopEnd = ""
 
-	c.writeFmt("br label %%%s\n", start)
+	c.writeFmt("br label %%%s\n", c.loopStart)
 
 	// Condition
-	c.writeRaw(start + ":\n")
+	c.writeRaw(c.loopStart + ":\n")
 
 	if stmt.Condition != nil {
 		body = c.blocks.unnamedRaw()
-		end = c.blocks.unnamedRaw()
+		c.loopEnd = c.blocks.unnamedRaw()
 
 		condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
-		c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, body, end)
+		c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, body, c.loopEnd)
 	} else {
-		end = c.blocks.unnamedRaw()
+		c.loopEnd = c.blocks.unnamedRaw()
 	}
 
 	// Body
-	if start != body {
+	if c.loopStart != body {
 		c.writeRaw(body + ":\n")
 	}
 
 	c.acceptStmt(stmt.Body)
-	c.writeFmt("br label %%%s\n", start)
+	c.writeFmt("br label %%%s\n", c.loopStart)
 
 	// End
-	c.writeRaw(end + ":\n")
+	c.writeRaw(c.loopEnd + ":\n")
+
+	// Reset basic block names
+	c.loopStart = ""
+	c.loopEnd = ""
 }
 
 func (c *codegen) VisitReturn(stmt *ast.Return) {
@@ -106,4 +110,12 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		val := c.load(c.acceptExpr(stmt.Expr), stmt.Expr.Type())
 		c.writeFmt("ret %s %s\n", c.getType(stmt.Expr.Type()), val)
 	}
+}
+
+func (c *codegen) VisitBreak(stmt *ast.Break) {
+	c.writeFmt("br label %%%s\n", c.loopEnd)
+}
+
+func (c *codegen) VisitContinue(stmt *ast.Continue) {
+	c.writeFmt("br label %%%s\n", c.loopStart)
 }

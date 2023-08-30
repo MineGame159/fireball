@@ -86,6 +86,14 @@ func (h *highlighter) VisitReturn(stmt *ast.Return) {
 	stmt.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitBreak(stmt *ast.Break) {
+	stmt.AcceptChildren(h)
+}
+
+func (h *highlighter) VisitContinue(stmt *ast.Continue) {
+	stmt.AcceptChildren(h)
+}
+
 // Expressions
 
 func (h *highlighter) VisitGroup(expr *ast.Group) {

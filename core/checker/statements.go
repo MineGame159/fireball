@@ -66,3 +66,11 @@ func (c *checker) VisitReturn(stmt *ast.Return) {
 		c.error(stmt, "Cannot return type '%s' from a function with return type '%s'.", type_, c.function.Returns)
 	}
 }
+
+func (c *checker) VisitBreak(stmt *ast.Break) {
+	stmt.AcceptChildren(c)
+}
+
+func (c *checker) VisitContinue(stmt *ast.Continue) {
+	stmt.AcceptChildren(c)
+}

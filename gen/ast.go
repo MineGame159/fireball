@@ -119,6 +119,22 @@ var stmts = []item{
 		token: "Token_",
 		ast:   true,
 	},
+	{
+		name: "Break",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
+	{
+		name: "Continue",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
 }
 
 var exprs = []item{

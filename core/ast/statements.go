@@ -12,6 +12,8 @@ type StmtVisitor interface {
 	VisitIf(stmt *If)
 	VisitFor(stmt *For)
 	VisitReturn(stmt *Return)
+	VisitBreak(stmt *Break)
+	VisitContinue(stmt *Continue)
 }
 
 type Stmt interface {
@@ -164,4 +166,40 @@ func (r *Return) AcceptChildren(acceptor Acceptor) {
 }
 
 func (r *Return) AcceptTypes(visitor types.Visitor) {
+}
+
+type Break struct {
+	Token_ scanner.Token
+}
+
+func (b *Break) Token() scanner.Token {
+	return b.Token_
+}
+
+func (b *Break) Accept(visitor StmtVisitor) {
+	visitor.VisitBreak(b)
+}
+
+func (b *Break) AcceptChildren(acceptor Acceptor) {
+}
+
+func (b *Break) AcceptTypes(visitor types.Visitor) {
+}
+
+type Continue struct {
+	Token_ scanner.Token
+}
+
+func (c *Continue) Token() scanner.Token {
+	return c.Token_
+}
+
+func (c *Continue) Accept(visitor StmtVisitor) {
+	visitor.VisitContinue(c)
+}
+
+func (c *Continue) AcceptChildren(acceptor Acceptor) {
+}
+
+func (c *Continue) AcceptTypes(visitor types.Visitor) {
 }

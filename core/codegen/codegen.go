@@ -30,6 +30,9 @@ type codegen struct {
 	scopes    []scope
 	variables []variable
 
+	loopStart string
+	loopEnd   string
+
 	exprValue value
 
 	writer io.Writer
