@@ -64,6 +64,29 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 		depth:  0,
 	}
 
+	// Emit types
+	for _, decl := range decls {
+		if v, ok := decl.(*ast.Struct); ok {
+			val := c.globals.constant("%struct."+v.Name.Lexeme, v.Type)
+			c.types[v.Type] = val
+
+			c.writeRaw(val.identifier)
+			c.writeRaw(" = type { ")
+
+			for i, field := range v.Fields {
+				if i > 0 {
+					c.writeRaw(", ")
+				}
+
+				c.writeRaw(c.getType(field.Type).identifier)
+			}
+
+			c.writeRaw(" }\n")
+		}
+	}
+
+	c.writeRaw("\n")
+
 	// Find all functions
 	for _, decl := range decls {
 		if f, ok := decl.(*ast.Func); ok {
@@ -73,7 +96,7 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 				params[i] = param.Type
 			}
 
-			c.addFunction(f.Name, types.FunctionType{
+			c.addFunction(f.Name, &types.FunctionType{
 				Params:   params,
 				Variadic: f.Variadic,
 				Returns:  f.Returns,
@@ -106,10 +129,10 @@ func (c *codegen) load(val value, type_ types.Type) value {
 }
 
 func (c *codegen) toPtrOrLoad(val value, type_ types.Type) value {
-	if v, ok := val.type_.(types.ArrayType); ok && val.needsLoading {
+	if val.needsLoading {
 		return value{
 			identifier: val.identifier,
-			type_:      types.PointerType{Pointee: v.Base},
+			type_:      &types.PointerType{Pointee: val.type_},
 		}
 	}
 
@@ -189,7 +212,7 @@ func (c *codegen) getType(type_ types.Type) value {
 	}
 
 	// Array
-	if v, ok := type_.(types.ArrayType); ok {
+	if v, ok := type_.(*types.ArrayType); ok {
 		val := c.globals.constant(fmt.Sprintf("[%d x %s]", v.Count, c.getType(v.Base)), type_)
 		c.types[type_] = val
 
@@ -197,7 +220,7 @@ func (c *codegen) getType(type_ types.Type) value {
 	}
 
 	// Pointer
-	if _, ok := type_.(types.PointerType); ok {
+	if _, ok := type_.(*types.PointerType); ok {
 		val := c.globals.constant("ptr", type_)
 		c.types[type_] = val
 

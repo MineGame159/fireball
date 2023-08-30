@@ -161,6 +161,11 @@ func (p *parser) call() (ast.Expr, *core.Error) {
 			if err != nil {
 				return nil, err
 			}
+		} else if p.match(scanner.Dot) {
+			expr, err = p.finishMember(expr)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			break
 		}
@@ -225,6 +230,18 @@ func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Error) {
 		Token_: token,
 		Value:  value,
 		Index:  index,
+	}, nil
+}
+
+func (p *parser) finishMember(value ast.Expr) (ast.Expr, *core.Error) {
+	name, err := p.consume(scanner.Identifier, "Expected member name.")
+	if err != nil {
+		return nil, err
+	}
+
+	return &ast.Member{
+		Value: value,
+		Name:  name,
 	}, nil
 }
 

@@ -53,6 +53,7 @@ const (
 	Continue
 	Break
 	Return
+	Struct
 
 	Number
 	Character
@@ -104,7 +105,7 @@ func IsArithmetic(kind TokenKind) bool {
 }
 
 func IsKeyword(kind TokenKind) bool {
-	return kind >= 29 && kind <= 44
+	return kind >= 29 && kind <= 45
 }
 
 func IsOperator(kind TokenKind) bool {

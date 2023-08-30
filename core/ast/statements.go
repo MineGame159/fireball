@@ -33,6 +33,15 @@ func (b *Block) Accept(visitor StmtVisitor) {
 	visitor.VisitBlock(b)
 }
 
+func (b *Block) AcceptChildren(acceptor Acceptor) {
+	for _, v := range b.Stmts {
+		acceptor.AcceptStmt(v)
+	}
+}
+
+func (b *Block) AcceptTypes(visitor types.Visitor) {
+}
+
 type Expression struct {
 	Token_ scanner.Token
 	Expr   Expr
@@ -44,6 +53,15 @@ func (e *Expression) Token() scanner.Token {
 
 func (e *Expression) Accept(visitor StmtVisitor) {
 	visitor.VisitExpression(e)
+}
+
+func (e *Expression) AcceptChildren(acceptor Acceptor) {
+	if e.Expr != nil {
+		acceptor.AcceptExpr(e.Expr)
+	}
+}
+
+func (e *Expression) AcceptTypes(visitor types.Visitor) {
 }
 
 type Variable struct {
@@ -58,6 +76,16 @@ func (v *Variable) Token() scanner.Token {
 
 func (v *Variable) Accept(visitor StmtVisitor) {
 	visitor.VisitVariable(v)
+}
+
+func (v *Variable) AcceptChildren(acceptor Acceptor) {
+	if v.Initializer != nil {
+		acceptor.AcceptExpr(v.Initializer)
+	}
+}
+
+func (v *Variable) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&v.Type)
 }
 
 type If struct {
@@ -75,6 +103,21 @@ func (i *If) Accept(visitor StmtVisitor) {
 	visitor.VisitIf(i)
 }
 
+func (i *If) AcceptChildren(acceptor Acceptor) {
+	if i.Condition != nil {
+		acceptor.AcceptExpr(i.Condition)
+	}
+	if i.Then != nil {
+		acceptor.AcceptStmt(i.Then)
+	}
+	if i.Else != nil {
+		acceptor.AcceptStmt(i.Else)
+	}
+}
+
+func (i *If) AcceptTypes(visitor types.Visitor) {
+}
+
 type For struct {
 	Token_    scanner.Token
 	Condition Expr
@@ -89,6 +132,18 @@ func (f *For) Accept(visitor StmtVisitor) {
 	visitor.VisitFor(f)
 }
 
+func (f *For) AcceptChildren(acceptor Acceptor) {
+	if f.Condition != nil {
+		acceptor.AcceptExpr(f.Condition)
+	}
+	if f.Body != nil {
+		acceptor.AcceptStmt(f.Body)
+	}
+}
+
+func (f *For) AcceptTypes(visitor types.Visitor) {
+}
+
 type Return struct {
 	Token_ scanner.Token
 	Expr   Expr
@@ -100,4 +155,13 @@ func (r *Return) Token() scanner.Token {
 
 func (r *Return) Accept(visitor StmtVisitor) {
 	visitor.VisitReturn(r)
+}
+
+func (r *Return) AcceptChildren(acceptor Acceptor) {
+	if r.Expr != nil {
+		acceptor.AcceptExpr(r.Expr)
+	}
+}
+
+func (r *Return) AcceptTypes(visitor types.Visitor) {
 }

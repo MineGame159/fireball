@@ -9,6 +9,10 @@ import (
 func (p *parser) declaration() ast.Decl {
 	p.extern = false
 
+	if p.match(scanner.Struct) {
+		return p.struct_()
+	}
+
 	if p.match(scanner.Func) {
 		return p.function()
 	}
@@ -26,6 +30,76 @@ func (p *parser) declaration() ast.Decl {
 	p.syncToDecl()
 
 	return nil
+}
+
+func (p *parser) struct_() ast.Decl {
+	// Name
+	name := p.consume2(scanner.Identifier)
+
+	if name.IsError() {
+		p.error2(p.next, "Expected struct name.")
+		if !p.syncToDecl() {
+			return nil
+		}
+		return nil
+	}
+
+	// Left brace
+	if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
+		p.error2(p.next, "Expected '{' after struct name.")
+		if !p.syncToDecl() {
+			return nil
+		}
+		return nil
+	}
+
+	// Fields
+	fields := make([]ast.Field, 0, 4)
+
+	for !p.check(scanner.RightBrace) {
+		// Name
+		name := p.consume2(scanner.Identifier)
+
+		if name.IsError() {
+			p.error2(p.next, "Expected field name.")
+			if !p.syncToDecl() {
+				return nil
+			}
+			return nil
+		}
+
+		// Type
+		type_, err := p.parseType()
+
+		if err != nil {
+			p.reporter.Report(*err)
+			if !p.syncToDecl() {
+				return nil
+			}
+			return nil
+		}
+
+		// Add
+		fields = append(fields, ast.Field{
+			Name: name,
+			Type: type_,
+		})
+	}
+
+	// Right brace
+	if brace := p.consume2(scanner.RightBrace); brace.IsError() {
+		p.error2(p.next, "Expected '}' after struct fields.")
+		if !p.syncToDecl() {
+			return nil
+		}
+		return nil
+	}
+
+	// Return
+	return &ast.Struct{
+		Name:   name,
+		Fields: fields,
+	}
 }
 
 func (p *parser) function() ast.Decl {

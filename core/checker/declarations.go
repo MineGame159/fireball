@@ -4,6 +4,10 @@ import (
 	"fireball/core/ast"
 )
 
+func (c *checker) VisitStruct(decl *ast.Struct) {
+	decl.AcceptChildren(c)
+}
+
 func (c *checker) VisitFunc(decl *ast.Func) {
 	// Push scope
 	c.function = decl
@@ -16,7 +20,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	// Body
 	for _, stmt := range decl.Body {
-		c.acceptStmt(stmt)
+		c.AcceptStmt(stmt)
 	}
 
 	// Pop scope

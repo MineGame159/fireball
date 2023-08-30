@@ -7,20 +7,16 @@ import (
 
 func (c *checker) VisitBlock(stmt *ast.Block) {
 	c.pushScope()
-
-	for _, s := range stmt.Stmts {
-		c.acceptStmt(s)
-	}
-
+	stmt.AcceptChildren(c)
 	c.popScope()
 }
 
 func (c *checker) VisitExpression(stmt *ast.Expression) {
-	c.acceptExpr(stmt.Expr)
+	stmt.AcceptChildren(c)
 }
 
 func (c *checker) VisitVariable(stmt *ast.Variable) {
-	c.acceptExpr(stmt.Initializer)
+	stmt.AcceptChildren(c)
 
 	if stmt.Type == nil {
 		if stmt.Initializer == nil {
@@ -42,9 +38,7 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 }
 
 func (c *checker) VisitIf(stmt *ast.If) {
-	c.acceptExpr(stmt.Condition)
-	c.acceptStmt(stmt.Then)
-	c.acceptStmt(stmt.Else)
+	stmt.AcceptChildren(c)
 
 	if !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
 		c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
@@ -52,8 +46,7 @@ func (c *checker) VisitIf(stmt *ast.If) {
 }
 
 func (c *checker) VisitFor(stmt *ast.For) {
-	c.acceptExpr(stmt.Condition)
-	c.acceptStmt(stmt.Body)
+	stmt.AcceptChildren(c)
 
 	if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
 		c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
@@ -61,7 +54,7 @@ func (c *checker) VisitFor(stmt *ast.For) {
 }
 
 func (c *checker) VisitReturn(stmt *ast.Return) {
-	c.acceptExpr(stmt.Expr)
+	stmt.AcceptChildren(c)
 
 	var type_ types.Type = types.Primitive(types.Void)
 

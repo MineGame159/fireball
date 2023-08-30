@@ -9,14 +9,17 @@ import (
 )
 
 func (c *checker) VisitGroup(expr *ast.Group) {
-	c.acceptExpr(expr.Expr)
+	expr.AcceptChildren(c)
+
 	expr.SetType(expr.Expr.Type())
 }
 
 func (c *checker) VisitLiteral(expr *ast.Literal) {
+	expr.AcceptChildren(c)
+
 	switch expr.Value.Kind {
 	case scanner.Nil:
-		expr.SetType(types.PointerType{Pointee: types.Primitive(types.Void)})
+		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.Void)})
 
 	case scanner.True, scanner.False:
 		expr.SetType(types.Primitive(types.Bool))
@@ -34,12 +37,12 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 		expr.SetType(types.Primitive(types.U8))
 
 	case scanner.String:
-		expr.SetType(types.PointerType{Pointee: types.Primitive(types.U8)})
+		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.U8)})
 	}
 }
 
 func (c *checker) VisitUnary(expr *ast.Unary) {
-	c.acceptExpr(expr.Right)
+	expr.AcceptChildren(c)
 
 	switch expr.Op.Kind {
 	case scanner.Bang:
@@ -61,7 +64,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		c.error(expr, "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Type())
 
 	case scanner.Ampersand:
-		expr.SetType(types.PointerType{Pointee: expr.Right.Type()})
+		expr.SetType(&types.PointerType{Pointee: expr.Right.Type()})
 
 	default:
 		log.Fatalln("Invalid unary operator")
@@ -69,9 +72,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 }
 
 func (c *checker) VisitBinary(expr *ast.Binary) {
-	// Accept
-	c.acceptExpr(expr.Left)
-	c.acceptExpr(expr.Right)
+	expr.AcceptChildren(c)
 
 	if scanner.IsArithmetic(expr.Op.Kind) {
 		// Arithmetic
@@ -108,6 +109,8 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 }
 
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
+	expr.AcceptChildren(c)
+
 	// Function
 	function := c.getFunction(expr.Identifier)
 
@@ -118,7 +121,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 			params[i] = param.Type
 		}
 
-		expr.SetType(types.FunctionType{
+		expr.SetType(&types.FunctionType{
 			Params:   params,
 			Variadic: function.Variadic,
 			Returns:  function.Returns,
@@ -140,12 +143,11 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 }
 
 func (c *checker) VisitAssignment(expr *ast.Assignment) {
-	c.acceptExpr(expr.Assignee)
-	c.acceptExpr(expr.Value)
+	expr.AcceptChildren(c)
 }
 
 func (c *checker) VisitCast(expr *ast.Cast) {
-	c.acceptExpr(expr.Expr)
+	expr.AcceptChildren(c)
 
 	if types.IsPrimitive(expr.Expr.Type(), types.Void) || types.IsPrimitive(expr.Type(), types.Void) {
 		c.error(expr, "Cannot cast to or from type 'void'.")
@@ -153,13 +155,9 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 }
 
 func (c *checker) VisitCall(expr *ast.Call) {
-	c.acceptExpr(expr.Callee)
+	expr.AcceptChildren(c)
 
-	for _, arg := range expr.Args {
-		c.acceptExpr(arg)
-	}
-
-	if v, ok := expr.Callee.Type().(types.FunctionType); ok {
+	if v, ok := expr.Callee.Type().(*types.FunctionType); ok {
 		toCheck := min(len(v.Params), len(expr.Args))
 
 		if v.Variadic {
@@ -186,15 +184,42 @@ func (c *checker) VisitCall(expr *ast.Call) {
 }
 
 func (c *checker) VisitIndex(expr *ast.Index) {
-	c.acceptExpr(expr.Value)
-	c.acceptExpr(expr.Index)
+	expr.AcceptChildren(c)
 
-	if v, ok := expr.Value.Type().(types.ArrayType); ok {
+	if v, ok := expr.Value.Type().(*types.ArrayType); ok {
 		expr.SetType(v.Base)
-	} else if v, ok := expr.Value.Type().(types.PointerType); ok {
+	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
 		expr.SetType(v.Pointee)
 	} else {
 		c.error(expr, "Can only index into array and pointer types, not '%s'.", expr.Value.Type())
-		expr.SetType(types.PointerType{Pointee: types.Primitive(types.Void)})
+		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.Void)})
+	}
+}
+
+func (c *checker) VisitMember(expr *ast.Member) {
+	expr.AcceptChildren(c)
+
+	var s *types.StructType
+
+	if v, ok := expr.Value.Type().(*types.StructType); ok {
+		s = v
+	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
+		if v, ok := v.Pointee.(*types.StructType); ok {
+			s = v
+		}
+	}
+
+	if s != nil {
+		_, field := s.GetField(expr.Name.Lexeme)
+
+		if field != nil {
+			expr.SetType(field.Type)
+		} else {
+			c.error(expr, "Struct '%s' does not contain member '%s'.", s, expr.Name)
+			expr.SetType(types.Primitive(types.Void))
+		}
+	} else {
+		c.error(expr, "Only structs and pointers to structs can have members, not '%s'.", expr.Value.Type())
+		expr.SetType(types.Primitive(types.Void))
 	}
 }

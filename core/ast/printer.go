@@ -28,6 +28,14 @@ func Print(node Node, writer io.Writer) {
 
 // Declarations
 
+func (p *printer) VisitStruct(decl *Struct) {
+	p.print("struct %s", decl.Name)
+
+	for _, field := range decl.Fields {
+		p.print("%s %s", field.Name, field.Type)
+	}
+}
+
 func (p *printer) VisitFunc(decl *Func) {
 	str := strings.Builder{}
 
@@ -148,6 +156,11 @@ func (p *printer) VisitIndex(expr *Index) {
 
 	p.acceptExpr(expr.Value)
 	p.acceptExpr(expr.Index)
+}
+
+func (p *printer) VisitMember(expr *Member) {
+	p.print(".%s", expr.Name)
+	p.acceptExpr(expr.Value)
 }
 
 // Utils

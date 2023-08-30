@@ -8,4 +8,10 @@ type Type interface {
 	Size() int
 
 	CanAssignTo(other Type) bool
+
+	AcceptTypes(visitor Visitor)
+}
+
+type Visitor interface {
+	VisitType(type_ *Type)
 }

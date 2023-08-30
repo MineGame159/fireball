@@ -7,6 +7,7 @@ import (
 	"fireball/core/codegen"
 	"fireball/core/parser"
 	"fireball/core/scanner"
+	"fireball/core/typeresolver"
 	"fmt"
 	"log"
 	"os"
@@ -56,6 +57,7 @@ func build(path string) {
 	reporter := &consoleReporter{}
 
 	decls := parser.Parse(reporter, scanner.NewScanner(text))
+	typeresolver.Resolve(reporter, decls)
 	checker.Check(reporter, decls)
 
 	if reporter.hadError {

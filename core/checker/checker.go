@@ -37,7 +37,7 @@ func Check(reporter core.ErrorReporter, decls []ast.Decl) {
 	}
 
 	for _, decl := range decls {
-		c.acceptDecl(decl)
+		c.AcceptDecl(decl)
 	}
 }
 
@@ -91,24 +91,18 @@ func (c *checker) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
 }
 
-// Accept
+// ast.Acceptor
 
-func (c *checker) acceptDecl(decl ast.Decl) {
-	if decl != nil {
-		decl.Accept(c)
-	}
+func (c *checker) AcceptDecl(decl ast.Decl) {
+	decl.Accept(c)
 }
 
-func (c *checker) acceptStmt(stmt ast.Stmt) {
-	if stmt != nil {
-		stmt.Accept(c)
-	}
+func (c *checker) AcceptStmt(stmt ast.Stmt) {
+	stmt.Accept(c)
 }
 
-func (c *checker) acceptExpr(expr ast.Expr) {
-	if expr != nil {
-		expr.Accept(c)
-	}
+func (c *checker) AcceptExpr(expr ast.Expr) {
+	expr.Accept(c)
 }
 
 // Errors

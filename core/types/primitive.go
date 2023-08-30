@@ -44,7 +44,7 @@ func Primitive(kind PrimitiveKind) *PrimitiveType {
 	return &primitives[kind]
 }
 
-func (p PrimitiveType) Size() int {
+func (p *PrimitiveType) Size() int {
 	switch p.Kind {
 	case Void:
 		return 0
@@ -62,11 +62,13 @@ func (p PrimitiveType) Size() int {
 	}
 }
 
-func (p PrimitiveType) CanAssignTo(other Type) bool {
+func (p *PrimitiveType) CanAssignTo(other Type) bool {
 	return IsPrimitive(other, p.Kind)
 }
 
-func (p PrimitiveType) String() string {
+func (p *PrimitiveType) AcceptTypes(visitor Visitor) {}
+
+func (p *PrimitiveType) String() string {
 	switch p.Kind {
 	case Void:
 		return "void"

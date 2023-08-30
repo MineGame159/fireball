@@ -52,7 +52,7 @@ func (p *parser) parseType() (types.Type, *core.Error) {
 		return p.parsePointerType()
 	}
 
-	return p.parsePrimitiveType()
+	return p.parseIdentifierType()
 }
 
 func (p *parser) parseArrayType() (types.Type, *core.Error) {
@@ -82,7 +82,7 @@ func (p *parser) parseArrayType() (types.Type, *core.Error) {
 		return nil, err
 	}
 
-	return types.ArrayType{
+	return &types.ArrayType{
 		Count: uint32(count),
 		Base:  base,
 	}, nil
@@ -94,10 +94,10 @@ func (p *parser) parsePointerType() (types.Type, *core.Error) {
 		return nil, err
 	}
 
-	return types.PointerType{Pointee: pointee}, nil
+	return &types.PointerType{Pointee: pointee}, nil
 }
 
-func (p *parser) parsePrimitiveType() (types.Type, *core.Error) {
+func (p *parser) parseIdentifierType() (types.Type, *core.Error) {
 	ident, err := p.consume(scanner.Identifier, "Expected type name.")
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (p *parser) parsePrimitiveType() (types.Type, *core.Error) {
 		kind = types.F64
 
 	default:
-		return nil, p.error(ident, "Unknown type '%s'.", ident)
+		return &types.UnresolvedType{Identifier: ident}, nil
 	}
 
 	return types.Primitive(kind), nil

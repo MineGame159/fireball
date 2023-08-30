@@ -5,6 +5,10 @@ import (
 	"fireball/core/types"
 )
 
+func (c *codegen) VisitStruct(decl *ast.Struct) {
+
+}
+
 func (c *codegen) VisitFunc(decl *ast.Func) {
 	// Setup state
 	c.pushScope()

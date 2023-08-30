@@ -7,6 +7,7 @@ import (
 	"fireball/core/checker"
 	"fireball/core/parser"
 	"fireball/core/scanner"
+	"fireball/core/typeresolver"
 	"go.lsp.dev/protocol"
 	"go.lsp.dev/uri"
 	"go.uber.org/zap"
@@ -380,6 +381,7 @@ func (h *handler) parse(ctx context.Context, uri uri.URI) error {
 	}
 
 	decls := parser.Parse(reporter, scanner.NewScanner(h.files[uri]))
+	typeresolver.Resolve(reporter, decls)
 	checker.Check(reporter, decls)
 
 	return h.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{

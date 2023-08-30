@@ -141,6 +141,8 @@ func (s *Scanner) identifierKind() TokenKind {
 		return s.checkKeyword(1, "r", Or)
 	case 'r':
 		return s.checkKeyword(1, "eturn", Return)
+	case 's':
+		return s.checkKeyword(1, "truct", Struct)
 	case 't':
 		return s.checkKeyword(1, "rue", True)
 	case 'v':

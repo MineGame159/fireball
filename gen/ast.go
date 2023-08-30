@@ -20,6 +20,24 @@ type field struct {
 
 var decls = []item{
 	{
+		name: "Struct",
+		fields: []field{
+			{name: "Name", type_: "Token"},
+			{name: "Fields", type_: "[]Field"},
+			{name: "Type", type_: "Type"},
+		},
+		token: "Name",
+		ast:   true,
+	},
+	{
+		name: "Field",
+		fields: []field{
+			{name: "Name", type_: "Token"},
+			{name: "Type", type_: "Type"},
+		},
+		ast: false,
+	},
+	{
 		name: "Func",
 		fields: []field{
 			{name: "Extern", type_: "bool"},
@@ -187,6 +205,15 @@ var exprs = []item{
 		token: "Token_",
 		ast:   true,
 	},
+	{
+		name: "Member",
+		fields: []field{
+			{name: "Value", type_: "Expr"},
+			{name: "Name", type_: "Token"},
+		},
+		token: "Name",
+		ast:   true,
+	},
 }
 
 func main() {
@@ -285,6 +312,78 @@ func generate(w *writer, kind string, items []item) {
 			w.write("}")
 			w.write("")
 
+			// AcceptChildren
+			w.write("%s AcceptChildren(acceptor Acceptor) {", method)
+
+			for _, f := range item.fields {
+				type_ := f.type_
+				array := false
+
+				if strings.HasPrefix(type_, "[]") {
+					type_ = type_[2:]
+					array = true
+				}
+
+				if type_ == "Decl" || type_ == "Stmt" || type_ == "Expr" {
+					if array {
+						w.write("for _, v := range %c.%s {", short, f.name)
+						w.write("acceptor.Accept%s(v)", type_)
+						w.write("}")
+					} else {
+						w.write("if %c.%s != nil {", short, f.name)
+						w.write("acceptor.Accept%s(%c.%s)", type_, short, f.name)
+						w.write("}")
+					}
+				}
+			}
+
+			w.write("}")
+			w.write("")
+
+			// AcceptTypes
+			w.write("%s AcceptTypes(visitor types.Visitor) {", method)
+
+			for _, f := range item.fields {
+				if strings.HasPrefix(f.type_, "[]") {
+					type_ := f.type_[2:]
+
+					if type_ == "Type" {
+						w.write("for i := range %c.%s {", short, f.name)
+						w.write("visitor.VisitType(&%c.%s[i])", short, f.name)
+						w.write("}")
+					} else {
+						fi := getItem(items, type_)
+
+						if fi != nil && fi.hasTypeField() {
+							w.write("for i := range %c.%s {", short, f.name)
+
+							for _, fif := range fi.fields {
+								if fif.type_ == "Type" {
+									w.write("visitor.VisitType(&%c.%s[i].%s)", short, f.name, fif.name)
+								}
+							}
+
+							w.write("}")
+						}
+					}
+				} else if f.type_ == "Type" {
+					w.write("visitor.VisitType(&%c.%s)", short, f.name)
+				} else {
+					fi := getItem(items, f.type_)
+
+					if fi != nil && fi.hasTypeField() {
+						for _, fif := range fi.fields {
+							if fif.type_ == "Type" {
+								w.write("visitor.VisitType(&%c.%s.%s)", short, f.name, fif.name)
+							}
+						}
+					}
+				}
+			}
+
+			w.write("}")
+			w.write("")
+
 			// Expr
 			if kind == "Expr" {
 				// Type
@@ -301,6 +400,26 @@ func generate(w *writer, kind string, items []item) {
 			}
 		}
 	}
+}
+
+func getItem(items []item, name string) *item {
+	for i, _ := range items {
+		if items[i].name == name {
+			return &items[i]
+		}
+	}
+
+	return nil
+}
+
+func (i *item) hasTypeField() bool {
+	for _, f := range i.fields {
+		if f.type_ == "Type" {
+			return true
+		}
+	}
+
+	return false
 }
 
 type writer struct {

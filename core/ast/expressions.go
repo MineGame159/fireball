@@ -15,6 +15,7 @@ type ExprVisitor interface {
 	VisitCast(expr *Cast)
 	VisitCall(expr *Call)
 	VisitIndex(expr *Index)
+	VisitMember(expr *Member)
 }
 
 type Expr interface {
@@ -41,6 +42,15 @@ func (g *Group) Accept(visitor ExprVisitor) {
 	visitor.VisitGroup(g)
 }
 
+func (g *Group) AcceptChildren(acceptor Acceptor) {
+	if g.Expr != nil {
+		acceptor.AcceptExpr(g.Expr)
+	}
+}
+
+func (g *Group) AcceptTypes(visitor types.Visitor) {
+}
+
 func (g *Group) Type() types.Type {
 	return g.type_
 }
@@ -61,6 +71,12 @@ func (l *Literal) Token() scanner.Token {
 
 func (l *Literal) Accept(visitor ExprVisitor) {
 	visitor.VisitLiteral(l)
+}
+
+func (l *Literal) AcceptChildren(acceptor Acceptor) {
+}
+
+func (l *Literal) AcceptTypes(visitor types.Visitor) {
 }
 
 func (l *Literal) Type() types.Type {
@@ -84,6 +100,15 @@ func (u *Unary) Token() scanner.Token {
 
 func (u *Unary) Accept(visitor ExprVisitor) {
 	visitor.VisitUnary(u)
+}
+
+func (u *Unary) AcceptChildren(acceptor Acceptor) {
+	if u.Right != nil {
+		acceptor.AcceptExpr(u.Right)
+	}
+}
+
+func (u *Unary) AcceptTypes(visitor types.Visitor) {
 }
 
 func (u *Unary) Type() types.Type {
@@ -110,6 +135,18 @@ func (b *Binary) Accept(visitor ExprVisitor) {
 	visitor.VisitBinary(b)
 }
 
+func (b *Binary) AcceptChildren(acceptor Acceptor) {
+	if b.Left != nil {
+		acceptor.AcceptExpr(b.Left)
+	}
+	if b.Right != nil {
+		acceptor.AcceptExpr(b.Right)
+	}
+}
+
+func (b *Binary) AcceptTypes(visitor types.Visitor) {
+}
+
 func (b *Binary) Type() types.Type {
 	return b.type_
 }
@@ -130,6 +167,12 @@ func (i *Identifier) Token() scanner.Token {
 
 func (i *Identifier) Accept(visitor ExprVisitor) {
 	visitor.VisitIdentifier(i)
+}
+
+func (i *Identifier) AcceptChildren(acceptor Acceptor) {
+}
+
+func (i *Identifier) AcceptTypes(visitor types.Visitor) {
 }
 
 func (i *Identifier) Type() types.Type {
@@ -156,6 +199,18 @@ func (a *Assignment) Accept(visitor ExprVisitor) {
 	visitor.VisitAssignment(a)
 }
 
+func (a *Assignment) AcceptChildren(acceptor Acceptor) {
+	if a.Assignee != nil {
+		acceptor.AcceptExpr(a.Assignee)
+	}
+	if a.Value != nil {
+		acceptor.AcceptExpr(a.Value)
+	}
+}
+
+func (a *Assignment) AcceptTypes(visitor types.Visitor) {
+}
+
 func (a *Assignment) Type() types.Type {
 	return a.type_
 }
@@ -177,6 +232,15 @@ func (c *Cast) Token() scanner.Token {
 
 func (c *Cast) Accept(visitor ExprVisitor) {
 	visitor.VisitCast(c)
+}
+
+func (c *Cast) AcceptChildren(acceptor Acceptor) {
+	if c.Expr != nil {
+		acceptor.AcceptExpr(c.Expr)
+	}
+}
+
+func (c *Cast) AcceptTypes(visitor types.Visitor) {
 }
 
 func (c *Cast) Type() types.Type {
@@ -203,6 +267,18 @@ func (c *Call) Accept(visitor ExprVisitor) {
 	visitor.VisitCall(c)
 }
 
+func (c *Call) AcceptChildren(acceptor Acceptor) {
+	if c.Callee != nil {
+		acceptor.AcceptExpr(c.Callee)
+	}
+	for _, v := range c.Args {
+		acceptor.AcceptExpr(v)
+	}
+}
+
+func (c *Call) AcceptTypes(visitor types.Visitor) {
+}
+
 func (c *Call) Type() types.Type {
 	return c.type_
 }
@@ -227,10 +303,54 @@ func (i *Index) Accept(visitor ExprVisitor) {
 	visitor.VisitIndex(i)
 }
 
+func (i *Index) AcceptChildren(acceptor Acceptor) {
+	if i.Value != nil {
+		acceptor.AcceptExpr(i.Value)
+	}
+	if i.Index != nil {
+		acceptor.AcceptExpr(i.Index)
+	}
+}
+
+func (i *Index) AcceptTypes(visitor types.Visitor) {
+}
+
 func (i *Index) Type() types.Type {
 	return i.type_
 }
 
 func (i *Index) SetType(type_ types.Type) {
 	i.type_ = type_
+}
+
+type Member struct {
+	type_ types.Type
+
+	Value Expr
+	Name  scanner.Token
+}
+
+func (m *Member) Token() scanner.Token {
+	return m.Name
+}
+
+func (m *Member) Accept(visitor ExprVisitor) {
+	visitor.VisitMember(m)
+}
+
+func (m *Member) AcceptChildren(acceptor Acceptor) {
+	if m.Value != nil {
+		acceptor.AcceptExpr(m.Value)
+	}
+}
+
+func (m *Member) AcceptTypes(visitor types.Visitor) {
+}
+
+func (m *Member) Type() types.Type {
+	return m.type_
+}
+
+func (m *Member) SetType(type_ types.Type) {
+	m.type_ = type_
 }

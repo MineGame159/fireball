@@ -89,7 +89,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 	case scanner.Ampersand:
 		c.exprValue = value{
 			identifier: c.exprValue.identifier,
-			type_:      types.PointerType{Pointee: c.exprValue.type_},
+			type_:      &types.PointerType{Pointee: c.exprValue.type_},
 		}
 
 	default:
@@ -198,8 +198,8 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 		}
 	}
 
-	if _, ok := expr.Expr.Type().(types.PointerType); ok {
-		if _, ok := expr.Type().(types.PointerType); ok {
+	if _, ok := expr.Expr.Type().(*types.PointerType); ok {
+		if _, ok := expr.Type().(*types.PointerType); ok {
 			// pointer to pointer
 			return
 		}
@@ -210,9 +210,9 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 }
 
 func (c *codegen) VisitCall(expr *ast.Call) {
-	var f types.FunctionType
+	var f *types.FunctionType
 
-	if v, ok := expr.Callee.Type().(types.FunctionType); ok {
+	if v, ok := expr.Callee.Type().(*types.FunctionType); ok {
 		f = v
 	}
 
@@ -262,6 +262,38 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	res.needsLoading = true
 
 	c.writeFmt("%s = getelementptr inbounds %s, %s %s, %s %s\n", res, type_, c.getType(val.type_), val, c.getType(expr.Index.Type()), index)
+
+	c.exprValue = res
+}
+
+func (c *codegen) VisitMember(expr *ast.Member) {
+	val := c.toPtrOrLoad(c.acceptExpr(expr.Value), expr.Value.Type())
+
+	var s *types.StructType
+
+	if v, ok := expr.Value.Type().(*types.StructType); ok {
+		s = v
+	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
+		if v, ok := v.Pointee.(*types.StructType); ok {
+			s = v
+
+			res := c.locals.unnamed(val.type_)
+			c.writeFmt("%s = load ptr, ptr %s\n", res, val)
+
+			val = res
+		}
+	}
+
+	if s == nil {
+		log.Fatalln("Invalid member value")
+	}
+
+	i, _ := s.GetField(expr.Name.Lexeme)
+
+	res := c.locals.unnamed(expr.Type())
+	res.needsLoading = true
+
+	c.writeFmt("%s = getelementptr inbounds %s, %s %s, i32 0, i32 %d\n", res, c.getType(s), c.getType(val.type_), val, i)
 
 	c.exprValue = res
 }

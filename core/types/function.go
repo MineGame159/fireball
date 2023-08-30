@@ -8,11 +8,11 @@ type FunctionType struct {
 	Returns  Type
 }
 
-func (f FunctionType) Size() int {
+func (f *FunctionType) Size() int {
 	return 4
 }
 
-func (f FunctionType) CanAssignTo(other Type) bool {
+func (f *FunctionType) CanAssignTo(other Type) bool {
 	if v, ok := other.(*FunctionType); ok {
 		if !f.Returns.CanAssignTo(v.Returns) {
 			return false
@@ -34,7 +34,15 @@ func (f FunctionType) CanAssignTo(other Type) bool {
 	return false
 }
 
-func (f FunctionType) String() string {
+func (f *FunctionType) AcceptTypes(visitor Visitor) {
+	for i := range f.Params {
+		visitor.VisitType(&f.Params[i])
+	}
+
+	visitor.VisitType(&f.Returns)
+}
+
+func (f *FunctionType) String() string {
 	str := strings.Builder{}
 
 	str.WriteRune('(')

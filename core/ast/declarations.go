@@ -6,6 +6,7 @@ import "fireball/core/types"
 //go:generate go run ../../gen/ast.go
 
 type DeclVisitor interface {
+	VisitStruct(decl *Struct)
 	VisitFunc(decl *Func)
 }
 
@@ -13,6 +14,35 @@ type Decl interface {
 	Node
 
 	Accept(visitor DeclVisitor)
+}
+
+type Struct struct {
+	Name   scanner.Token
+	Fields []Field
+	Type   types.Type
+}
+
+func (s *Struct) Token() scanner.Token {
+	return s.Name
+}
+
+func (s *Struct) Accept(visitor DeclVisitor) {
+	visitor.VisitStruct(s)
+}
+
+func (s *Struct) AcceptChildren(acceptor Acceptor) {
+}
+
+func (s *Struct) AcceptTypes(visitor types.Visitor) {
+	for i := range s.Fields {
+		visitor.VisitType(&s.Fields[i].Type)
+	}
+	visitor.VisitType(&s.Type)
+}
+
+type Field struct {
+	Name scanner.Token
+	Type types.Type
 }
 
 type Func struct {
@@ -30,6 +60,19 @@ func (f *Func) Token() scanner.Token {
 
 func (f *Func) Accept(visitor DeclVisitor) {
 	visitor.VisitFunc(f)
+}
+
+func (f *Func) AcceptChildren(acceptor Acceptor) {
+	for _, v := range f.Body {
+		acceptor.AcceptStmt(v)
+	}
+}
+
+func (f *Func) AcceptTypes(visitor types.Visitor) {
+	for i := range f.Params {
+		visitor.VisitType(&f.Params[i].Type)
+	}
+	visitor.VisitType(&f.Returns)
 }
 
 type Param struct {
