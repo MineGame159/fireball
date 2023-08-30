@@ -3,19 +3,122 @@
   "scopeName": "source.fb",
   "patterns": [
     {
-      "include": "#comment"
+      "include": "#lineComment"
+    },
+    {
+      "include": "#blockComment"
+    },
+    {
+      "include": "#operator"
+    },
+    {
+      "include": "#terminator"
+    },
+    {
+      "include": "#dot"
+    },
+    {
+      "include": "#comma"
+    },
+    {
+      "include": "#leftParen"
+    },
+    {
+      "include": "#rightParen"
+    },
+    {
+      "include": "#leftBrace"
+    },
+    {
+      "include": "#rightBrace"
+    },
+    {
+      "include": "#leftBracket"
+    },
+    {
+      "include": "#rightBracket"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#character"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#keyword"
     }
   ],
   "repository": {
-    "comment": {
+    "lineComment": {
       "begin": "//",
       "end": "\n",
-      "beginCaptures": {
-        "0": {
-          "name": "comment.line.double-slash.fb"
-        }
-      },
       "name": "comment.line.fb"
+    },
+    "blockComment": {
+      "begin": "\\\\\\*",
+      "end": "\\*\\\\",
+      "name": "comment.block"
+    },
+    "operator": {
+      "match": "\\+=|-=|\\*=|\\/=|%=|\\+|-|\\*|\\/|%|&",
+      "name": "keyword.operator.fb"
+    },
+    "terminator": {
+      "match": ";",
+      "name": "punctuation.terminator.fb"
+    },
+    "dot": {
+      "match": "\\.",
+      "name": "punctuation.other.period.fb"
+    },
+    "comma": {
+      "match": ",",
+      "name": "punctuation.other.comma.fb"
+    },
+    "leftParen": {
+      "match": "\\(",
+      "name": "punctuation.definition.begin.bracket.round.fb"
+    },
+    "rightParen": {
+      "match": "\\)",
+      "name": "punctuation.definition.end.bracket.round.fb"
+    },
+    "leftBrace": {
+      "match": "{",
+      "name": "punctuation.definition.begin.bracket.curly.fb"
+    },
+    "rightBrace": {
+      "match": "}",
+      "name": "punctuation.definition.end.bracket.curly.fb"
+    },
+    "leftBracket": {
+      "match": "\\[",
+      "name": "punctuation.definition.begin.bracket.square.fb"
+    },
+    "rightBracket": {
+      "match": "\\]",
+      "name": "punctuation.definition.end.bracket.square.fb"
+    },
+    "number": {
+      "match": "\\b-?[0-9]+(\\.[0-9])?[fF]?\\b",
+      "name": "constant.numeric.fb"
+    },
+    "character": {
+      "begin": "'",
+      "end": "'",
+      "name": "string.quoted.single.fb"
+    },
+    "string": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.fb"
+    },
+    "keyword": {
+      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|extern|func|continue|break|return|struct)\\b",
+      "name": "keyword.fb"
     }
   }
 }

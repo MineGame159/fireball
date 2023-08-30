@@ -17,3 +17,26 @@ type Acceptor interface {
 	AcceptStmt(stmt Stmt)
 	AcceptExpr(expr Expr)
 }
+
+type Range struct {
+	Start Pos
+	End   Pos
+}
+
+type Pos struct {
+	Line   int
+	Column int
+}
+
+func TokenToPos(token scanner.Token, end bool) Pos {
+	offset := 0
+
+	if end {
+		offset = len(token.Lexeme)
+	}
+
+	return Pos{
+		Line:   token.Line,
+		Column: token.Column + offset,
+	}
+}

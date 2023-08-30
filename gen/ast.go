@@ -275,9 +275,14 @@ func generate(w *writer, kind string, items []item) {
 		// Struct
 		w.write("type %s struct {", item.name)
 
-		if kind == "Expr" {
-			w.write("type_ types.Type")
-			w.write("")
+		if item.ast {
+			if kind == "Decl" {
+				w.write("Range Range")
+				w.write("")
+			} else if kind == "Expr" {
+				w.write("type_ types.Type")
+				w.write("")
+			}
 		}
 
 		for _, field := range item.fields {

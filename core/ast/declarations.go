@@ -17,6 +17,8 @@ type Decl interface {
 }
 
 type Struct struct {
+	Range Range
+
 	Name   scanner.Token
 	Fields []Field
 	Type   types.Type
@@ -46,6 +48,8 @@ type Field struct {
 }
 
 type Func struct {
+	Range Range
+
 	Extern   bool
 	Name     scanner.Token
 	Params   []Param

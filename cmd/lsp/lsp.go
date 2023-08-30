@@ -12,16 +12,18 @@ import (
 )
 
 func Start(port uint16) {
-	server := &handler{
-		files: make(map[protocol.URI]string),
-	}
+	server := &handler{}
 
 	stream, logger := getStream(port)
-
 	_, conn, client := protocol.NewServer(context.Background(), server, stream, logger)
 
 	server.logger = logger
 	server.client = client
+
+	server.docs = &Documents{
+		client: client,
+		docs:   make(map[protocol.URI]*Document),
+	}
 
 	logger.Info("Listening")
 	<-conn.Done()

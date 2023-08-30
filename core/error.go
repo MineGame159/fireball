@@ -16,3 +16,9 @@ func (p *Error) Error() string {
 type ErrorReporter interface {
 	Report(error Error)
 }
+
+type NopReporter struct {
+}
+
+func (n NopReporter) Report(error Error) {
+}

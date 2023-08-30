@@ -3,21 +3,19 @@ package lsp
 import (
 	"context"
 	"errors"
-	"fireball/core"
-	"fireball/core/checker"
-	"fireball/core/parser"
+	"fireball/core/ast"
 	"fireball/core/scanner"
-	"fireball/core/typeresolver"
+	"fireball/core/types"
 	"go.lsp.dev/protocol"
-	"go.lsp.dev/uri"
 	"go.uber.org/zap"
+	"strings"
 )
 
 type handler struct {
 	logger *zap.Logger
 	client protocol.Client
 
-	files map[protocol.URI]string
+	docs *Documents
 }
 
 type SemanticTokensOptions struct {
@@ -44,16 +42,18 @@ func (h *handler) Initialize(ctx context.Context, params *protocol.InitializePar
 			SemanticTokensProvider: &SemanticTokensOptions{
 				Legend: protocol.SemanticTokensLegend{
 					TokenTypes: []protocol.SemanticTokenTypes{
-						protocol.SemanticTokenKeyword,
-						protocol.SemanticTokenOperator,
-						protocol.SemanticTokenNumber,
-						protocol.SemanticTokenString,
 						protocol.SemanticTokenFunction,
+						protocol.SemanticTokenParameter,
 						protocol.SemanticTokenVariable,
+						protocol.SemanticTokenClass,
+						protocol.SemanticTokenProperty,
 					},
 					TokenModifiers: []protocol.SemanticTokenModifiers{},
 				},
 				Full: &SemanticTokensFull{},
+			},
+			DocumentSymbolProvider: &protocol.DocumentSymbolOptions{
+				Label: "Fireball",
 			},
 		},
 		ServerInfo: &protocol.ServerInfo{
@@ -125,9 +125,13 @@ func (h *handler) Definition(ctx context.Context, params *protocol.DefinitionPar
 
 func (h *handler) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) (err error) {
 	h.logger.Debug("handle DidChange")
-	h.files[params.TextDocument.URI] = params.ContentChanges[0].Text
 
-	return h.parse(ctx, params.TextDocument.URI)
+	doc, err := h.docs.Get(params.TextDocument.URI)
+	if err != nil {
+		return err
+	}
+
+	return doc.SetText(ctx, params.ContentChanges[0].Text)
 }
 
 func (h *handler) DidChangeConfiguration(ctx context.Context, params *protocol.DidChangeConfigurationParams) (err error) {
@@ -144,16 +148,16 @@ func (h *handler) DidChangeWorkspaceFolders(ctx context.Context, params *protoco
 
 func (h *handler) DidClose(ctx context.Context, params *protocol.DidCloseTextDocumentParams) (err error) {
 	h.logger.Debug("handle DidClose")
-	delete(h.files, params.TextDocument.URI)
+	h.docs.Remove(params.TextDocument.URI)
 
 	return nil
 }
 
 func (h *handler) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) (err error) {
 	h.logger.Debug("handle DidOpen")
-	h.files[params.TextDocument.URI] = params.TextDocument.Text
+	doc := h.docs.Add(params.TextDocument.URI)
 
-	return h.parse(ctx, params.TextDocument.URI)
+	return doc.SetText(ctx, params.TextDocument.Text)
 }
 
 func (h *handler) DidSave(ctx context.Context, params *protocol.DidSaveTextDocumentParams) (err error) {
@@ -177,7 +181,61 @@ func (h *handler) DocumentLinkResolve(ctx context.Context, params *protocol.Docu
 }
 
 func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentSymbolParams) (result []interface{}, err error) {
-	return nil, errors.New("not implemented")
+	h.logger.Debug("handle DocumentSymbol")
+
+	// Get document
+	doc, err := h.docs.Get(params.TextDocument.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	doc.EnsureParsed()
+
+	// Get symbols
+	symbols := make([]interface{}, 0, 8)
+
+	for _, decl := range doc.Decls {
+		if v, ok := decl.(*ast.Struct); ok {
+			// Struct
+			symbols = append(symbols, &protocol.DocumentSymbol{
+				Name:           v.Name.Lexeme,
+				Kind:           protocol.SymbolKindStruct,
+				Range:          rangeToRange(v.Range),
+				SelectionRange: tokenToRange(v.Name),
+			})
+		} else if v, ok := decl.(*ast.Func); ok {
+			// Function
+			signature := strings.Builder{}
+			signature.WriteRune('(')
+
+			for i, param := range v.Params {
+				if i > 0 {
+					signature.WriteString(", ")
+				}
+
+				signature.WriteString(param.Name.Lexeme)
+				signature.WriteRune(' ')
+				signature.WriteString(param.Type.String())
+			}
+
+			signature.WriteRune(')')
+
+			if !types.IsPrimitive(v.Returns, types.Void) {
+				signature.WriteRune(' ')
+				signature.WriteString(v.Returns.String())
+			}
+
+			symbols = append(symbols, &protocol.DocumentSymbol{
+				Name:           v.Name.Lexeme,
+				Detail:         signature.String(),
+				Kind:           protocol.SymbolKindFunction,
+				Range:          rangeToRange(v.Range),
+				SelectionRange: tokenToRange(v.Name),
+			})
+		}
+	}
+
+	return symbols, nil
 }
 
 func (h *handler) ExecuteCommand(ctx context.Context, params *protocol.ExecuteCommandParams) (result interface{}, err error) {
@@ -287,62 +345,16 @@ func (h *handler) OutgoingCalls(ctx context.Context, params *protocol.CallHierar
 func (h *handler) SemanticTokensFull(ctx context.Context, params *protocol.SemanticTokensParams) (result *protocol.SemanticTokens, err error) {
 	h.logger.Debug("handle SemanticTokensFull")
 
-	s := scanner.NewScanner(h.files[params.TextDocument.URI])
-	data := make([]uint32, 0, 64)
-
-	lastTokenKind := scanner.Eof
-
-	lastLine := 0
-	lastColumn := 0
-
-	for {
-		token := s.Next()
-		if token.Kind == scanner.Eof {
-			break
-		}
-
-		kind := uint32(0)
-
-		if scanner.IsKeyword(token.Kind) {
-			kind = 1
-		} else if scanner.IsOperator(token.Kind) {
-			kind = 2
-		} else {
-			switch token.Kind {
-			case scanner.Number:
-				kind = 3
-
-			case scanner.Character, scanner.String:
-				kind = 4
-
-			case scanner.Identifier:
-				switch lastTokenKind {
-				case scanner.Func:
-					kind = 5
-
-				case scanner.Var:
-					kind = 6
-				}
-			}
-		}
-
-		if kind != 0 {
-			if lastLine != token.Line-1 {
-				lastColumn = 0
-			}
-
-			data = append(data, uint32(token.Line-1-lastLine))
-			data = append(data, uint32(token.Column-lastColumn))
-			data = append(data, uint32(len(token.Lexeme)))
-			data = append(data, kind-1)
-			data = append(data, 0)
-
-			lastLine = token.Line - 1
-			lastColumn = token.Column
-		}
-
-		lastTokenKind = token.Kind
+	// Get document
+	doc, err := h.docs.Get(params.TextDocument.URI)
+	if err != nil {
+		return nil, err
 	}
+
+	doc.EnsureParsed()
+
+	// Get semantic tokens
+	data := highlight(doc.Decls)
 
 	return &protocol.SemanticTokens{
 		Data: data,
@@ -375,40 +387,34 @@ func (h *handler) Request(ctx context.Context, method string, params interface{}
 
 // Utils
 
-func (h *handler) parse(ctx context.Context, uri uri.URI) error {
-	reporter := &diagnosticReporter{
-		diagnostics: make([]protocol.Diagnostic, 0),
-	}
-
-	decls := parser.Parse(reporter, scanner.NewScanner(h.files[uri]))
-	typeresolver.Resolve(reporter, decls)
-	checker.Check(reporter, decls)
-
-	return h.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
-		URI:         uri,
-		Diagnostics: reporter.diagnostics,
-	})
-}
-
-type diagnosticReporter struct {
-	diagnostics []protocol.Diagnostic
-}
-
-func (d *diagnosticReporter) Report(error core.Error) {
-	pos := protocol.Position{
-		Line:      uint32(error.Line - 1),
-		Character: uint32(error.Column),
-	}
-
-	d.diagnostics = append(d.diagnostics, protocol.Diagnostic{
-		Range: protocol.Range{
-			Start: pos,
-			End: protocol.Position{
-				Line:      pos.Line,
-				Character: pos.Character + 1,
-			},
+func rangeToRange(r ast.Range) protocol.Range {
+	return protocol.Range{
+		Start: protocol.Position{
+			Line:      uint32(r.Start.Line - 1),
+			Character: uint32(r.Start.Column),
 		},
-		Severity: protocol.DiagnosticSeverityError,
-		Message:  error.Message,
-	})
+		End: protocol.Position{
+			Line:      uint32(r.End.Line - 1),
+			Character: uint32(r.End.Column),
+		},
+	}
+}
+
+func tokenToRange(token scanner.Token) protocol.Range {
+	return toRange(token.Line, token.Column, len(token.Lexeme))
+}
+
+func toRange(line, column, length int) protocol.Range {
+	pos := protocol.Position{
+		Line:      uint32(line - 1),
+		Character: uint32(column),
+	}
+
+	return protocol.Range{
+		Start: pos,
+		End: protocol.Position{
+			Line:      pos.Line,
+			Character: pos.Character + uint32(length),
+		},
+	}
 }
