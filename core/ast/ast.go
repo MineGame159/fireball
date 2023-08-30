@@ -28,6 +28,13 @@ type Pos struct {
 	Column int
 }
 
+func TokenToRange(token scanner.Token) Range {
+	return Range{
+		Start: TokenToPos(token, false),
+		End:   TokenToPos(token, true),
+	}
+}
+
 func TokenToPos(token scanner.Token, end bool) Pos {
 	offset := 0
 

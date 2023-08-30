@@ -7,7 +7,7 @@ import (
 	"fireball/core/types"
 )
 
-func (p *parser) statement() (ast.Stmt, *core.Error) {
+func (p *parser) statement() (ast.Stmt, *core.Diagnostic) {
 	if p.match(scanner.LeftBrace) {
 		return p.block()
 	}
@@ -33,7 +33,7 @@ func (p *parser) statement() (ast.Stmt, *core.Error) {
 	return p.expressionStmt()
 }
 
-func (p *parser) block() (ast.Stmt, *core.Error) {
+func (p *parser) block() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 	stmts := make([]ast.Stmt, 0, 4)
 
@@ -56,7 +56,7 @@ func (p *parser) block() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) expressionStmt() (ast.Stmt, *core.Error) {
+func (p *parser) expressionStmt() (ast.Stmt, *core.Diagnostic) {
 	token := p.next
 
 	expr, err := p.expression()
@@ -81,7 +81,7 @@ func (p *parser) expressionStmt() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) variable() (ast.Stmt, *core.Error) {
+func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 	// Name
 	name, err := p.consume(scanner.Identifier, "expected variable name")
 	if err != nil {
@@ -128,7 +128,7 @@ func (p *parser) variable() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) if_() (ast.Stmt, *core.Error) {
+func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
 	// Condition
@@ -164,7 +164,7 @@ func (p *parser) if_() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) for_() (ast.Stmt, *core.Error) {
+func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
 	// Condition
@@ -193,7 +193,7 @@ func (p *parser) for_() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) return_() (ast.Stmt, *core.Error) {
+func (p *parser) return_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
 	// Value
@@ -219,7 +219,7 @@ func (p *parser) return_() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) break_() (ast.Stmt, *core.Error) {
+func (p *parser) break_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
 	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
@@ -231,7 +231,7 @@ func (p *parser) break_() (ast.Stmt, *core.Error) {
 	}, nil
 }
 
-func (p *parser) continue_() (ast.Stmt, *core.Error) {
+func (p *parser) continue_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
 	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {

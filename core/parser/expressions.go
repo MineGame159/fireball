@@ -6,11 +6,11 @@ import (
 	"fireball/core/scanner"
 )
 
-func (p *parser) expression() (ast.Expr, *core.Error) {
+func (p *parser) expression() (ast.Expr, *core.Diagnostic) {
 	return p.equality()
 }
 
-func (p *parser) equality() (ast.Expr, *core.Error) {
+func (p *parser) equality() (ast.Expr, *core.Diagnostic) {
 	expr, err := p.comparison()
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (p *parser) equality() (ast.Expr, *core.Error) {
 	return expr, nil
 }
 
-func (p *parser) comparison() (ast.Expr, *core.Error) {
+func (p *parser) comparison() (ast.Expr, *core.Diagnostic) {
 	expr, err := p.term()
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (p *parser) comparison() (ast.Expr, *core.Error) {
 	return expr, nil
 }
 
-func (p *parser) term() (ast.Expr, *core.Error) {
+func (p *parser) term() (ast.Expr, *core.Diagnostic) {
 	expr, err := p.factor()
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (p *parser) term() (ast.Expr, *core.Error) {
 	return expr, nil
 }
 
-func (p *parser) factor() (ast.Expr, *core.Error) {
+func (p *parser) factor() (ast.Expr, *core.Diagnostic) {
 	expr, err := p.unary()
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (p *parser) factor() (ast.Expr, *core.Error) {
 	return expr, nil
 }
 
-func (p *parser) unary() (ast.Expr, *core.Error) {
+func (p *parser) unary() (ast.Expr, *core.Diagnostic) {
 	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand) {
 		op := p.current
 		right, err := p.unary()
@@ -124,7 +124,7 @@ func (p *parser) unary() (ast.Expr, *core.Error) {
 	return p.call()
 }
 
-func (p *parser) call() (ast.Expr, *core.Error) {
+func (p *parser) call() (ast.Expr, *core.Diagnostic) {
 	expr, err := p.primary()
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (p *parser) call() (ast.Expr, *core.Error) {
 	return expr, nil
 }
 
-func (p *parser) finishAssignment(assignee ast.Expr) (ast.Expr, *core.Error) {
+func (p *parser) finishAssignment(assignee ast.Expr) (ast.Expr, *core.Diagnostic) {
 	op := p.current
 
 	value, err := p.expression()
@@ -189,7 +189,7 @@ func (p *parser) finishAssignment(assignee ast.Expr) (ast.Expr, *core.Error) {
 	}, nil
 }
 
-func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *core.Error) {
+func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *core.Diagnostic) {
 	args := make([]ast.Expr, 0, 4)
 
 	for !p.check(scanner.RightParen) {
@@ -214,7 +214,7 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *core.Error) {
 	}, nil
 }
 
-func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Error) {
+func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 	token := p.current
 
 	index, err := p.expression()
@@ -233,7 +233,7 @@ func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Error) {
 	}, nil
 }
 
-func (p *parser) finishMember(value ast.Expr) (ast.Expr, *core.Error) {
+func (p *parser) finishMember(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 	name, err := p.consume(scanner.Identifier, "Expected member name.")
 	if err != nil {
 		return nil, err
@@ -245,7 +245,7 @@ func (p *parser) finishMember(value ast.Expr) (ast.Expr, *core.Error) {
 	}, nil
 }
 
-func (p *parser) primary() (ast.Expr, *core.Error) {
+func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 	if p.match(scanner.Nil, scanner.True, scanner.False, scanner.Number, scanner.Character, scanner.String) {
 		return &ast.Literal{
 			Value: p.current,

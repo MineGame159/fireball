@@ -43,7 +43,7 @@ func parseInt(str *u8) i32 {
         var ch = str[i];
 
         if ch == '\0' {
-            return num;
+            break;
         }
 
         if ch >= '0' {

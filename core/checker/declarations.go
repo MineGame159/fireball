@@ -1,11 +1,33 @@
 package checker
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
+	"fireball/core/types"
 )
 
 func (c *checker) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(c)
+
+	// Check name collision
+	if !c.structs.Add(decl.Name.Lexeme) {
+		c.errorNode(decl, "Struct with the name '%s' already exists.", decl.Name)
+	}
+
+	// Check fields
+	fields := core.NewSet[string]()
+
+	for _, field := range decl.Fields {
+		// Check name collision
+		if !fields.Add(field.Name.Lexeme) {
+			c.errorToken(field.Name, "Field with the name '%s' already exists.", field.Name)
+		}
+
+		// Check void type
+		if types.IsPrimitive(field.Type, types.Void) {
+			c.errorToken(field.Name, "Field cannot be of type 'void'.")
+		}
+	}
 }
 
 func (c *checker) VisitFunc(decl *ast.Func) {
@@ -24,6 +46,33 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	}
 
 	// Pop scope
-	c.function = nil
 	c.popScope()
+	c.function = nil
+
+	// Check name collision
+	if !c.functions.Add(decl.Name.Lexeme) {
+		c.errorNode(decl, "Function with the name '%s' already exists.", decl.Name)
+	}
+
+	// Check parameter void type
+	for _, param := range decl.Params {
+		if types.IsPrimitive(param.Type, types.Void) {
+			c.errorToken(param.Name, "Parameter cannot be of type 'void'.")
+		}
+	}
+
+	// Check last return
+	if !decl.Extern && !types.IsPrimitive(decl.Returns, types.Void) {
+		valid := len(decl.Body) > 0
+
+		if valid {
+			if _, ok := decl.Body[len(decl.Body)-1].(*ast.Return); !ok {
+				valid = false
+			}
+		}
+
+		if !valid {
+			c.errorNode(decl, "Function needs to return a '%s' value.", decl.Returns)
+		}
+	}
 }

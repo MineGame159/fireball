@@ -18,10 +18,10 @@ type parser struct {
 
 	extern bool
 
-	reporter core.ErrorReporter
+	reporter core.Reporter
 }
 
-func Parse(reporter core.ErrorReporter, scanner *scanner.Scanner) []ast.Decl {
+func Parse(reporter core.Reporter, scanner *scanner.Scanner) []ast.Decl {
 	// Initialise parser
 	p := &parser{
 		scanner:  scanner,
@@ -44,7 +44,7 @@ func Parse(reporter core.ErrorReporter, scanner *scanner.Scanner) []ast.Decl {
 	return decls
 }
 
-func (p *parser) parseType() (types.Type, *core.Error) {
+func (p *parser) parseType() (types.Type, *core.Diagnostic) {
 	if p.match(scanner.LeftBracket) {
 		return p.parseArrayType()
 	}
@@ -55,7 +55,7 @@ func (p *parser) parseType() (types.Type, *core.Error) {
 	return p.parseIdentifierType()
 }
 
-func (p *parser) parseArrayType() (types.Type, *core.Error) {
+func (p *parser) parseArrayType() (types.Type, *core.Diagnostic) {
 	// Count
 	token, err := p.consume(scanner.Number, "Expected array size.")
 	if err != nil {
@@ -88,7 +88,7 @@ func (p *parser) parseArrayType() (types.Type, *core.Error) {
 	}, nil
 }
 
-func (p *parser) parsePointerType() (types.Type, *core.Error) {
+func (p *parser) parsePointerType() (types.Type, *core.Diagnostic) {
 	pointee, err := p.parseType()
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (p *parser) parsePointerType() (types.Type, *core.Error) {
 	return &types.PointerType{Pointee: pointee}, nil
 }
 
-func (p *parser) parseIdentifierType() (types.Type, *core.Error) {
+func (p *parser) parseIdentifierType() (types.Type, *core.Diagnostic) {
 	ident, err := p.consume(scanner.Identifier, "Expected type name.")
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (p *parser) parseIdentifierType() (types.Type, *core.Error) {
 	return types.Primitive(kind), nil
 }
 
-func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *core.Error) {
+func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *core.Diagnostic) {
 	if p.check(kind) {
 		return p.advance(), nil
 	}
@@ -157,19 +157,19 @@ func (p *parser) consume2(kind scanner.TokenKind) scanner.Token {
 	return scanner.Token{Kind: scanner.Error}
 }
 
-func (p *parser) error(token scanner.Token, format string, args ...any) *core.Error {
-	return &core.Error{
+func (p *parser) error(token scanner.Token, format string, args ...any) *core.Diagnostic {
+	return &core.Diagnostic{
+		Kind:    core.ErrorKind,
+		Range:   ast.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
-		Line:    token.Line,
-		Column:  token.Column,
 	}
 }
 
 func (p *parser) error2(token scanner.Token, format string, args ...any) {
-	p.reporter.Report(core.Error{
+	p.reporter.Report(core.Diagnostic{
+		Kind:    core.ErrorKind,
+		Range:   ast.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
-		Line:    token.Line,
-		Column:  token.Column,
 	})
 }
 

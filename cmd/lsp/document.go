@@ -83,10 +83,16 @@ type diagnosticReporter struct {
 	diagnostics []protocol.Diagnostic
 }
 
-func (d *diagnosticReporter) Report(error core.Error) {
+func (d *diagnosticReporter) Report(diag core.Diagnostic) {
+	severity := protocol.DiagnosticSeverityError
+
+	if diag.Kind == core.WarningKind {
+		severity = protocol.DiagnosticSeverityWarning
+	}
+
 	d.diagnostics = append(d.diagnostics, protocol.Diagnostic{
-		Range:    toRange(error.Line, error.Column, 1),
-		Severity: protocol.DiagnosticSeverityError,
-		Message:  error.Message,
+		Range:    convertRange(diag.Range),
+		Severity: severity,
+		Message:  diag.Message,
 	})
 }

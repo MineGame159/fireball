@@ -10,10 +10,10 @@ import (
 type resolver struct {
 	structs map[string]*types.StructType
 
-	reporter core.ErrorReporter
+	reporter core.Reporter
 }
 
-func Resolve(reporter core.ErrorReporter, decls []ast.Decl) {
+func Resolve(reporter core.Reporter, decls []ast.Decl) {
 	r := &resolver{
 		structs:  make(map[string]*types.StructType),
 		reporter: reporter,
@@ -55,9 +55,10 @@ func (r *resolver) VisitType(type_ *types.Type) {
 
 		if !ok {
 			r.error("Unknown type '%s'.", v)
+			*type_ = types.Primitive(types.Void)
+		} else {
+			*type_ = t
 		}
-
-		*type_ = t
 	}
 
 	if *type_ != nil {
@@ -82,13 +83,12 @@ func (r *resolver) AcceptExpr(expr ast.Expr) {
 	expr.Accept(r)
 }
 
-// Error
+// Diagnostic
 
 func (r *resolver) error(format string, args ...any) {
 	// TODO
-	r.reporter.Report(core.Error{
+	r.reporter.Report(core.Diagnostic{
+		Kind:    core.ErrorKind,
 		Message: fmt.Sprintf(format, args...),
-		Line:    0,
-		Column:  0,
 	})
 }

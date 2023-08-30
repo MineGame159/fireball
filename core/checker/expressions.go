@@ -47,7 +47,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 	switch expr.Op.Kind {
 	case scanner.Bang:
 		if !types.IsPrimitive(expr.Right.Type(), types.Bool) {
-			c.error(expr, "Expected a 'bool' but got a '%s'.", expr.Right.Type())
+			c.errorNode(expr, "Expected a 'bool' but got a '%s'.", expr.Right.Type())
 		}
 
 		expr.SetType(types.Primitive(types.Bool))
@@ -61,7 +61,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		}
 
 		expr.SetType(types.Primitive(types.I32))
-		c.error(expr, "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Type())
+		c.errorNode(expr, "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Type())
 
 	case scanner.Ampersand:
 		expr.SetType(&types.PointerType{Pointee: expr.Right.Type()})
@@ -86,7 +86,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		}
 
 		expr.SetType(types.Primitive(types.I32))
-		c.error(expr, "Expected two number types.")
+		c.errorNode(expr, "Expected two number types.")
 	} else if scanner.IsEquality(expr.Op.Kind) {
 		// Equality
 		expr.SetType(types.Primitive(types.Bool))
@@ -97,14 +97,14 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
 			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
 				if !types.IsNumber(left.Kind) || !types.IsNumber(right.Kind) || left != right {
-					c.error(expr, "Expected two number types.")
+					c.errorNode(expr, "Expected two number types.")
 				}
 			}
 		}
 	} else {
 		// Error
 		expr.SetType(types.Primitive(types.Void))
-		c.error(expr, "Invalid operator.")
+		c.errorNode(expr, "Invalid operator.")
 	}
 }
 
@@ -133,13 +133,14 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	variable := c.getVariable(expr.Identifier)
 
 	if variable != nil {
+		variable.used = true
 		expr.SetType(variable.type_)
 		return
 	}
 
 	// Error
 	expr.SetType(types.Primitive(types.Void))
-	c.error(expr, "Unknown identifier.")
+	c.errorNode(expr, "Unknown identifier.")
 }
 
 func (c *checker) VisitAssignment(expr *ast.Assignment) {
@@ -150,7 +151,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(c)
 
 	if types.IsPrimitive(expr.Expr.Type(), types.Void) || types.IsPrimitive(expr.Type(), types.Void) {
-		c.error(expr, "Cannot cast to or from type 'void'.")
+		c.errorNode(expr, "Cannot cast to or from type 'void'.")
 	}
 }
 
@@ -162,24 +163,24 @@ func (c *checker) VisitCall(expr *ast.Call) {
 
 		if v.Variadic {
 			if len(expr.Args) < len(v.Params) {
-				c.error(expr, "Got '%d' arguments but function takes at least '%d'.", len(expr.Args), len(v.Params))
+				c.errorNode(expr, "Got '%d' arguments but function takes at least '%d'.", len(expr.Args), len(v.Params))
 			}
 		} else {
 			if len(v.Params) != len(expr.Args) {
-				c.error(expr, "Got '%d' arguments but function only takes '%d'.", len(expr.Args), len(v.Params))
+				c.errorNode(expr, "Got '%d' arguments but function only takes '%d'.", len(expr.Args), len(v.Params))
 			}
 		}
 
 		for i := 0; i < toCheck; i++ {
 			if !expr.Args[i].Type().CanAssignTo(v.Params[i]) {
-				c.error(expr, "Argument with type '%s' cannot be assigned to a parameter wth type '%s'.", expr.Args[i].Type(), v.Params[i])
+				c.errorNode(expr, "Argument with type '%s' cannot be assigned to a parameter wth type '%s'.", expr.Args[i].Type(), v.Params[i])
 			}
 		}
 
 		expr.SetType(v.Returns)
 	} else {
 		expr.SetType(types.Primitive(types.Void))
-		c.error(expr, "Can't call type '%s'.", expr.Callee.Type())
+		c.errorNode(expr, "Can't call type '%s'.", expr.Callee.Type())
 	}
 }
 
@@ -191,7 +192,7 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
 		expr.SetType(v.Pointee)
 	} else {
-		c.error(expr, "Can only index into array and pointer types, not '%s'.", expr.Value.Type())
+		c.errorNode(expr, "Can only index into array and pointer types, not '%s'.", expr.Value.Type())
 		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.Void)})
 	}
 }
@@ -215,11 +216,11 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		if field != nil {
 			expr.SetType(field.Type)
 		} else {
-			c.error(expr, "Struct '%s' does not contain member '%s'.", s, expr.Name)
+			c.errorNode(expr, "Struct '%s' does not contain member '%s'.", s, expr.Name)
 			expr.SetType(types.Primitive(types.Void))
 		}
 	} else {
-		c.error(expr, "Only structs and pointers to structs can have members, not '%s'.", expr.Value.Type())
+		c.errorNode(expr, "Only structs and pointers to structs can have members, not '%s'.", expr.Value.Type())
 		expr.SetType(types.Primitive(types.Void))
 	}
 }

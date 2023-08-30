@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fireball/core/ast"
-	"fireball/core/scanner"
 	"fireball/core/types"
 	"go.lsp.dev/protocol"
 	"go.uber.org/zap"
@@ -200,8 +199,8 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 			symbols = append(symbols, &protocol.DocumentSymbol{
 				Name:           v.Name.Lexeme,
 				Kind:           protocol.SymbolKindStruct,
-				Range:          rangeToRange(v.Range),
-				SelectionRange: tokenToRange(v.Name),
+				Range:          convertRange(v.Range),
+				SelectionRange: convertRange(ast.TokenToRange(v.Name)),
 			})
 		} else if v, ok := decl.(*ast.Func); ok {
 			// Function
@@ -229,8 +228,8 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 				Name:           v.Name.Lexeme,
 				Detail:         signature.String(),
 				Kind:           protocol.SymbolKindFunction,
-				Range:          rangeToRange(v.Range),
-				SelectionRange: tokenToRange(v.Name),
+				Range:          convertRange(v.Range),
+				SelectionRange: convertRange(ast.TokenToRange(v.Name)),
 			})
 		}
 	}
@@ -387,7 +386,7 @@ func (h *handler) Request(ctx context.Context, method string, params interface{}
 
 // Utils
 
-func rangeToRange(r ast.Range) protocol.Range {
+func convertRange(r ast.Range) protocol.Range {
 	return protocol.Range{
 		Start: protocol.Position{
 			Line:      uint32(r.Start.Line - 1),
@@ -396,25 +395,6 @@ func rangeToRange(r ast.Range) protocol.Range {
 		End: protocol.Position{
 			Line:      uint32(r.End.Line - 1),
 			Character: uint32(r.End.Column),
-		},
-	}
-}
-
-func tokenToRange(token scanner.Token) protocol.Range {
-	return toRange(token.Line, token.Column, len(token.Lexeme))
-}
-
-func toRange(line, column, length int) protocol.Range {
-	pos := protocol.Position{
-		Line:      uint32(line - 1),
-		Character: uint32(column),
-	}
-
-	return protocol.Range{
-		Start: pos,
-		End: protocol.Position{
-			Line:      pos.Line,
-			Character: pos.Character + uint32(length),
 		},
 	}
 }

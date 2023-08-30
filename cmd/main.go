@@ -80,7 +80,7 @@ type consoleReporter struct {
 	hadError bool
 }
 
-func (c *consoleReporter) Report(error core.Error) {
-	fmt.Println(error.Error())
+func (c *consoleReporter) Report(error core.Diagnostic) {
+	fmt.Println(error)
 	c.hadError = true
 }
