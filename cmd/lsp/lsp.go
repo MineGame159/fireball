@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"github.com/spf13/cobra"
 	"go.lsp.dev/jsonrpc2"
 	"go.lsp.dev/protocol"
 	"go.uber.org/zap"
@@ -11,10 +12,24 @@ import (
 	"strconv"
 )
 
-func Start(port uint16) {
+var port uint16
+
+func GetCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "lsp",
+		Short: "Language server for Fireball",
+		Run:   lspCmd,
+	}
+
+	cmd.Flags().Uint16VarP(&port, "port", "p", 0, "Port to start the LSP server on. If not specified the LSP server will use STDOUT / STDIN.")
+
+	return cmd
+}
+
+func lspCmd(_ *cobra.Command, _ []string) {
 	server := &handler{}
 
-	stream, logger := getStream(port)
+	stream, logger := getStream()
 	_, conn, client := protocol.NewServer(context.Background(), server, stream, logger)
 
 	server.logger = logger
@@ -29,7 +44,7 @@ func Start(port uint16) {
 	<-conn.Done()
 }
 
-func getStream(port uint16) (jsonrpc2.Stream, *zap.Logger) {
+func getStream() (jsonrpc2.Stream, *zap.Logger) {
 	// STDIO
 	if port == 0 {
 		return jsonrpc2.NewStream(os.Stdout), zap.NewNop()
@@ -40,6 +55,7 @@ func getStream(port uint16) (jsonrpc2.Stream, *zap.Logger) {
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
+	logger.Info("Listening on :" + strconv.Itoa(int(port)))
 
 	listener, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
 	if err != nil {
