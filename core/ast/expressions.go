@@ -49,6 +49,7 @@ func (g *Group) AcceptChildren(acceptor Acceptor) {
 }
 
 func (g *Group) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&g.type_)
 }
 
 func (g *Group) Type() types.Type {
@@ -77,6 +78,7 @@ func (l *Literal) AcceptChildren(acceptor Acceptor) {
 }
 
 func (l *Literal) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&l.type_)
 }
 
 func (l *Literal) Type() types.Type {
@@ -109,6 +111,7 @@ func (u *Unary) AcceptChildren(acceptor Acceptor) {
 }
 
 func (u *Unary) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&u.type_)
 }
 
 func (u *Unary) Type() types.Type {
@@ -145,6 +148,7 @@ func (b *Binary) AcceptChildren(acceptor Acceptor) {
 }
 
 func (b *Binary) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&b.type_)
 }
 
 func (b *Binary) Type() types.Type {
@@ -173,6 +177,7 @@ func (i *Identifier) AcceptChildren(acceptor Acceptor) {
 }
 
 func (i *Identifier) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&i.type_)
 }
 
 func (i *Identifier) Type() types.Type {
@@ -209,6 +214,7 @@ func (a *Assignment) AcceptChildren(acceptor Acceptor) {
 }
 
 func (a *Assignment) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&a.type_)
 }
 
 func (a *Assignment) Type() types.Type {
@@ -241,6 +247,7 @@ func (c *Cast) AcceptChildren(acceptor Acceptor) {
 }
 
 func (c *Cast) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&c.type_)
 }
 
 func (c *Cast) Type() types.Type {
@@ -277,6 +284,7 @@ func (c *Call) AcceptChildren(acceptor Acceptor) {
 }
 
 func (c *Call) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&c.type_)
 }
 
 func (c *Call) Type() types.Type {
@@ -313,6 +321,7 @@ func (i *Index) AcceptChildren(acceptor Acceptor) {
 }
 
 func (i *Index) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&i.type_)
 }
 
 func (i *Index) Type() types.Type {
@@ -345,6 +354,7 @@ func (m *Member) AcceptChildren(acceptor Acceptor) {
 }
 
 func (m *Member) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&m.type_)
 }
 
 func (m *Member) Type() types.Type {

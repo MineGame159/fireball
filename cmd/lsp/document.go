@@ -8,7 +8,6 @@ import (
 	"fireball/core/checker"
 	"fireball/core/parser"
 	"fireball/core/scanner"
-	"fireball/core/typeresolver"
 	"go.lsp.dev/protocol"
 	"sync"
 )
@@ -66,7 +65,6 @@ func (d *Document) SetText(ctx context.Context, text string) error {
 	d.Decls = parser.Parse(reporter, scanner.NewScanner(text))
 	d.parseWaitGroup.Done()
 
-	typeresolver.Resolve(reporter, d.Decls)
 	checker.Check(reporter, d.Decls)
 
 	return d.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{

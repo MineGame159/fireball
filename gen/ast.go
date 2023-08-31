@@ -364,6 +364,10 @@ func generate(w *writer, kind string, items []item) {
 			// AcceptTypes
 			w.write("%s AcceptTypes(visitor types.Visitor) {", method)
 
+			if kind == "Expr" {
+				w.write("visitor.VisitType(&%c.type_)", short)
+			}
+
 			for _, f := range item.fields {
 				if strings.HasPrefix(f.type_, "[]") {
 					type_ := f.type_[2:]

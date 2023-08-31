@@ -142,14 +142,13 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 }
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
-	c.acceptExpr(expr.Expr)
-	val := c.load(c.exprValue, expr.Expr.Type())
-
-	res := c.locals.unnamed(expr.Type())
-	c.exprValue = res
+	val := c.load(c.acceptExpr(expr.Expr), expr.Expr.Type())
 
 	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
 		if to, ok := expr.Type().(*types.PrimitiveType); ok {
+			res := c.locals.unnamed(expr.Type())
+			c.exprValue = res
+
 			if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsInteger(to.Kind) {
 				// integer / bool to integer
 				if from.Size() > to.Size() {
@@ -201,6 +200,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	if _, ok := expr.Expr.Type().(*types.PointerType); ok {
 		if _, ok := expr.Type().(*types.PointerType); ok {
 			// pointer to pointer
+			c.exprValue = val
 			return
 		}
 	}

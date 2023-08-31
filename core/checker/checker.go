@@ -12,7 +12,7 @@ type checker struct {
 	scopes    []scope
 	variables []variable
 
-	structs core.Set[string]
+	structs map[string]*types.StructType
 
 	functions core.Set[string]
 	function  *ast.Func
@@ -38,10 +38,39 @@ type variable struct {
 
 func Check(reporter core.Reporter, decls []ast.Decl) {
 	c := &checker{
-		structs:   core.NewSet[string](),
+		structs:   make(map[string]*types.StructType),
 		functions: core.NewSet[string](),
 		reporter:  reporter,
 		decls:     decls,
+	}
+
+	// Collect structs
+	for _, decl := range decls {
+		if s, ok := decl.(*ast.Struct); ok {
+			// Create type
+			fields := make([]types.Field, len(s.Fields))
+
+			for i, field := range s.Fields {
+				fields[i] = types.Field{
+					Name: field.Name.Lexeme,
+					Type: field.Type,
+				}
+			}
+
+			type_ := &types.StructType{
+				Name:   s.Name.Lexeme,
+				Fields: fields,
+			}
+
+			s.Type = type_
+
+			// Save in map and check name collision
+			if _, ok := c.structs[s.Name.Lexeme]; ok {
+				c.errorNode(decl, "Struct with the name '%s' already exists.", s.Name)
+			}
+
+			c.structs[s.Name.Lexeme] = type_
+		}
 	}
 
 	for _, decl := range decls {
@@ -109,18 +138,45 @@ func (c *checker) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
 }
 
+// types.Visitor
+
+func (c *checker) VisitType(type_ *types.Type) {
+	if v, ok := (*type_).(*types.UnresolvedType); ok {
+		t, ok := c.structs[v.Identifier.Lexeme]
+
+		if !ok {
+			// TODO: Range
+			c.reporter.Report(core.Diagnostic{
+				Kind:    core.ErrorKind,
+				Message: fmt.Sprintf("Unknown type '%s'.", v),
+			})
+
+			*type_ = types.Primitive(types.Void)
+		} else {
+			*type_ = t
+		}
+	}
+
+	if *type_ != nil {
+		(*type_).AcceptTypes(c)
+	}
+}
+
 // ast.Acceptor
 
 func (c *checker) AcceptDecl(decl ast.Decl) {
 	decl.Accept(c)
+	decl.AcceptTypes(c)
 }
 
 func (c *checker) AcceptStmt(stmt ast.Stmt) {
 	stmt.Accept(c)
+	stmt.AcceptTypes(c)
 }
 
 func (c *checker) AcceptExpr(expr ast.Expr) {
 	expr.Accept(c)
+	expr.AcceptTypes(c)
 }
 
 // Diagnostics

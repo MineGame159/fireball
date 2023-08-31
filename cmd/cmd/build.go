@@ -7,7 +7,6 @@ import (
 	"fireball/core/codegen"
 	"fireball/core/parser"
 	"fireball/core/scanner"
-	"fireball/core/typeresolver"
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -42,14 +41,13 @@ func buildExecutable(input string) string {
 
 	text := string(b)
 
-	// Parse, resolve and check
+	// Parse and check
 	reporter := &consoleReporter{
 		error:   color.New(color.FgRed),
 		warning: color.New(color.FgYellow),
 	}
 
 	decls := parser.Parse(reporter, scanner.NewScanner(text))
-	typeresolver.Resolve(reporter, decls)
 	checker.Check(reporter, decls)
 
 	if reporter.errorCount > 0 {

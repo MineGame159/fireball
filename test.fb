@@ -4,25 +4,28 @@ struct Vec2 {
 }
 
 func main() i32 {
-    var point = getPoint();
-    modifyPoint(&point);
+    var point = newPoint(2, 6);
 
     printf("X: %d, Y: %d\n", point.x, point.y);
 
+    freePoint(point);
     return 0;
 }
 
-func getPoint() Vec2 {
-    var point Vec2;
+func newPoint(x i32, y i32) *Vec2 {
+    var point = malloc(8 as u64) as *Vec2;
 
-    point.x = 1;
-    point.y = 3;
+    point.x = x;
+    point.y = y;
 
     return point;
 }
 
-func modifyPoint(point *Vec2) {
-    point.y *= 2;
+func freePoint(point *Vec2) {
+    free(point as *void);
 }
 
 extern func printf(format *u8, ...) void
+
+extern func malloc(size u64) *void
+extern func free(ptr *void) void

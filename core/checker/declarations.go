@@ -9,11 +9,6 @@ import (
 func (c *checker) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(c)
 
-	// Check name collision
-	if !c.structs.Add(decl.Name.Lexeme) {
-		c.errorNode(decl, "Struct with the name '%s' already exists.", decl.Name)
-	}
-
 	// Check fields
 	fields := core.NewSet[string]()
 
