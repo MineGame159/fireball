@@ -85,6 +85,7 @@ var stmts = []item{
 			{name: "Type", type_: "Type"},
 			{name: "Name", type_: "Token"},
 			{name: "Initializer", type_: "Expr"},
+			{name: "InferType", type_: "bool"},
 		},
 		token: "Name",
 		ast:   true,

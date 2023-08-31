@@ -8,7 +8,7 @@ import (
 	"fireball/core/checker"
 	"fireball/core/parser"
 	"fireball/core/scanner"
-	"go.lsp.dev/protocol"
+	"github.com/MineGame159/protocol"
 	"sync"
 )
 

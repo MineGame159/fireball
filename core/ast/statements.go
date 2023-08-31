@@ -70,6 +70,7 @@ type Variable struct {
 	Type        types.Type
 	Name        scanner.Token
 	Initializer Expr
+	InferType   bool
 }
 
 func (v *Variable) Token() scanner.Token {

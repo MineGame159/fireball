@@ -1,9 +1,6 @@
 func main() i32 {
     // Initialize random number generator (broken nil keyword)
-    var _null *i64;
-    _null = nil;
-
-    srand(time(_null) as u32);
+    srand(time(nil as *i64) as u32);
 
     // Get target number
     var target = rand() % 20 + 1;

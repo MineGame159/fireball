@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fireball/core/ast"
 	"fireball/core/types"
-	"go.lsp.dev/protocol"
+	"github.com/MineGame159/protocol"
 	"go.uber.org/zap"
 	"strings"
 )
@@ -54,6 +54,7 @@ func (h *handler) Initialize(ctx context.Context, params *protocol.InitializePar
 			DocumentSymbolProvider: &protocol.DocumentSymbolOptions{
 				Label: "Fireball",
 			},
+			InlayHintProvider: &protocol.InlayHintOptions{},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "fireball",
@@ -380,6 +381,35 @@ func (h *handler) Moniker(ctx context.Context, params *protocol.MonikerParams) (
 	return nil, errors.New("not implemented")
 }
 
+func (h *handler) InlayHint(ctx context.Context, params *protocol.InlayHintParams) (result []protocol.InlayHint, err error) {
+	h.logger.Debug("handle InlayHint")
+
+	// Get document
+	doc, err := h.docs.Get(params.TextDocument.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	doc.EnsureParsed()
+
+	// Get hints
+	hints := make([]protocol.InlayHint, 0, 8)
+
+	for _, decl := range doc.Decls {
+		ast.VisitStmts[*ast.Variable](decl, func(stmt *ast.Variable) {
+			if stmt.InferType {
+				hints = append(hints, protocol.InlayHint{
+					Position: convertPos(ast.TokenToPos(stmt.Name, true)),
+					Label:    " " + stmt.Type.String(),
+					Kind:     protocol.InlayHintKindType,
+				})
+			}
+		})
+	}
+
+	return hints, nil
+}
+
 func (h *handler) Request(ctx context.Context, method string, params interface{}) (result interface{}, err error) {
 	return nil, errors.New("not implemented")
 }
@@ -388,13 +418,14 @@ func (h *handler) Request(ctx context.Context, method string, params interface{}
 
 func convertRange(r ast.Range) protocol.Range {
 	return protocol.Range{
-		Start: protocol.Position{
-			Line:      uint32(r.Start.Line - 1),
-			Character: uint32(r.Start.Column),
-		},
-		End: protocol.Position{
-			Line:      uint32(r.End.Line - 1),
-			Character: uint32(r.End.Column),
-		},
+		Start: convertPos(r.Start),
+		End:   convertPos(r.End),
+	}
+}
+
+func convertPos(p ast.Pos) protocol.Position {
+	return protocol.Position{
+		Line:      uint32(p.Line - 1),
+		Character: uint32(p.Column),
 	}
 }

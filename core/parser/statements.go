@@ -125,6 +125,7 @@ func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 		Type:        type_,
 		Name:        name,
 		Initializer: initializer,
+		InferType:   type_ == nil,
 	}, nil
 }
 

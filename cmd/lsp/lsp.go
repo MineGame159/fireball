@@ -2,9 +2,9 @@ package lsp
 
 import (
 	"context"
+	"github.com/MineGame159/protocol"
 	"github.com/spf13/cobra"
 	"go.lsp.dev/jsonrpc2"
-	"go.lsp.dev/protocol"
 	"go.uber.org/zap"
 	"log"
 	"net"
