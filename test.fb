@@ -8,7 +8,7 @@ func main() i32 {
 
     printf("X: %d, Y: %d\n", point.x, point.y);
 
-    freePoint(point);
+    free(point);
     return 0;
 }
 
@@ -19,10 +19,6 @@ func newPoint(x i32, y i32) *Vec2 {
     point.y = y;
 
     return point;
-}
-
-func freePoint(point *Vec2) {
-    free(point as *void);
 }
 
 extern func printf(format *u8, ...) void

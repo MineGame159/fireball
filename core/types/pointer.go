@@ -10,7 +10,7 @@ func (p *PointerType) Size() int {
 
 func (p *PointerType) CanAssignTo(other Type) bool {
 	if v, ok := other.(*PointerType); ok {
-		return p.Pointee.CanAssignTo(v.Pointee)
+		return IsPrimitive(v.Pointee, Void) || p.Pointee.CanAssignTo(v.Pointee)
 	}
 
 	return false
