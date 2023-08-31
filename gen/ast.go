@@ -175,6 +175,16 @@ var exprs = []item{
 		ast:   true,
 	},
 	{
+		name: "Logical",
+		fields: []field{
+			{name: "Left", type_: "Expr"},
+			{name: "Op", type_: "Token"},
+			{name: "Right", type_: "Expr"},
+		},
+		token: "Op",
+		ast:   true,
+	},
+	{
 		name: "Identifier",
 		fields: []field{
 			{name: "Identifier", type_: "Token"},
@@ -428,7 +438,7 @@ func generate(w *writer, kind string, items []item) {
 }
 
 func getItem(items []item, name string) *item {
-	for i, _ := range items {
+	for i := range items {
 		if items[i].name == name {
 			return &items[i]
 		}

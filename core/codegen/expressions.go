@@ -104,6 +104,56 @@ func (c *codegen) VisitBinary(expr *ast.Binary) {
 	c.exprValue = c.binary(expr.Op.Kind, left, expr.Left.Type(), right, expr.Right.Type())
 }
 
+func (c *codegen) VisitLogical(expr *ast.Logical) {
+	left := c.load(c.acceptExpr(expr.Left), expr.Left.Type())
+	right := c.load(c.acceptExpr(expr.Right), expr.Right.Type())
+
+	switch expr.Op.Kind {
+	case scanner.Or:
+		false_ := c.blocks.unnamedRaw()
+		end := c.blocks.unnamedRaw()
+
+		// Start
+		startBlock := c.block
+		c.writeFmt("br i1 %s, label %%%s, label %%%s\n", left, end, false_)
+
+		// False
+		c.writeBlock(false_)
+		c.writeFmt("br label %%%s\n", end)
+
+		// End
+		c.writeBlock(end)
+
+		res := c.locals.unnamed(expr.Type())
+		c.writeFmt("%s = phi i1 [ true, %%%s ], [ %s, %%%s ]\n", res, startBlock, right, false_)
+
+		c.exprValue = res
+
+	case scanner.And:
+		true_ := c.blocks.unnamedRaw()
+		end := c.blocks.unnamedRaw()
+
+		// Start
+		startBlock := c.block
+		c.writeFmt("br i1 %s, label %%%s, label %%%s\n", left, true_, end)
+
+		// True
+		c.writeBlock(true_)
+		c.writeFmt("br label %%%s\n", end)
+
+		// End
+		c.writeBlock(end)
+
+		res := c.locals.unnamed(expr.Type())
+		c.writeFmt("%s = phi i1 [ false, %%%s ], [ %s, %%%s ]\n", res, startBlock, right, true_)
+
+		c.exprValue = res
+
+	default:
+		log.Fatalln("Invalid logical operator")
+	}
+}
+
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 	// Functions
 	f := c.getFunction(expr.Identifier)

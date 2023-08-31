@@ -112,6 +112,10 @@ func (h *highlighter) VisitBinary(expr *ast.Binary) {
 	expr.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitLogical(expr *ast.Logical) {
+	expr.AcceptChildren(h)
+}
+
 func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
 	if _, ok := h.functions[expr.Identifier.Lexeme]; ok {
 		h.add(expr.Identifier, functionKind)

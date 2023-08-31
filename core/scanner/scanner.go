@@ -58,8 +58,15 @@ func (s *Scanner) Next() Token {
 		return s.make(Colon)
 	case ';':
 		return s.make(Semicolon)
+
+	case '|':
+		if s.match('|') {
+			return s.make(Or)
+		}
+
+		return s.error("Unexpected character.")
 	case '&':
-		return s.make(Ampersand)
+		return s.matchToken('&', And, Ampersand)
 
 	case '+':
 		return s.matchToken('=', PlusEqual, Plus)
@@ -101,14 +108,7 @@ func (s *Scanner) identifier() Token {
 func (s *Scanner) identifierKind() TokenKind {
 	switch s.text[s.startI] {
 	case 'a':
-		if s.currentI-s.startI > 1 {
-			switch s.text[s.startI+1] {
-			case 'n':
-				return s.checkKeyword(2, "d", And)
-			case 's':
-				return As
-			}
-		}
+		return s.checkKeyword(1, "s", As)
 	case 'b':
 		return s.checkKeyword(1, "reak", Break)
 	case 'c':
@@ -137,8 +137,6 @@ func (s *Scanner) identifierKind() TokenKind {
 		return s.checkKeyword(1, "f", If)
 	case 'n':
 		return s.checkKeyword(1, "il", Nil)
-	case 'o':
-		return s.checkKeyword(1, "r", Or)
 	case 'r':
 		return s.checkKeyword(1, "eturn", Return)
 	case 's':

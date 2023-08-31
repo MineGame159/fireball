@@ -1,24 +1,15 @@
-struct Vec2 {
-    x i32
-    y i32
-}
-
 func main() i32 {
-    var point = newPoint(2, 6);
+    printf("true  || true  = %d\n", true || true);
+    printf("true  || false = %d\n", true || false);
+    printf("false || true  = %d\n", false || true);
+    printf("false || false = %d\n", false || false);
+    printf("\n");
+    printf("true  && true  = %d\n", true && true);
+    printf("true  && false = %d\n", true && false);
+    printf("false && true  = %d\n", false && true);
+    printf("false && false = %d\n", false && false);
 
-    printf("X: %d, Y: %d\n", point.x, point.y);
-
-    free(point);
     return 0;
-}
-
-func newPoint(x i32, y i32) *Vec2 {
-    var point = malloc(8 as u64) as *Vec2;
-
-    point.x = x;
-    point.y = y;
-
-    return point;
 }
 
 extern func printf(format *u8, ...) void

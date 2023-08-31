@@ -10,6 +10,7 @@ type ExprVisitor interface {
 	VisitLiteral(expr *Literal)
 	VisitUnary(expr *Unary)
 	VisitBinary(expr *Binary)
+	VisitLogical(expr *Logical)
 	VisitIdentifier(expr *Identifier)
 	VisitAssignment(expr *Assignment)
 	VisitCast(expr *Cast)
@@ -157,6 +158,43 @@ func (b *Binary) Type() types.Type {
 
 func (b *Binary) SetType(type_ types.Type) {
 	b.type_ = type_
+}
+
+type Logical struct {
+	type_ types.Type
+
+	Left  Expr
+	Op    scanner.Token
+	Right Expr
+}
+
+func (l *Logical) Token() scanner.Token {
+	return l.Op
+}
+
+func (l *Logical) Accept(visitor ExprVisitor) {
+	visitor.VisitLogical(l)
+}
+
+func (l *Logical) AcceptChildren(acceptor Acceptor) {
+	if l.Left != nil {
+		acceptor.AcceptExpr(l.Left)
+	}
+	if l.Right != nil {
+		acceptor.AcceptExpr(l.Right)
+	}
+}
+
+func (l *Logical) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(&l.type_)
+}
+
+func (l *Logical) Type() types.Type {
+	return l.type_
+}
+
+func (l *Logical) SetType(type_ types.Type) {
+	l.type_ = type_
 }
 
 type Identifier struct {

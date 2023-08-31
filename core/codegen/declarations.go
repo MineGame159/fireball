@@ -38,7 +38,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 		c.writeStr(")\n\n")
 	} else {
 		c.writeStr(") {\n")
-		c.writeRaw(c.blocks.unnamedRaw() + ":\n")
+		c.writeBlock(c.blocks.unnamedRaw())
 
 		for _, param := range decl.Params {
 			val := c.locals.named(param.Name.Lexeme+".var", param.Type)

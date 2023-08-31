@@ -49,19 +49,19 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, then, else_)
 
 	// Then
-	c.writeRaw(then + ":\n")
+	c.writeBlock(then)
 	c.acceptStmt(stmt.Then)
 	c.writeFmt("br label %%%s\n", end)
 
 	// Else
 	if stmt.Else != nil {
-		c.writeRaw(else_ + ":\n")
+		c.writeBlock(else_)
 		c.acceptStmt(stmt.Else)
 		c.writeFmt("br label %%%s\n", end)
 	}
 
 	// End
-	c.writeRaw(end + ":\n")
+	c.writeBlock(end)
 }
 
 func (c *codegen) VisitFor(stmt *ast.For) {
@@ -73,7 +73,7 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 	c.writeFmt("br label %%%s\n", c.loopStart)
 
 	// Condition
-	c.writeRaw(c.loopStart + ":\n")
+	c.writeBlock(c.loopStart)
 
 	if stmt.Condition != nil {
 		body = c.blocks.unnamedRaw()
@@ -87,14 +87,14 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 
 	// Body
 	if c.loopStart != body {
-		c.writeRaw(body + ":\n")
+		c.writeBlock(body)
 	}
 
 	c.acceptStmt(stmt.Body)
 	c.writeFmt("br label %%%s\n", c.loopStart)
 
 	// End
-	c.writeRaw(c.loopEnd + ":\n")
+	c.writeBlock(c.loopEnd)
 
 	// Reset basic block names
 	c.loopStart = ""

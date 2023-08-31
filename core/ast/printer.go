@@ -135,6 +135,12 @@ func (p *printer) VisitBinary(expr *Binary) {
 	p.acceptExpr(expr.Right)
 }
 
+func (p *printer) VisitLogical(expr *Logical) {
+	p.print(expr.Op.Lexeme)
+	p.acceptExpr(expr.Left)
+	p.acceptExpr(expr.Right)
+}
+
 func (p *printer) VisitIdentifier(expr *Identifier) {
 	p.print(expr.Identifier.Lexeme)
 }

@@ -108,6 +108,22 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 	}
 }
 
+func (c *checker) VisitLogical(expr *ast.Logical) {
+	expr.AcceptChildren(c)
+
+	// Check bool types
+	if !types.IsPrimitive(expr.Left.Type(), types.Bool) {
+		c.errorNode(expr, "Left - Expected a 'bool' but got a '%s'.", expr.Left.Type())
+	}
+
+	if !types.IsPrimitive(expr.Right.Type(), types.Bool) {
+		c.errorNode(expr, "Right - Expected a 'bool' but got a '%s'.", expr.Right.Type())
+	}
+
+	// Set type
+	expr.SetType(types.Primitive(types.Bool))
+}
+
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	expr.AcceptChildren(c)
 

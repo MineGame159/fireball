@@ -30,6 +30,8 @@ type codegen struct {
 	scopes    []scope
 	variables []variable
 
+	block string
+
 	loopStart string
 	loopEnd   string
 
@@ -140,6 +142,11 @@ func (c *codegen) toPtrOrLoad(val value, type_ types.Type) value {
 	}
 
 	return c.load(val, type_)
+}
+
+func (c *codegen) writeBlock(block string) {
+	c.writeRaw(block + ":\n")
+	c.block = block
 }
 
 // Constants
