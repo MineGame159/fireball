@@ -58,9 +58,9 @@
       "name": "comment.line.fb"
     },
     "blockComment": {
-      "begin": "\\\\\\*",
-      "end": "\\*\\\\",
-      "name": "comment.block"
+      "begin": "/\\*",
+      "end": "\\*/",
+      "name": "comment.block.fb"
     },
     "operator": {
       "match": "\\+=|-=|\\*=|\\/=|%=|\\+|-|\\*|\\/|%|&",

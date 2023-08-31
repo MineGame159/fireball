@@ -248,18 +248,41 @@ func (s *Scanner) skipWhitespace() {
 		switch c {
 		case ' ', '\r', '\t':
 			s.advance()
+
 		case '\n':
 			s.advance()
 			s.line++
 			s.column = 0
+
 		case '/':
 			if s.peekNext() == '/' {
-				for s.peek() != '\n' && !s.isAtEnd() {
+				for !s.isAtEnd() && s.peek() != '\n' {
 					s.advance()
+				}
+			} else if s.peekNext() == '*' {
+				s.advance()
+				s.advance()
+
+				for !s.isAtEnd() && s.peek() != '*' && s.peekNext() != '/' {
+					if s.peek() == '\n' {
+						s.line++
+						s.column = 0
+					}
+
+					s.advance()
+				}
+
+				if !s.isAtEnd() {
+					s.advance()
+
+					if !s.isAtEnd() {
+						s.advance()
+					}
 				}
 			} else {
 				return
 			}
+
 		default:
 			return
 		}
