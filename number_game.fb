@@ -46,11 +46,9 @@ func parseInt(str *u8) i32 {
             break;
         }
 
-        if ch >= '0' {
-            if ch <= '9' {
-                num *= 10;
-                num += (ch - '0') as i32;
-            }
+        if ch >= '0' && ch <= '9' {
+            num *= 10;
+            num += (ch - '0') as i32;
         }
 
         i += 1;

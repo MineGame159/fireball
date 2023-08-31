@@ -35,11 +35,11 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 		case "\\0":
 			char = '\000'
 
-		case "\n":
+		case "\\n":
 			char = '\n'
-		case "\r":
+		case "\\r":
 			char = '\r'
-		case "\t":
+		case "\\t":
 			char = '\t'
 
 		default:
