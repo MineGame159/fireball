@@ -256,6 +256,13 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	val := c.toPtrOrLoad(c.acceptExpr(expr.Value), expr.Value.Type())
 	index := c.load(c.acceptExpr(expr.Index), expr.Index.Type())
 
+	if _, ok := expr.Value.Type().(*types.PointerType); ok {
+		res := c.locals.unnamed(val.type_)
+		c.writeFmt("%s = load ptr, ptr %s\n", res, val)
+
+		val = res
+	}
+
 	type_ := c.getType(expr.Type())
 
 	res := c.locals.unnamed(expr.Type())
