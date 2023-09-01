@@ -31,7 +31,7 @@ func (c *codegen) VisitVariable(stmt *ast.Variable) {
 }
 
 func (c *codegen) VisitIf(stmt *ast.If) {
-	// Get basic block names
+	// GetLeaf basic block names
 	then := c.blocks.unnamedRaw()
 	else_ := ""
 	end := ""
@@ -65,7 +65,7 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 }
 
 func (c *codegen) VisitFor(stmt *ast.For) {
-	// Get basic block names
+	// GetLeaf basic block names
 	c.loopStart = c.blocks.unnamedRaw()
 	body := c.loopStart
 	c.loopEnd = ""

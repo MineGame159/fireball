@@ -26,6 +26,7 @@ type Document struct {
 	Decls []ast.Decl
 
 	parseWaitGroup sync.WaitGroup
+	checkWaitGroup sync.WaitGroup
 }
 
 // Documents
@@ -62,10 +63,13 @@ func (d *Document) SetText(ctx context.Context, text string) error {
 	}
 
 	d.parseWaitGroup.Add(1)
+	d.checkWaitGroup.Add(1)
+
 	d.Decls = parser.Parse(reporter, scanner.NewScanner(text))
 	d.parseWaitGroup.Done()
 
 	checker.Check(reporter, d.Decls)
+	d.checkWaitGroup.Done()
 
 	return d.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
 		URI:         d.Uri,
@@ -75,6 +79,10 @@ func (d *Document) SetText(ctx context.Context, text string) error {
 
 func (d *Document) EnsureParsed() {
 	d.parseWaitGroup.Wait()
+}
+
+func (d *Document) EnsureChecked() {
+	d.checkWaitGroup.Wait()
 }
 
 type diagnosticReporter struct {

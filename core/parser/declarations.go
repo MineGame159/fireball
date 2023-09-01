@@ -33,7 +33,7 @@ func (p *parser) declaration() ast.Decl {
 }
 
 func (p *parser) struct_() ast.Decl {
-	start := ast.TokenToPos(p.current, false)
+	start := p.current
 
 	// Name
 	name := p.consume2(scanner.Identifier)
@@ -97,21 +97,18 @@ func (p *parser) struct_() ast.Decl {
 		return nil
 	}
 
-	end := ast.TokenToPos(p.current, true)
-
 	// Return
-	return &ast.Struct{
-		Range: ast.Range{
-			Start: start,
-			End:   end,
-		},
+	decl := &ast.Struct{
 		Name:   name,
 		Fields: fields,
 	}
+
+	decl.SetRangeToken(start, p.current)
+	return decl
 }
 
 func (p *parser) function() ast.Decl {
-	start := ast.TokenToPos(p.current, false)
+	start := p.current
 
 	// Name
 	name := p.consume2(scanner.Identifier)
@@ -240,14 +237,8 @@ func (p *parser) function() ast.Decl {
 		}
 	}
 
-	end := ast.TokenToPos(p.current, true)
-
 	// Return
-	return &ast.Func{
-		Range: ast.Range{
-			Start: start,
-			End:   end,
-		},
+	decl := &ast.Func{
 		Extern:   p.extern,
 		Name:     name,
 		Params:   params,
@@ -255,6 +246,9 @@ func (p *parser) function() ast.Decl {
 		Returns:  returns,
 		Body:     body,
 	}
+
+	decl.SetRangeToken(start, p.current)
+	return decl
 }
 
 func (p *parser) syncToDecl() bool {

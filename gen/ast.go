@@ -299,17 +299,21 @@ func generate(w *writer, kind string, items []item) {
 
 	// Items
 	for _, item := range items {
+		// Comment
+		w.write("// %s", item.name)
+		w.write("")
+
 		// Struct
 		w.write("type %s struct {", item.name)
 
 		if item.ast {
-			if kind == "Decl" {
-				w.write("Range Range")
-				w.write("")
-			} else if kind == "Expr" {
+			w.write("range_ Range")
+
+			if kind == "Expr" {
 				w.write("type_ types.Type")
-				w.write("")
 			}
+
+			w.write("")
 		}
 
 		for _, field := range item.fields {
@@ -338,6 +342,39 @@ func generate(w *writer, kind string, items []item) {
 			w.write("}")
 			w.write("")
 
+			// Range
+			w.write("%s Range() Range {", method)
+			w.write("return %c.range_", short)
+			w.write("}")
+			w.write("")
+
+			// SetRangeToken
+			w.write("%s SetRangeToken(start, end scanner.Token) {", method)
+			w.write("%c.range_ = Range{", short)
+			w.write("Start: TokenToPos(start, false),")
+			w.write("End: TokenToPos(end, true),")
+			w.write("}")
+			w.write("}")
+			w.write("")
+
+			// SetRangePos
+			w.write("%s SetRangePos(start, end Pos) {", method)
+			w.write("%c.range_ = Range{", short)
+			w.write("Start: start,")
+			w.write("End: end,")
+			w.write("}")
+			w.write("}")
+			w.write("")
+
+			// SetRangeNode
+			w.write("%s SetRangeNode(start, end Node) {", method)
+			w.write("%c.range_ = Range{", short)
+			w.write("Start: start.Range().Start,")
+			w.write("End: end.Range().End,")
+			w.write("}")
+			w.write("}")
+			w.write("")
+
 			// Accept
 			w.write("%s Accept(visitor %sVisitor) {", method, kind)
 			w.write("visitor.Visit%s(%c)", item.name, short)
@@ -346,6 +383,7 @@ func generate(w *writer, kind string, items []item) {
 
 			// AcceptChildren
 			w.write("%s AcceptChildren(acceptor Acceptor) {", method)
+			leaf := true
 
 			for _, f := range item.fields {
 				type_ := f.type_
@@ -366,6 +404,8 @@ func generate(w *writer, kind string, items []item) {
 						w.write("acceptor.Accept%s(%c.%s)", type_, short, f.name)
 						w.write("}")
 					}
+
+					leaf = false
 				}
 			}
 
@@ -417,6 +457,12 @@ func generate(w *writer, kind string, items []item) {
 				}
 			}
 
+			w.write("}")
+			w.write("")
+
+			// Leaf
+			w.write("%s Leaf() bool {", method)
+			w.write("return %t", leaf)
 			w.write("}")
 			w.write("")
 

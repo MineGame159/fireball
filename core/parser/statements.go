@@ -35,6 +35,8 @@ func (p *parser) statement() (ast.Stmt, *core.Diagnostic) {
 
 func (p *parser) block() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
+
+	// Statements
 	stmts := make([]ast.Stmt, 0, 4)
 
 	for !p.check(scanner.RightBrace) {
@@ -46,19 +48,25 @@ func (p *parser) block() (ast.Stmt, *core.Diagnostic) {
 		stmts = append(stmts, stmt)
 	}
 
+	// Right brace
 	if _, err := p.consume(scanner.RightBrace, "Expected '}'."); err != nil {
 		return nil, err
 	}
 
-	return &ast.Block{
+	// Return
+	stmt := &ast.Block{
 		Token_: token,
 		Stmts:  stmts,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }
 
 func (p *parser) expressionStmt() (ast.Stmt, *core.Diagnostic) {
 	token := p.next
 
+	// Expression
 	expr, err := p.expression()
 	if err != nil {
 		return nil, err
@@ -71,17 +79,24 @@ func (p *parser) expressionStmt() (ast.Stmt, *core.Diagnostic) {
 		return nil, p.error(token, "Invalid statement.")
 	}
 
+	// Semicolon
 	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
 		return nil, err
 	}
 
-	return &ast.Expression{
+	// Return
+	stmt := &ast.Expression{
 		Token_: token,
 		Expr:   expr,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }
 
 func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
+	start := p.current
+
 	// Name
 	name, err := p.consume(scanner.Identifier, "expected variable name")
 	if err != nil {
@@ -116,17 +131,21 @@ func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 		}
 	}
 
+	// Semicolon
 	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
 		return nil, err
 	}
 
 	// Return
-	return &ast.Variable{
+	stmt := &ast.Variable{
 		Type:        type_,
 		Name:        name,
 		Initializer: initializer,
 		InferType:   type_ == nil,
-	}, nil
+	}
+
+	stmt.SetRangeToken(start, p.current)
+	return stmt, nil
 }
 
 func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
@@ -157,12 +176,15 @@ func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	// Return
-	return &ast.If{
+	stmt := &ast.If{
 		Token_:    token,
 		Condition: condition,
 		Then:      then,
 		Else:      else_,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }
 
 func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
@@ -187,11 +209,14 @@ func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	// Return
-	return &ast.For{
+	stmt := &ast.For{
 		Token_:    token,
 		Condition: condition,
 		Body:      body,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }
 
 func (p *parser) return_() (ast.Stmt, *core.Diagnostic) {
@@ -214,32 +239,45 @@ func (p *parser) return_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	// Return
-	return &ast.Return{
+	stmt := &ast.Return{
 		Token_: token,
 		Expr:   expr,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }
 
 func (p *parser) break_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
+	// Semicolon
 	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
 		return nil, err
 	}
 
-	return &ast.Break{
+	// Return
+	stmt := &ast.Break{
 		Token_: token,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }
 
 func (p *parser) continue_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
+	// Semicolon
 	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
 		return nil, err
 	}
 
-	return &ast.Continue{
+	// Return
+	stmt := &ast.Continue{
 		Token_: token,
-	}, nil
+	}
+
+	stmt.SetRangeToken(token, p.current)
+	return stmt, nil
 }

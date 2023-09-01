@@ -152,7 +152,7 @@ func (c *codegen) writeBlock(block string) {
 // Constants
 
 func (c *codegen) getConstant(data string) string {
-	// Get
+	// GetLeaf
 	for _, co := range c.constants {
 		if co.original == data {
 			return co.identifier

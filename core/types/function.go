@@ -45,7 +45,7 @@ func (f *FunctionType) AcceptTypes(visitor Visitor) {
 func (f *FunctionType) String() string {
 	str := strings.Builder{}
 
-	str.WriteRune('(')
+	str.WriteString("func(")
 
 	for i, param := range f.Params {
 		if i > 0 {

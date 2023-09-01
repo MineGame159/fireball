@@ -54,7 +54,8 @@ func (h *handler) Initialize(ctx context.Context, params *protocol.InitializePar
 			DocumentSymbolProvider: &protocol.DocumentSymbolOptions{
 				Label: "Fireball",
 			},
-			InlayHintProvider: &protocol.InlayHintOptions{},
+			HoverProvider:     true,
+			InlayHintProvider: true,
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    "fireball",
@@ -183,7 +184,7 @@ func (h *handler) DocumentLinkResolve(ctx context.Context, params *protocol.Docu
 func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentSymbolParams) (result []interface{}, err error) {
 	h.logger.Debug("handle DocumentSymbol")
 
-	// Get document
+	// GetLeaf document
 	doc, err := h.docs.Get(params.TextDocument.URI)
 	if err != nil {
 		return nil, err
@@ -191,7 +192,7 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 
 	doc.EnsureParsed()
 
-	// Get symbols
+	// GetLeaf symbols
 	symbols := make([]interface{}, 0, 8)
 
 	for _, decl := range doc.Decls {
@@ -200,7 +201,7 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 			symbols = append(symbols, &protocol.DocumentSymbol{
 				Name:           v.Name.Lexeme,
 				Kind:           protocol.SymbolKindStruct,
-				Range:          convertRange(v.Range),
+				Range:          convertRange(v.Range()),
 				SelectionRange: convertRange(ast.TokenToRange(v.Name)),
 			})
 		} else if v, ok := decl.(*ast.Func); ok {
@@ -229,7 +230,7 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 				Name:           v.Name.Lexeme,
 				Detail:         signature.String(),
 				Kind:           protocol.SymbolKindFunction,
-				Range:          convertRange(v.Range),
+				Range:          convertRange(v.Range()),
 				SelectionRange: convertRange(ast.TokenToRange(v.Name)),
 			})
 		}
@@ -251,7 +252,59 @@ func (h *handler) Formatting(ctx context.Context, params *protocol.DocumentForma
 }
 
 func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (result *protocol.Hover, err error) {
-	return nil, errors.New("not implemented")
+	h.logger.Debug("handle Hover")
+
+	// GetLeaf document
+	doc, err := h.docs.Get(params.TextDocument.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	doc.EnsureChecked()
+
+	// Convert position
+	pos := ast.Pos{
+		Line:   int(params.Position.Line + 1),
+		Column: int(params.Position.Character),
+	}
+
+	// GetLeaf node under cursor
+	for _, decl := range doc.Decls {
+		node := ast.GetLeaf(decl, pos)
+
+		if expr, ok := node.(ast.Expr); ok {
+			// ast.Expt
+			text := expr.Type().String()
+
+			// Ignore literal expressions
+			if _, ok := expr.(*ast.Literal); ok {
+				text = ""
+			}
+
+			// Return
+			if text != "" {
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.PlainText,
+						Value: text,
+					},
+					Range: convertRangePtr(expr.Range()),
+				}, nil
+			}
+		} else if variable, ok := node.(*ast.Variable); ok {
+			// ast.Variable
+			return &protocol.Hover{
+				Contents: protocol.MarkupContent{
+					Kind:  protocol.PlainText,
+					Value: variable.Type.String(),
+				},
+				Range: convertRangePtr(ast.TokenToRange(variable.Name)),
+			}, nil
+		}
+	}
+
+	// Return nil
+	return nil, nil
 }
 
 func (h *handler) Implementation(ctx context.Context, params *protocol.ImplementationParams) (result []protocol.Location, err error) {
@@ -345,7 +398,7 @@ func (h *handler) OutgoingCalls(ctx context.Context, params *protocol.CallHierar
 func (h *handler) SemanticTokensFull(ctx context.Context, params *protocol.SemanticTokensParams) (result *protocol.SemanticTokens, err error) {
 	h.logger.Debug("handle SemanticTokensFull")
 
-	// Get document
+	// GetLeaf document
 	doc, err := h.docs.Get(params.TextDocument.URI)
 	if err != nil {
 		return nil, err
@@ -353,7 +406,7 @@ func (h *handler) SemanticTokensFull(ctx context.Context, params *protocol.Seman
 
 	doc.EnsureParsed()
 
-	// Get semantic tokens
+	// GetLeaf semantic tokens
 	data := highlight(doc.Decls)
 
 	return &protocol.SemanticTokens{
@@ -384,7 +437,7 @@ func (h *handler) Moniker(ctx context.Context, params *protocol.MonikerParams) (
 func (h *handler) InlayHint(ctx context.Context, params *protocol.InlayHintParams) (result []protocol.InlayHint, err error) {
 	h.logger.Debug("handle InlayHint")
 
-	// Get document
+	// GetLeaf document
 	doc, err := h.docs.Get(params.TextDocument.URI)
 	if err != nil {
 		return nil, err
@@ -392,7 +445,7 @@ func (h *handler) InlayHint(ctx context.Context, params *protocol.InlayHintParam
 
 	doc.EnsureParsed()
 
-	// Get hints
+	// GetLeaf hints
 	hints := make([]protocol.InlayHint, 0, 8)
 
 	for _, decl := range doc.Decls {
@@ -418,6 +471,13 @@ func (h *handler) Request(ctx context.Context, method string, params interface{}
 
 func convertRange(r ast.Range) protocol.Range {
 	return protocol.Range{
+		Start: convertPos(r.Start),
+		End:   convertPos(r.End),
+	}
+}
+
+func convertRangePtr(r ast.Range) *protocol.Range {
+	return &protocol.Range{
 		Start: convertPos(r.Start),
 		End:   convertPos(r.End),
 	}
