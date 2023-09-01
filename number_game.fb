@@ -17,11 +17,11 @@ func main() i32 {
         var guess = parseInt(ptr);
 
         // Compare guess
-        if guess == target {
+        if (guess == target) {
             printf("Congratulations, you win!\n\n");
             return 0;
         }
-        else if guess > target {
+        else if (guess > target) {
             printf("Wrong guess, you guessed too high\n\n");
         }
         else {
@@ -39,11 +39,11 @@ func parseInt(str *u8) i32 {
     for {
         var ch = str[i];
 
-        if ch == '\0' {
+        if (ch == '\0') {
             break;
         }
 
-        if ch >= '0' && ch <= '9' {
+        if (ch >= '0' && ch <= '9') {
             num *= 10;
             num += (ch - '0') as i32;
         }
@@ -60,7 +60,7 @@ func input(str *u8, length i32) {
     for {
         var ch = getchar();
 
-        if ch == 10 {
+        if (ch == 10) {
             str[i] = '\0';
             return;
         }
@@ -69,7 +69,7 @@ func input(str *u8, length i32) {
 
         i += 1;
 
-        if i >= length - 1 {
+        if (i >= length - 1) {
             return;
         }
     }

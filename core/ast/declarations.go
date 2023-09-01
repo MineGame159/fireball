@@ -60,19 +60,23 @@ func (s *Struct) Accept(visitor DeclVisitor) {
 	visitor.VisitStruct(s)
 }
 
-func (s *Struct) AcceptChildren(acceptor Acceptor) {
+func (s *Struct) AcceptChildren(visitor Acceptor) {
 }
 
 func (s *Struct) AcceptTypes(visitor types.Visitor) {
-	for i := range s.Fields {
-		visitor.VisitType(s.Fields[i].Type)
+	for i_ := range s.Fields {
+		if s.Fields[i_].Type != nil {
+			visitor.VisitType(s.Fields[i_].Type)
+		}
 	}
-	visitor.VisitType(s.Type)
+	if s.Type != nil {
+		visitor.VisitType(s.Type)
+	}
 }
 
 func (s *Struct) AcceptTypesPtr(visitor types.PtrVisitor) {
-	for i := range s.Fields {
-		visitor.VisitType(&s.Fields[i].Type)
+	for i_ := range s.Fields {
+		visitor.VisitType(&s.Fields[i_].Type)
 	}
 	visitor.VisitType(&s.Type)
 }
@@ -134,22 +138,28 @@ func (f *Func) Accept(visitor DeclVisitor) {
 	visitor.VisitFunc(f)
 }
 
-func (f *Func) AcceptChildren(acceptor Acceptor) {
-	for _, v := range f.Body {
-		acceptor.AcceptStmt(v)
+func (f *Func) AcceptChildren(visitor Acceptor) {
+	for i_ := range f.Body {
+		if f.Body[i_] != nil {
+			visitor.AcceptStmt(f.Body[i_])
+		}
 	}
 }
 
 func (f *Func) AcceptTypes(visitor types.Visitor) {
-	for i := range f.Params {
-		visitor.VisitType(f.Params[i].Type)
+	for i_ := range f.Params {
+		if f.Params[i_].Type != nil {
+			visitor.VisitType(f.Params[i_].Type)
+		}
 	}
-	visitor.VisitType(f.Returns)
+	if f.Returns != nil {
+		visitor.VisitType(f.Returns)
+	}
 }
 
 func (f *Func) AcceptTypesPtr(visitor types.PtrVisitor) {
-	for i := range f.Params {
-		visitor.VisitType(&f.Params[i].Type)
+	for i_ := range f.Params {
+		visitor.VisitType(&f.Params[i_].Type)
 	}
 	visitor.VisitType(&f.Returns)
 }

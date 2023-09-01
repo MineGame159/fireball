@@ -9,6 +9,7 @@ import "fireball/core/scanner"
 type ExprVisitor interface {
 	VisitGroup(expr *Group)
 	VisitLiteral(expr *Literal)
+	VisitInitializer(expr *Initializer)
 	VisitUnary(expr *Unary)
 	VisitBinary(expr *Binary)
 	VisitLogical(expr *Logical)
@@ -72,14 +73,16 @@ func (g *Group) Accept(visitor ExprVisitor) {
 	visitor.VisitGroup(g)
 }
 
-func (g *Group) AcceptChildren(acceptor Acceptor) {
+func (g *Group) AcceptChildren(visitor Acceptor) {
 	if g.Expr != nil {
-		acceptor.AcceptExpr(g.Expr)
+		visitor.AcceptExpr(g.Expr)
 	}
 }
 
 func (g *Group) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(g.type_)
+	if g.type_ != nil {
+		visitor.VisitType(g.type_)
+	}
 }
 
 func (g *Group) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -140,11 +143,13 @@ func (l *Literal) Accept(visitor ExprVisitor) {
 	visitor.VisitLiteral(l)
 }
 
-func (l *Literal) AcceptChildren(acceptor Acceptor) {
+func (l *Literal) AcceptChildren(visitor Acceptor) {
 }
 
 func (l *Literal) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(l.type_)
+	if l.type_ != nil {
+		visitor.VisitType(l.type_)
+	}
 }
 
 func (l *Literal) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -161,6 +166,86 @@ func (l *Literal) Type() types.Type {
 
 func (l *Literal) SetType(type_ types.Type) {
 	l.type_ = type_
+}
+
+// Initializer
+
+type Initializer struct {
+	range_ core.Range
+	type_  types.Type
+
+	Name   scanner.Token
+	Fields []InitField
+}
+
+func (i *Initializer) Token() scanner.Token {
+	return i.Name
+}
+
+func (i *Initializer) Range() core.Range {
+	return i.range_
+}
+
+func (i *Initializer) SetRangeToken(start, end scanner.Token) {
+	i.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
+	}
+}
+
+func (i *Initializer) SetRangePos(start, end core.Pos) {
+	i.range_ = core.Range{
+		Start: start,
+		End:   end,
+	}
+}
+
+func (i *Initializer) SetRangeNode(start, end Node) {
+	i.range_ = core.Range{
+		Start: start.Range().Start,
+		End:   end.Range().End,
+	}
+}
+
+func (i *Initializer) Accept(visitor ExprVisitor) {
+	visitor.VisitInitializer(i)
+}
+
+func (i *Initializer) AcceptChildren(visitor Acceptor) {
+	for i_ := range i.Fields {
+		if i.Fields[i_].Value != nil {
+			visitor.AcceptExpr(i.Fields[i_].Value)
+		}
+	}
+}
+
+func (i *Initializer) AcceptTypes(visitor types.Visitor) {
+	if i.type_ != nil {
+		visitor.VisitType(i.type_)
+	}
+}
+
+func (i *Initializer) AcceptTypesPtr(visitor types.PtrVisitor) {
+	visitor.VisitType(&i.type_)
+}
+
+func (i *Initializer) Leaf() bool {
+	return false
+}
+
+func (i *Initializer) Type() types.Type {
+	return i.type_
+}
+
+func (i *Initializer) SetType(type_ types.Type) {
+	i.type_ = type_
+}
+
+// InitField
+
+type InitField struct {
+	Name  scanner.Token
+	Value Expr
 }
 
 // Unary
@@ -206,14 +291,16 @@ func (u *Unary) Accept(visitor ExprVisitor) {
 	visitor.VisitUnary(u)
 }
 
-func (u *Unary) AcceptChildren(acceptor Acceptor) {
+func (u *Unary) AcceptChildren(visitor Acceptor) {
 	if u.Right != nil {
-		acceptor.AcceptExpr(u.Right)
+		visitor.AcceptExpr(u.Right)
 	}
 }
 
 func (u *Unary) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(u.type_)
+	if u.type_ != nil {
+		visitor.VisitType(u.type_)
+	}
 }
 
 func (u *Unary) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -276,17 +363,19 @@ func (b *Binary) Accept(visitor ExprVisitor) {
 	visitor.VisitBinary(b)
 }
 
-func (b *Binary) AcceptChildren(acceptor Acceptor) {
+func (b *Binary) AcceptChildren(visitor Acceptor) {
 	if b.Left != nil {
-		acceptor.AcceptExpr(b.Left)
+		visitor.AcceptExpr(b.Left)
 	}
 	if b.Right != nil {
-		acceptor.AcceptExpr(b.Right)
+		visitor.AcceptExpr(b.Right)
 	}
 }
 
 func (b *Binary) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(b.type_)
+	if b.type_ != nil {
+		visitor.VisitType(b.type_)
+	}
 }
 
 func (b *Binary) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -349,17 +438,19 @@ func (l *Logical) Accept(visitor ExprVisitor) {
 	visitor.VisitLogical(l)
 }
 
-func (l *Logical) AcceptChildren(acceptor Acceptor) {
+func (l *Logical) AcceptChildren(visitor Acceptor) {
 	if l.Left != nil {
-		acceptor.AcceptExpr(l.Left)
+		visitor.AcceptExpr(l.Left)
 	}
 	if l.Right != nil {
-		acceptor.AcceptExpr(l.Right)
+		visitor.AcceptExpr(l.Right)
 	}
 }
 
 func (l *Logical) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(l.type_)
+	if l.type_ != nil {
+		visitor.VisitType(l.type_)
+	}
 }
 
 func (l *Logical) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -420,11 +511,13 @@ func (i *Identifier) Accept(visitor ExprVisitor) {
 	visitor.VisitIdentifier(i)
 }
 
-func (i *Identifier) AcceptChildren(acceptor Acceptor) {
+func (i *Identifier) AcceptChildren(visitor Acceptor) {
 }
 
 func (i *Identifier) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(i.type_)
+	if i.type_ != nil {
+		visitor.VisitType(i.type_)
+	}
 }
 
 func (i *Identifier) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -487,17 +580,19 @@ func (a *Assignment) Accept(visitor ExprVisitor) {
 	visitor.VisitAssignment(a)
 }
 
-func (a *Assignment) AcceptChildren(acceptor Acceptor) {
+func (a *Assignment) AcceptChildren(visitor Acceptor) {
 	if a.Assignee != nil {
-		acceptor.AcceptExpr(a.Assignee)
+		visitor.AcceptExpr(a.Assignee)
 	}
 	if a.Value != nil {
-		acceptor.AcceptExpr(a.Value)
+		visitor.AcceptExpr(a.Value)
 	}
 }
 
 func (a *Assignment) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(a.type_)
+	if a.type_ != nil {
+		visitor.VisitType(a.type_)
+	}
 }
 
 func (a *Assignment) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -559,14 +654,16 @@ func (c *Cast) Accept(visitor ExprVisitor) {
 	visitor.VisitCast(c)
 }
 
-func (c *Cast) AcceptChildren(acceptor Acceptor) {
+func (c *Cast) AcceptChildren(visitor Acceptor) {
 	if c.Expr != nil {
-		acceptor.AcceptExpr(c.Expr)
+		visitor.AcceptExpr(c.Expr)
 	}
 }
 
 func (c *Cast) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(c.type_)
+	if c.type_ != nil {
+		visitor.VisitType(c.type_)
+	}
 }
 
 func (c *Cast) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -629,17 +726,21 @@ func (c *Call) Accept(visitor ExprVisitor) {
 	visitor.VisitCall(c)
 }
 
-func (c *Call) AcceptChildren(acceptor Acceptor) {
+func (c *Call) AcceptChildren(visitor Acceptor) {
 	if c.Callee != nil {
-		acceptor.AcceptExpr(c.Callee)
+		visitor.AcceptExpr(c.Callee)
 	}
-	for _, v := range c.Args {
-		acceptor.AcceptExpr(v)
+	for i_ := range c.Args {
+		if c.Args[i_] != nil {
+			visitor.AcceptExpr(c.Args[i_])
+		}
 	}
 }
 
 func (c *Call) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(c.type_)
+	if c.type_ != nil {
+		visitor.VisitType(c.type_)
+	}
 }
 
 func (c *Call) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -702,17 +803,19 @@ func (i *Index) Accept(visitor ExprVisitor) {
 	visitor.VisitIndex(i)
 }
 
-func (i *Index) AcceptChildren(acceptor Acceptor) {
+func (i *Index) AcceptChildren(visitor Acceptor) {
 	if i.Value != nil {
-		acceptor.AcceptExpr(i.Value)
+		visitor.AcceptExpr(i.Value)
 	}
 	if i.Index != nil {
-		acceptor.AcceptExpr(i.Index)
+		visitor.AcceptExpr(i.Index)
 	}
 }
 
 func (i *Index) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(i.type_)
+	if i.type_ != nil {
+		visitor.VisitType(i.type_)
+	}
 }
 
 func (i *Index) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -774,14 +877,16 @@ func (m *Member) Accept(visitor ExprVisitor) {
 	visitor.VisitMember(m)
 }
 
-func (m *Member) AcceptChildren(acceptor Acceptor) {
+func (m *Member) AcceptChildren(visitor Acceptor) {
 	if m.Value != nil {
-		acceptor.AcceptExpr(m.Value)
+		visitor.AcceptExpr(m.Value)
 	}
 }
 
 func (m *Member) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(m.type_)
+	if m.type_ != nil {
+		visitor.VisitType(m.type_)
+	}
 }
 
 func (m *Member) AcceptTypesPtr(visitor types.PtrVisitor) {

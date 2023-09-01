@@ -1,16 +1,15 @@
-struct Yo {}
+struct Vec2 {
+    x i32
+    y i32
+}
 
 func main() i32 {
-    printf("true  || true  = %d\n", true || true);
-    printf("true  || false = %d\n", true || false);
-    printf("false || true  = %d\n", false || true);
-    printf("false || false = %d\n", false || false);
-    printf("\n");
-    printf("true  && true  = %d\n", true && true);
-    printf("true  && false = %d\n", true && false);
-    printf("false && true  = %d\n", false && true);
-    printf("false && false = %d\n", false && false);
+    var point = Vec2 {
+        x: 1,
+        y: 5
+    };
 
+    printf("X: %d, Y: %d\n", point.x, point.y);
     return 0;
 }
 

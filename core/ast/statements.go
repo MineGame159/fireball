@@ -65,9 +65,11 @@ func (b *Block) Accept(visitor StmtVisitor) {
 	visitor.VisitBlock(b)
 }
 
-func (b *Block) AcceptChildren(acceptor Acceptor) {
-	for _, v := range b.Stmts {
-		acceptor.AcceptStmt(v)
+func (b *Block) AcceptChildren(visitor Acceptor) {
+	for i_ := range b.Stmts {
+		if b.Stmts[i_] != nil {
+			visitor.AcceptStmt(b.Stmts[i_])
+		}
 	}
 }
 
@@ -123,9 +125,9 @@ func (e *Expression) Accept(visitor StmtVisitor) {
 	visitor.VisitExpression(e)
 }
 
-func (e *Expression) AcceptChildren(acceptor Acceptor) {
+func (e *Expression) AcceptChildren(visitor Acceptor) {
 	if e.Expr != nil {
-		acceptor.AcceptExpr(e.Expr)
+		visitor.AcceptExpr(e.Expr)
 	}
 }
 
@@ -183,14 +185,16 @@ func (v *Variable) Accept(visitor StmtVisitor) {
 	visitor.VisitVariable(v)
 }
 
-func (v *Variable) AcceptChildren(acceptor Acceptor) {
+func (v *Variable) AcceptChildren(visitor Acceptor) {
 	if v.Initializer != nil {
-		acceptor.AcceptExpr(v.Initializer)
+		visitor.AcceptExpr(v.Initializer)
 	}
 }
 
 func (v *Variable) AcceptTypes(visitor types.Visitor) {
-	visitor.VisitType(v.Type)
+	if v.Type != nil {
+		visitor.VisitType(v.Type)
+	}
 }
 
 func (v *Variable) AcceptTypesPtr(visitor types.PtrVisitor) {
@@ -245,15 +249,15 @@ func (i *If) Accept(visitor StmtVisitor) {
 	visitor.VisitIf(i)
 }
 
-func (i *If) AcceptChildren(acceptor Acceptor) {
+func (i *If) AcceptChildren(visitor Acceptor) {
 	if i.Condition != nil {
-		acceptor.AcceptExpr(i.Condition)
+		visitor.AcceptExpr(i.Condition)
 	}
 	if i.Then != nil {
-		acceptor.AcceptStmt(i.Then)
+		visitor.AcceptStmt(i.Then)
 	}
 	if i.Else != nil {
-		acceptor.AcceptStmt(i.Else)
+		visitor.AcceptStmt(i.Else)
 	}
 }
 
@@ -310,12 +314,12 @@ func (f *For) Accept(visitor StmtVisitor) {
 	visitor.VisitFor(f)
 }
 
-func (f *For) AcceptChildren(acceptor Acceptor) {
+func (f *For) AcceptChildren(visitor Acceptor) {
 	if f.Condition != nil {
-		acceptor.AcceptExpr(f.Condition)
+		visitor.AcceptExpr(f.Condition)
 	}
 	if f.Body != nil {
-		acceptor.AcceptStmt(f.Body)
+		visitor.AcceptStmt(f.Body)
 	}
 }
 
@@ -371,9 +375,9 @@ func (r *Return) Accept(visitor StmtVisitor) {
 	visitor.VisitReturn(r)
 }
 
-func (r *Return) AcceptChildren(acceptor Acceptor) {
+func (r *Return) AcceptChildren(visitor Acceptor) {
 	if r.Expr != nil {
-		acceptor.AcceptExpr(r.Expr)
+		visitor.AcceptExpr(r.Expr)
 	}
 }
 
@@ -428,7 +432,7 @@ func (b *Break) Accept(visitor StmtVisitor) {
 	visitor.VisitBreak(b)
 }
 
-func (b *Break) AcceptChildren(acceptor Acceptor) {
+func (b *Break) AcceptChildren(visitor Acceptor) {
 }
 
 func (b *Break) AcceptTypes(visitor types.Visitor) {
@@ -482,7 +486,7 @@ func (c *Continue) Accept(visitor StmtVisitor) {
 	visitor.VisitContinue(c)
 }
 
-func (c *Continue) AcceptChildren(acceptor Acceptor) {
+func (c *Continue) AcceptChildren(visitor Acceptor) {
 }
 
 func (c *Continue) AcceptTypes(visitor types.Visitor) {

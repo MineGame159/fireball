@@ -53,6 +53,44 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 	}
 }
 
+func (c *checker) VisitInitializer(expr *ast.Initializer) {
+	expr.AcceptChildren(c)
+
+	// Check struct
+	type_, ok := c.structs[expr.Name.Lexeme]
+
+	if !ok {
+		c.errorToken(expr.Name, "Unknown type '%s'.", expr.Name)
+		expr.SetType(types.Primitive(types.Void, core.Range{}))
+
+		return
+	}
+
+	expr.SetType(type_)
+
+	// Check fields
+	assignedFields := core.NewSet[string]()
+
+	for _, initField := range expr.Fields {
+		// Check name collision
+		if !assignedFields.Add(initField.Name.Lexeme) {
+			c.errorToken(initField.Name, "Field with the name '%s' was already assigned.", initField.Name)
+		}
+
+		// Check field
+		_, field := type_.GetField(initField.Name.Lexeme)
+		if field == nil {
+			c.errorToken(initField.Name, "Field with the name '%s' doesn't exist on the struct '%s'.", initField.Name, expr.Name)
+			continue
+		}
+
+		// Check value type
+		if !initField.Value.Type().CanAssignTo(field.Type) {
+			c.errorRange(initField.Value.Range(), "Expected a '%s' but got '%s'.", field.Type, initField.Value.Type())
+		}
+	}
+}
+
 func (c *checker) VisitUnary(expr *ast.Unary) {
 	expr.AcceptChildren(c)
 

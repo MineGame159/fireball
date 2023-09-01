@@ -123,11 +123,9 @@ func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 			return nil, err
 		}
 
-		if !p.check(scanner.Semicolon) {
-			initializer, err = p.expression()
-			if err != nil {
-				return nil, err
-			}
+		initializer, err = p.expression()
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -151,9 +149,19 @@ func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
+	// Left paren
+	if _, err := p.consume(scanner.LeftParen, "Expected '(' before condition."); err != nil {
+		return nil, err
+	}
+
 	// Condition
 	condition, err := p.expression()
 	if err != nil {
+		return nil, err
+	}
+
+	// Right paren
+	if _, err := p.consume(scanner.RightParen, "Expected ')' before condition."); err != nil {
 		return nil, err
 	}
 
@@ -190,16 +198,22 @@ func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
 func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
 	token := p.current
 
-	// Condition
 	var condition ast.Expr
 
-	if !p.check(scanner.LeftBrace) {
+	// Left paren
+	if p.match(scanner.LeftParen) {
+		// Condition
 		expr, err := p.expression()
 		if err != nil {
 			return nil, err
 		}
 
 		condition = expr
+
+		// Right paren
+		if _, err := p.consume(scanner.RightParen, "Expected ')' before condition."); err != nil {
+			return nil, err
+		}
 	}
 
 	// Body

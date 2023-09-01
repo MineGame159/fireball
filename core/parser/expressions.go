@@ -411,11 +411,19 @@ func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 
 	// abc
 	if p.match(scanner.Identifier) {
-		expr := &ast.Identifier{
-			Identifier: p.current,
+		token := p.current
+
+		// Initializer
+		if p.match(scanner.LeftBrace) {
+			return p.initializer(token)
 		}
 
-		expr.SetRangeToken(p.current, p.current)
+		// abc
+		expr := &ast.Identifier{
+			Identifier: token,
+		}
+
+		expr.SetRangeToken(token, token)
 		return expr, nil
 	}
 
@@ -430,8 +438,7 @@ func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Right paren
-		_, err = p.consume(scanner.RightParen, "Expected ')' after expression.")
-		if err != nil {
+		if _, err := p.consume(scanner.RightParen, "Expected ')' after expression."); err != nil {
 			return nil, err
 		}
 
@@ -447,4 +454,55 @@ func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 
 	// Error
 	return nil, p.error(p.next, "Expected expression.")
+}
+
+func (p *parser) initializer(name scanner.Token) (ast.Expr, *core.Diagnostic) {
+	// Fields
+	fields := make([]ast.InitField, 0, 4)
+
+	for !p.check(scanner.RightBrace) {
+		// Comma
+		if len(fields) > 0 {
+			if _, err := p.consume(scanner.Comma, "Expected ',' between fields."); err != nil {
+				return nil, err
+			}
+		}
+
+		// Name
+		name, err := p.consume(scanner.Identifier, "Expected field name.")
+		if err != nil {
+			return nil, err
+		}
+
+		// Colon
+		if _, err := p.consume(scanner.Colon, "Expected ':' after field name."); err != nil {
+			return nil, err
+		}
+
+		// Value
+		value, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
+
+		// Add
+		fields = append(fields, ast.InitField{
+			Name:  name,
+			Value: value,
+		})
+	}
+
+	// Right brace
+	if _, err := p.consume(scanner.RightBrace, "Expected '}' after initializer fields."); err != nil {
+		return nil, err
+	}
+
+	// Return
+	expr := &ast.Initializer{
+		Name:   name,
+		Fields: fields,
+	}
+
+	expr.SetRangeToken(name, p.current)
+	return expr, nil
 }

@@ -6,11 +6,11 @@ struct Data {
 }
 
 func main() i32 {
-    var data Data;
-
-    data.extension = ".go";
-    data.files = 0;
-    data.lines = 0;
+    var data = Data {
+        extension: ".go",
+        files: 0,
+        lines: 0
+    };
 
     directory(&data, ".");
 
@@ -26,19 +26,19 @@ func directory(data *Data, path *u8) {
     for {
         var entry = readdir(dir);
 
-        if entry == nil {
+        if (entry == nil) {
             break;
         }
 
         var child = combine(path, &entry.name[0]);
 
-        if entry.type == 4 {
+        if (entry.type == 4) {
             // Directory
-            if !equals(&entry.name[0], ".") && !equals(&entry.name[0], "..") {
+            if (!equals(&entry.name[0], ".") && !equals(&entry.name[0], "..")) {
                 directory(data, child);
             }
         }
-        else if entry.type == 8 {
+        else if (entry.type == 8) {
             // File
             file(data, child);
         }
@@ -50,7 +50,7 @@ func directory(data *Data, path *u8) {
 }
 
 func file(data *Data, path *u8) {
-    if endsWith(path, data.extension) {
+    if (endsWith(path, data.extension)) {
         data.files += 1;
         data.lines += getLineCount(path);
     }
@@ -65,7 +65,7 @@ func getLineCount(path *u8) i32 {
     for {
         var read = fread(&str[0], 1 as u64, 1024 as u64, stream) as i32;
 
-        if read == 0 {
+        if (read == 0) {
             break;
         }
 
@@ -81,11 +81,11 @@ func count(str *u8, len i32, char u8) i32 {
     var cnt = 0;
 
     for {
-        if i >= len {
+        if (i >= len) {
             break;
         }
 
-        if str[i] == char {
+        if (str[i] == char) {
             cnt += 1;
         }
 
@@ -116,7 +116,7 @@ func length(str *u8) i32 {
     for {
         var ch = str[i];
 
-        if ch == '\0' {
+        if (ch == '\0') {
             break;
         }
 
@@ -133,11 +133,11 @@ func equals(str1 *u8, str2 *u8) bool {
         var ch1 = str1[i];
         var ch2 = str2[i];
 
-        if ch1 != ch2 {
+        if (ch1 != ch2) {
             return false;
         }
 
-        if ch1 == '\0' && ch2 == '\0' {
+        if (ch1 == '\0' && ch2 == '\0') {
             break;
         }
 
@@ -151,18 +151,18 @@ func endsWith(str *u8, end *u8) bool {
     var strLen = length(str);
     var endLen = length(end);
 
-    if endLen > strLen {
+    if (endLen > strLen) {
         return false;
     }
 
     var i = 0;
 
     for {
-        if i >= endLen {
+        if (i >= endLen) {
             break;
         }
 
-        if str[strLen - 1 - i] != end[endLen - 1 - i] {
+        if (str[strLen - 1 - i] != end[endLen - 1 - i]) {
             return false;
         }
 

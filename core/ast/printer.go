@@ -124,6 +124,18 @@ func (p *printer) VisitLiteral(expr *Literal) {
 	p.print(expr.Value.Lexeme)
 }
 
+func (p *printer) VisitInitializer(expr *Initializer) {
+	p.print("%s {}", expr.Name)
+	p.depth++
+
+	for _, field := range expr.Fields {
+		p.print("%s:", field.Name)
+		p.acceptExpr(field.Value)
+	}
+
+	p.depth--
+}
+
 func (p *printer) VisitUnary(expr *Unary) {
 	p.print(expr.Op.Lexeme)
 	p.acceptExpr(expr.Right)

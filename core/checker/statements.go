@@ -23,6 +23,7 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 	if stmt.Type == nil {
 		if stmt.Initializer == nil {
 			c.errorToken(stmt.Name, "Variable with no initializer needs to have an explicit type.")
+			stmt.Type = types.Primitive(types.Void, core.Range{})
 		} else {
 			stmt.Type = stmt.Initializer.Type().Copy()
 		}

@@ -60,6 +60,31 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	c.exprValue = c.locals.constant(raw, expr.Type())
 }
 
+func (c *codegen) VisitInitializer(expr *ast.Initializer) {
+	// TODO: Use LLVM's structure literal syntax if possible, aka if all fields are assigned
+	struct_, _ := expr.Type().(*types.StructType)
+	type_ := c.getType(expr.Type())
+
+	// Allocate struct
+	res := c.locals.unnamed(expr.Type())
+	c.writeFmt("%s = alloca %s\n", res, type_)
+
+	// Assign fields
+	for _, field := range expr.Fields {
+		i, _ := struct_.GetField(field.Name.Lexeme)
+
+		value := c.load(c.acceptExpr(field.Value), field.Value.Type())
+
+		ptr := c.locals.unnamed(expr.Type())
+		c.writeFmt("%s = getelementptr inbounds %s, ptr %s, i32 0, i32 %d\n", ptr, type_, res, i)
+		c.writeFmt("store %s %s, ptr %s\n", c.getType(field.Value.Type()), value, ptr)
+	}
+
+	// Return
+	res.needsLoading = true
+	c.exprValue = res
+}
+
 func (c *codegen) VisitUnary(expr *ast.Unary) {
 	c.acceptExpr(expr.Right)
 

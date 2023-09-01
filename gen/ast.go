@@ -157,6 +157,23 @@ var exprs = []item{
 		ast:   true,
 	},
 	{
+		name: "Initializer",
+		fields: []field{
+			{name: "Name", type_: "Token"},
+			{name: "Fields", type_: "[]InitField"},
+		},
+		token: "Name",
+		ast:   true,
+	},
+	{
+		name: "InitField",
+		fields: []field{
+			{name: "Name", type_: "Token"},
+			{name: "Value", type_: "Expr"},
+		},
+		ast: false,
+	},
+	{
 		name: "Unary",
 		fields: []field{
 			{name: "Op", type_: "Token"},
@@ -383,41 +400,19 @@ func generate(w *writer, kind string, items []item) {
 			w.write("")
 
 			// AcceptChildren
-			w.write("%s AcceptChildren(acceptor Acceptor) {", method)
-			leaf := true
-
-			for _, f := range item.fields {
-				type_ := f.type_
-				array := false
-
-				if strings.HasPrefix(type_, "[]") {
-					type_ = type_[2:]
-					array = true
-				}
-
-				if type_ == "Decl" || type_ == "Stmt" || type_ == "Expr" {
-					if array {
-						w.write("for _, v := range %c.%s {", short, f.name)
-						w.write("acceptor.Accept%s(v)", type_)
-						w.write("}")
-					} else {
-						w.write("if %c.%s != nil {", short, f.name)
-						w.write("acceptor.Accept%s(%c.%s)", type_, short, f.name)
-						w.write("}")
-					}
-
-					leaf = false
-				}
-			}
-
-			w.write("}")
-			w.write("")
+			leaf := !genVisitor(w, kind, items, item, short, method, "AcceptChildren", false, "Acceptor", "Accept?", func(s string) bool {
+				return s == "Decl" || s == "Stmt" || s == "Expr"
+			})
 
 			// AcceptTypes
-			genAcceptTypes(w, kind, items, item, short, method, false)
+			genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(s string) bool {
+				return s == "Type"
+			})
 
 			// AcceptTypesPtr
-			genAcceptTypes(w, kind, items, item, short, method, true)
+			genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(s string) bool {
+				return s == "Type"
+			})
 
 			// Leaf
 			w.write("%s Leaf() bool {", method)
@@ -443,63 +438,89 @@ func generate(w *writer, kind string, items []item) {
 	}
 }
 
-func genAcceptTypes(w *writer, kind string, items []item, item item, short uint8, method string, ptr bool) {
-	if ptr {
-		w.write("%s AcceptTypesPtr(visitor types.PtrVisitor) {", method)
-	} else {
-		w.write("%s AcceptTypes(visitor types.Visitor) {", method)
-	}
+func genVisitor(w *writer, kind string, items []item, item item, short uint8, method string, name string, ptr bool, visitor string, visitFormat string, target func(string) bool) bool {
+	w.write("%s %s(visitor %s) {", method, name, visitor)
 
+	hasChildren := false
 	ptrStr := ""
 
 	if ptr {
 		ptrStr = "&"
 	}
 
-	if kind == "Expr" {
-		w.write("visitor.VisitType(%s%c.type_)", ptrStr, short)
+	if kind == "Expr" && target("Type") {
+		visit(w, ptr, "VisitType", fmt.Sprintf("%s%c.type_", ptrStr, short))
 	}
 
 	for _, f := range item.fields {
 		if strings.HasPrefix(f.type_, "[]") {
 			type_ := f.type_[2:]
 
-			if type_ == "Type" {
-				w.write("for i := range %c.%s {", short, f.name)
-				w.write("visitor.VisitType(%s%c.%s[i])", ptrStr, short, f.name)
+			if target(type_) {
+				w.write("for i_ := range %c.%s {", short, f.name)
+				visit(w, ptr, formatVisit(visitFormat, type_), fmt.Sprintf("%s%c.%s[i_]", ptrStr, short, f.name))
 				w.write("}")
+
+				hasChildren = true
 			} else {
 				fi := getItem(items, type_)
 
-				if fi != nil && fi.hasTypeField() {
-					w.write("for i := range %c.%s {", short, f.name)
+				if fi != nil && fi.hasFieldWithType(target) {
+					w.write("for i_ := range %c.%s {", short, f.name)
 
 					for _, fif := range fi.fields {
-						if fif.type_ == "Type" {
-							w.write("visitor.VisitType(%s%c.%s[i].%s)", ptrStr, short, f.name, fif.name)
+						if target(fif.type_) {
+							visit(w, ptr, formatVisit(visitFormat, fif.type_), fmt.Sprintf("%s%c.%s[i_].%s", ptrStr, short, f.name, fif.name))
 						}
 					}
 
 					w.write("}")
+
+					hasChildren = true
 				}
 			}
-		} else if f.type_ == "Type" {
-			w.write("visitor.VisitType(%s%c.%s)", ptrStr, short, f.name)
+		} else if target(f.type_) {
+			visit(w, ptr, formatVisit(visitFormat, f.type_), fmt.Sprintf("%s%c.%s", ptrStr, short, f.name))
+			hasChildren = true
 		} else {
 			fi := getItem(items, f.type_)
 
-			if fi != nil && fi.hasTypeField() {
+			if fi != nil && fi.hasFieldWithType(target) {
 				for _, fif := range fi.fields {
-					if fif.type_ == "Type" {
-						w.write("visitor.VisitType(%s%c.%s.%s)", ptrStr, short, f.name, fif.name)
+					if target(fif.type_) {
+						visit(w, ptr, formatVisit(visitFormat, fif.type_), fmt.Sprintf("%s%c.%s.%s", ptrStr, short, f.name, fif.name))
 					}
 				}
+
+				hasChildren = true
 			}
 		}
 	}
 
 	w.write("}")
 	w.write("")
+
+	return hasChildren
+}
+
+func visit(w *writer, ptr bool, visit string, arg string) {
+	if !ptr {
+		w.write("if %s != nil {", arg)
+	}
+
+	w.write("visitor.%s(%s)", visit, arg)
+
+	if !ptr {
+		w.write("}")
+	}
+}
+
+func formatVisit(format, kind string) string {
+	if strings.HasSuffix(format, "?") {
+		format = format[:len(format)-1] + kind
+	}
+
+	return format
 }
 
 func getItem(items []item, name string) *item {
@@ -512,9 +533,9 @@ func getItem(items []item, name string) *item {
 	return nil
 }
 
-func (i *item) hasTypeField() bool {
+func (i *item) hasFieldWithType(target func(string) bool) bool {
 	for _, f := range i.fields {
-		if f.type_ == "Type" {
+		if target(f.type_) {
 			return true
 		}
 	}

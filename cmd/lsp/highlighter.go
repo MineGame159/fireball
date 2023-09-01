@@ -106,6 +106,12 @@ func (h *highlighter) VisitLiteral(expr *ast.Literal) {
 	expr.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitInitializer(expr *ast.Initializer) {
+	h.addToken(expr.Name, classKind)
+
+	expr.AcceptChildren(h)
+}
+
 func (h *highlighter) VisitUnary(expr *ast.Unary) {
 	expr.AcceptChildren(h)
 }
