@@ -201,33 +201,34 @@ const (
 )
 
 type semantic struct {
-	line       uint16
-	column     uint8
+	line   uint16
+	column uint8
+
+	// length - 0b00011111
+	// kind   - 0b11100000
 	lengthKind uint8
 }
 
 func newSemantic(line, column, length int, kind semanticKind) semantic {
+	length = min(length, 31)
+
 	return semantic{
 		line:       uint16(line - 1),
 		column:     uint8(column),
-		lengthKind: (uint8(length) & 0x0F) | ((uint8(kind) << 4) & 0xF0),
+		lengthKind: (uint8(length) & 0b00011111) | ((uint8(kind) << 5) & 0b11100000),
 	}
 }
 
 func (h *highlighter) addToken(token scanner.Token, kind semanticKind) {
-	length := len(token.Lexeme)
-
-	if token.Column < 256 && length < 128 {
+	if token.Column < 256 {
 		h.tokens = append(h.tokens, newSemantic(token.Line, token.Column, len(token.Lexeme), kind))
 	}
 }
 
 func (h *highlighter) addRange(range_ core.Range, kind semanticKind) {
 	if range_.Start.Line == range_.End.Line {
-		length := range_.End.Column - range_.Start.Column
-
-		if range_.Start.Column < 256 && length < 128 {
-			h.tokens = append(h.tokens, newSemantic(range_.Start.Line, range_.Start.Column, length, kind))
+		if range_.Start.Column < 256 {
+			h.tokens = append(h.tokens, newSemantic(range_.Start.Line, range_.Start.Column, range_.End.Column-range_.Start.Column, kind))
 		}
 	}
 }
@@ -261,8 +262,8 @@ func (h *highlighter) data() []uint32 {
 
 		data[j+0] = uint32(token.line - lastLine)
 		data[j+1] = uint32(token.column - lastColumn)
-		data[j+2] = uint32(token.lengthKind & 0x0F)
-		data[j+3] = uint32((token.lengthKind >> 4) & 0x0F)
+		data[j+2] = uint32(token.lengthKind & 0b00011111)
+		data[j+3] = uint32((token.lengthKind & 0b11100000) >> 5)
 		data[j+4] = uint32(0)
 
 		lastLine = token.line

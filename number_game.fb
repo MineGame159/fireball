@@ -65,7 +65,7 @@ func input(str *u8, length i32) {
             return;
         }
 
-        str[i] = ch;
+        str[i] = ch as u8;
 
         i += 1;
 

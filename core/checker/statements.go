@@ -22,19 +22,19 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 	// Check initializer type
 	if stmt.Type == nil {
 		if stmt.Initializer == nil {
-			c.errorNode(stmt, "Variable with no initializer needs to have an explicit type.")
+			c.errorToken(stmt.Name, "Variable with no initializer needs to have an explicit type.")
 		} else {
 			stmt.Type = stmt.Initializer.Type().Copy()
 		}
 	} else {
 		if stmt.Initializer != nil && !stmt.Initializer.Type().CanAssignTo(stmt.Type) {
-			c.errorNode(stmt, "Initializer with type '%s' cannot be assigned to a variable with type '%s'.", stmt.Initializer.Type(), stmt.Type)
+			c.errorRange(stmt.Initializer.Range(), "Initializer with type '%s' cannot be assigned to a variable with type '%s'.", stmt.Initializer.Type(), stmt.Type)
 		}
 	}
 
 	// Check name collision
 	if var_ := c.getVariable(stmt.Name); var_ != nil {
-		c.errorNode(stmt, "Variable with the name '%s' already exists.", stmt.Name)
+		c.errorToken(stmt.Name, "Variable with the name '%s' already exists.", stmt.Name)
 	} else {
 		c.addVariable(stmt.Name, stmt.Type)
 	}
@@ -50,7 +50,7 @@ func (c *checker) VisitIf(stmt *ast.If) {
 
 	// Check condition type
 	if !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
-		c.errorNode(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
+		c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
 	}
 }
 
@@ -62,7 +62,7 @@ func (c *checker) VisitFor(stmt *ast.For) {
 
 	// Check condition type
 	if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
-		c.errorNode(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
+		c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
 	}
 }
 
@@ -71,15 +71,18 @@ func (c *checker) VisitReturn(stmt *ast.Return) {
 
 	// Check return type
 	var type_ types.Type
+	var range_ core.Range
 
 	if stmt.Expr != nil {
 		type_ = stmt.Expr.Type().Copy()
+		range_ = stmt.Expr.Range()
 	} else {
 		type_ = types.Primitive(types.Void, core.Range{})
+		range_ = core.TokenToRange(stmt.Token_)
 	}
 
 	if !type_.CanAssignTo(c.function.Returns) {
-		c.errorNode(stmt, "Cannot return type '%s' from a function with return type '%s'.", type_, c.function.Returns)
+		c.errorRange(range_, "Cannot return type '%s' from a function with return type '%s'.", type_, c.function.Returns)
 	}
 }
 
@@ -88,7 +91,7 @@ func (c *checker) VisitBreak(stmt *ast.Break) {
 
 	// Check if break is inside a loop
 	if c.loopDepth == 0 {
-		c.errorNode(stmt, "A 'break' statement needs to be inside a loop.")
+		c.errorToken(stmt.Token(), "A 'break' statement needs to be inside a loop.")
 	}
 }
 
@@ -97,6 +100,6 @@ func (c *checker) VisitContinue(stmt *ast.Continue) {
 
 	// Check if continue is inside a loop
 	if c.loopDepth == 0 {
-		c.errorNode(stmt, "A 'continue' statement needs to be inside a loop.")
+		c.errorToken(stmt.Token(), "A 'continue' statement needs to be inside a loop.")
 	}
 }

@@ -46,7 +46,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	// Check name collision
 	if !c.functions.Add(decl.Name.Lexeme) {
-		c.errorNode(decl, "Function with the name '%s' already exists.", decl.Name)
+		c.errorToken(decl.Name, "Function with the name '%s' already exists.", decl.Name)
 	}
 
 	// Check parameter void type
@@ -67,7 +67,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		}
 
 		if !valid {
-			c.errorNode(decl, "Function needs to return a '%s' value.", decl.Returns)
+			c.errorToken(decl.Name, "Function needs to return a '%s' value.", decl.Returns)
 		}
 	}
 }

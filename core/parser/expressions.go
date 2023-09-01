@@ -17,7 +17,7 @@ func (p *parser) assignment() (ast.Expr, *core.Diagnostic) {
 		return nil, err
 	}
 
-	// + += -= *= /= %=
+	// = += -= *= /= %=
 	if p.match(scanner.Equal, scanner.PlusEqual, scanner.MinusEqual, scanner.StarEqual, scanner.SlashEqual, scanner.PercentageEqual) {
 		op := p.current
 

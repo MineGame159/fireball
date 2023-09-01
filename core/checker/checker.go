@@ -62,7 +62,7 @@ func Check(reporter core.Reporter, decls []ast.Decl) {
 
 			// Save in map and check name collision
 			if _, ok := c.structs[s.Name.Lexeme]; ok {
-				c.errorNode(decl, "Struct with the name '%s' already exists.", s.Name)
+				c.errorToken(s.Name, "Struct with the name '%s' already exists.", s.Name)
 			}
 
 			c.structs[s.Name.Lexeme] = type_
@@ -180,10 +180,6 @@ func (c *checker) errorRange(range_ core.Range, format string, args ...any) {
 	})
 }
 
-func (c *checker) errorNode(node ast.Node, format string, args ...any) {
-	c.errorToken(node.Token(), format, args...)
-}
-
 func (c *checker) errorToken(token scanner.Token, format string, args ...any) {
 	c.reporter.Report(core.Diagnostic{
 		Kind:    core.ErrorKind,
@@ -198,10 +194,6 @@ func (c *checker) warningRange(range_ core.Range, format string, args ...any) {
 		Range:   range_,
 		Message: fmt.Sprintf(format, args...),
 	})
-}
-
-func (c *checker) warningNode(node ast.Node, format string, args ...any) {
-	c.warningToken(node.Token(), format, args...)
 }
 
 func (c *checker) warningToken(token scanner.Token, format string, args ...any) {
