@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"errors"
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/types"
 	"github.com/MineGame159/protocol"
@@ -44,6 +45,7 @@ func (h *handler) Initialize(ctx context.Context, params *protocol.InitializePar
 						protocol.SemanticTokenFunction,
 						protocol.SemanticTokenParameter,
 						protocol.SemanticTokenVariable,
+						protocol.SemanticTokenType,
 						protocol.SemanticTokenClass,
 						protocol.SemanticTokenProperty,
 					},
@@ -202,7 +204,7 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 				Name:           v.Name.Lexeme,
 				Kind:           protocol.SymbolKindStruct,
 				Range:          convertRange(v.Range()),
-				SelectionRange: convertRange(ast.TokenToRange(v.Name)),
+				SelectionRange: convertRange(core.TokenToRange(v.Name)),
 			})
 		} else if v, ok := decl.(*ast.Func); ok {
 			// Function
@@ -231,7 +233,7 @@ func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentS
 				Detail:         signature.String(),
 				Kind:           protocol.SymbolKindFunction,
 				Range:          convertRange(v.Range()),
-				SelectionRange: convertRange(ast.TokenToRange(v.Name)),
+				SelectionRange: convertRange(core.TokenToRange(v.Name)),
 			})
 		}
 	}
@@ -263,7 +265,7 @@ func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (resu
 	doc.EnsureChecked()
 
 	// Convert position
-	pos := ast.Pos{
+	pos := core.Pos{
 		Line:   int(params.Position.Line + 1),
 		Column: int(params.Position.Character),
 	}
@@ -298,7 +300,7 @@ func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (resu
 					Kind:  protocol.PlainText,
 					Value: variable.Type.String(),
 				},
-				Range: convertRangePtr(ast.TokenToRange(variable.Name)),
+				Range: convertRangePtr(core.TokenToRange(variable.Name)),
 			}, nil
 		}
 	}
@@ -404,7 +406,7 @@ func (h *handler) SemanticTokensFull(ctx context.Context, params *protocol.Seman
 		return nil, err
 	}
 
-	doc.EnsureParsed()
+	doc.EnsureChecked()
 
 	// GetLeaf semantic tokens
 	data := highlight(doc.Decls)
@@ -452,7 +454,7 @@ func (h *handler) InlayHint(ctx context.Context, params *protocol.InlayHintParam
 		ast.VisitStmts[*ast.Variable](decl, func(stmt *ast.Variable) {
 			if stmt.InferType {
 				hints = append(hints, protocol.InlayHint{
-					Position: convertPos(ast.TokenToPos(stmt.Name, true)),
+					Position: convertPos(core.TokenToPos(stmt.Name, true)),
 					Label:    " " + stmt.Type.String(),
 					Kind:     protocol.InlayHintKindType,
 				})
@@ -469,21 +471,21 @@ func (h *handler) Request(ctx context.Context, method string, params interface{}
 
 // Utils
 
-func convertRange(r ast.Range) protocol.Range {
+func convertRange(r core.Range) protocol.Range {
 	return protocol.Range{
 		Start: convertPos(r.Start),
 		End:   convertPos(r.End),
 	}
 }
 
-func convertRangePtr(r ast.Range) *protocol.Range {
+func convertRangePtr(r core.Range) *protocol.Range {
 	return &protocol.Range{
 		Start: convertPos(r.Start),
 		End:   convertPos(r.End),
 	}
 }
 
-func convertPos(p ast.Pos) protocol.Position {
+func convertPos(p core.Pos) protocol.Position {
 	return protocol.Position{
 		Line:      uint32(p.Line - 1),
 		Character: uint32(p.Column),

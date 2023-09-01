@@ -1,17 +1,28 @@
 package types
 
-import "fmt"
+import (
+	"fireball/core"
+	"fmt"
+)
 
 type Type interface {
-	fmt.Stringer
-
+	Range() core.Range
 	Size() int
+	Copy() Type
 
+	Equals(other Type) bool
 	CanAssignTo(other Type) bool
 
-	AcceptTypes(visitor Visitor)
+	AcceptChildren(visitor Visitor)
+	AcceptChildrenPtr(visitor PtrVisitor)
+
+	fmt.Stringer
 }
 
 type Visitor interface {
+	VisitType(type_ Type)
+}
+
+type PtrVisitor interface {
 	VisitType(type_ *Type)
 }

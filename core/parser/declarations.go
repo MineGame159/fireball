@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
@@ -185,7 +186,7 @@ func (p *parser) function() ast.Decl {
 	}
 
 	// Returns
-	var returns types.Type = types.Primitive(types.Void)
+	var returns types.Type
 
 	if !p.check(scanner.LeftBrace) {
 		type_, err := p.parseType()
@@ -198,6 +199,8 @@ func (p *parser) function() ast.Decl {
 		}
 
 		returns = type_
+	} else {
+		returns = types.Primitive(types.Void, core.Range{})
 	}
 
 	// Body

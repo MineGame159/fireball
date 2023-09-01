@@ -1,7 +1,8 @@
 package ast
 
-import "fireball/core/scanner"
+import "fireball/core"
 import "fireball/core/types"
+import "fireball/core/scanner"
 
 //go:generate go run ../../gen/ast.go
 
@@ -31,7 +32,7 @@ type Expr interface {
 // Group
 
 type Group struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -42,26 +43,26 @@ func (g *Group) Token() scanner.Token {
 	return g.Token_
 }
 
-func (g *Group) Range() Range {
+func (g *Group) Range() core.Range {
 	return g.range_
 }
 
 func (g *Group) SetRangeToken(start, end scanner.Token) {
-	g.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	g.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (g *Group) SetRangePos(start, end Pos) {
-	g.range_ = Range{
+func (g *Group) SetRangePos(start, end core.Pos) {
+	g.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (g *Group) SetRangeNode(start, end Node) {
-	g.range_ = Range{
+	g.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -78,6 +79,10 @@ func (g *Group) AcceptChildren(acceptor Acceptor) {
 }
 
 func (g *Group) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(g.type_)
+}
+
+func (g *Group) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&g.type_)
 }
 
@@ -96,7 +101,7 @@ func (g *Group) SetType(type_ types.Type) {
 // Literal
 
 type Literal struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Value scanner.Token
@@ -106,26 +111,26 @@ func (l *Literal) Token() scanner.Token {
 	return l.Value
 }
 
-func (l *Literal) Range() Range {
+func (l *Literal) Range() core.Range {
 	return l.range_
 }
 
 func (l *Literal) SetRangeToken(start, end scanner.Token) {
-	l.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	l.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (l *Literal) SetRangePos(start, end Pos) {
-	l.range_ = Range{
+func (l *Literal) SetRangePos(start, end core.Pos) {
+	l.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (l *Literal) SetRangeNode(start, end Node) {
-	l.range_ = Range{
+	l.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -139,6 +144,10 @@ func (l *Literal) AcceptChildren(acceptor Acceptor) {
 }
 
 func (l *Literal) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(l.type_)
+}
+
+func (l *Literal) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&l.type_)
 }
 
@@ -157,7 +166,7 @@ func (l *Literal) SetType(type_ types.Type) {
 // Unary
 
 type Unary struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Op    scanner.Token
@@ -168,26 +177,26 @@ func (u *Unary) Token() scanner.Token {
 	return u.Op
 }
 
-func (u *Unary) Range() Range {
+func (u *Unary) Range() core.Range {
 	return u.range_
 }
 
 func (u *Unary) SetRangeToken(start, end scanner.Token) {
-	u.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	u.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (u *Unary) SetRangePos(start, end Pos) {
-	u.range_ = Range{
+func (u *Unary) SetRangePos(start, end core.Pos) {
+	u.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (u *Unary) SetRangeNode(start, end Node) {
-	u.range_ = Range{
+	u.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -204,6 +213,10 @@ func (u *Unary) AcceptChildren(acceptor Acceptor) {
 }
 
 func (u *Unary) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(u.type_)
+}
+
+func (u *Unary) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&u.type_)
 }
 
@@ -222,7 +235,7 @@ func (u *Unary) SetType(type_ types.Type) {
 // Binary
 
 type Binary struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Left  Expr
@@ -234,26 +247,26 @@ func (b *Binary) Token() scanner.Token {
 	return b.Op
 }
 
-func (b *Binary) Range() Range {
+func (b *Binary) Range() core.Range {
 	return b.range_
 }
 
 func (b *Binary) SetRangeToken(start, end scanner.Token) {
-	b.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	b.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (b *Binary) SetRangePos(start, end Pos) {
-	b.range_ = Range{
+func (b *Binary) SetRangePos(start, end core.Pos) {
+	b.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (b *Binary) SetRangeNode(start, end Node) {
-	b.range_ = Range{
+	b.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -273,6 +286,10 @@ func (b *Binary) AcceptChildren(acceptor Acceptor) {
 }
 
 func (b *Binary) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(b.type_)
+}
+
+func (b *Binary) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&b.type_)
 }
 
@@ -291,7 +308,7 @@ func (b *Binary) SetType(type_ types.Type) {
 // Logical
 
 type Logical struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Left  Expr
@@ -303,26 +320,26 @@ func (l *Logical) Token() scanner.Token {
 	return l.Op
 }
 
-func (l *Logical) Range() Range {
+func (l *Logical) Range() core.Range {
 	return l.range_
 }
 
 func (l *Logical) SetRangeToken(start, end scanner.Token) {
-	l.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	l.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (l *Logical) SetRangePos(start, end Pos) {
-	l.range_ = Range{
+func (l *Logical) SetRangePos(start, end core.Pos) {
+	l.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (l *Logical) SetRangeNode(start, end Node) {
-	l.range_ = Range{
+	l.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -342,6 +359,10 @@ func (l *Logical) AcceptChildren(acceptor Acceptor) {
 }
 
 func (l *Logical) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(l.type_)
+}
+
+func (l *Logical) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&l.type_)
 }
 
@@ -360,7 +381,7 @@ func (l *Logical) SetType(type_ types.Type) {
 // Identifier
 
 type Identifier struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Identifier scanner.Token
@@ -370,26 +391,26 @@ func (i *Identifier) Token() scanner.Token {
 	return i.Identifier
 }
 
-func (i *Identifier) Range() Range {
+func (i *Identifier) Range() core.Range {
 	return i.range_
 }
 
 func (i *Identifier) SetRangeToken(start, end scanner.Token) {
-	i.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	i.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (i *Identifier) SetRangePos(start, end Pos) {
-	i.range_ = Range{
+func (i *Identifier) SetRangePos(start, end core.Pos) {
+	i.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (i *Identifier) SetRangeNode(start, end Node) {
-	i.range_ = Range{
+	i.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -403,6 +424,10 @@ func (i *Identifier) AcceptChildren(acceptor Acceptor) {
 }
 
 func (i *Identifier) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(i.type_)
+}
+
+func (i *Identifier) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&i.type_)
 }
 
@@ -421,7 +446,7 @@ func (i *Identifier) SetType(type_ types.Type) {
 // Assignment
 
 type Assignment struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Assignee Expr
@@ -433,26 +458,26 @@ func (a *Assignment) Token() scanner.Token {
 	return a.Op
 }
 
-func (a *Assignment) Range() Range {
+func (a *Assignment) Range() core.Range {
 	return a.range_
 }
 
 func (a *Assignment) SetRangeToken(start, end scanner.Token) {
-	a.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	a.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (a *Assignment) SetRangePos(start, end Pos) {
-	a.range_ = Range{
+func (a *Assignment) SetRangePos(start, end core.Pos) {
+	a.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (a *Assignment) SetRangeNode(start, end Node) {
-	a.range_ = Range{
+	a.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -472,6 +497,10 @@ func (a *Assignment) AcceptChildren(acceptor Acceptor) {
 }
 
 func (a *Assignment) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(a.type_)
+}
+
+func (a *Assignment) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&a.type_)
 }
 
@@ -490,7 +519,7 @@ func (a *Assignment) SetType(type_ types.Type) {
 // Cast
 
 type Cast struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -501,26 +530,26 @@ func (c *Cast) Token() scanner.Token {
 	return c.Token_
 }
 
-func (c *Cast) Range() Range {
+func (c *Cast) Range() core.Range {
 	return c.range_
 }
 
 func (c *Cast) SetRangeToken(start, end scanner.Token) {
-	c.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	c.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (c *Cast) SetRangePos(start, end Pos) {
-	c.range_ = Range{
+func (c *Cast) SetRangePos(start, end core.Pos) {
+	c.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (c *Cast) SetRangeNode(start, end Node) {
-	c.range_ = Range{
+	c.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -537,6 +566,10 @@ func (c *Cast) AcceptChildren(acceptor Acceptor) {
 }
 
 func (c *Cast) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(c.type_)
+}
+
+func (c *Cast) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&c.type_)
 }
 
@@ -555,7 +588,7 @@ func (c *Cast) SetType(type_ types.Type) {
 // Call
 
 type Call struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -567,26 +600,26 @@ func (c *Call) Token() scanner.Token {
 	return c.Token_
 }
 
-func (c *Call) Range() Range {
+func (c *Call) Range() core.Range {
 	return c.range_
 }
 
 func (c *Call) SetRangeToken(start, end scanner.Token) {
-	c.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	c.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (c *Call) SetRangePos(start, end Pos) {
-	c.range_ = Range{
+func (c *Call) SetRangePos(start, end core.Pos) {
+	c.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (c *Call) SetRangeNode(start, end Node) {
-	c.range_ = Range{
+	c.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -606,6 +639,10 @@ func (c *Call) AcceptChildren(acceptor Acceptor) {
 }
 
 func (c *Call) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(c.type_)
+}
+
+func (c *Call) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&c.type_)
 }
 
@@ -624,7 +661,7 @@ func (c *Call) SetType(type_ types.Type) {
 // Index
 
 type Index struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -636,26 +673,26 @@ func (i *Index) Token() scanner.Token {
 	return i.Token_
 }
 
-func (i *Index) Range() Range {
+func (i *Index) Range() core.Range {
 	return i.range_
 }
 
 func (i *Index) SetRangeToken(start, end scanner.Token) {
-	i.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	i.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (i *Index) SetRangePos(start, end Pos) {
-	i.range_ = Range{
+func (i *Index) SetRangePos(start, end core.Pos) {
+	i.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (i *Index) SetRangeNode(start, end Node) {
-	i.range_ = Range{
+	i.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -675,6 +712,10 @@ func (i *Index) AcceptChildren(acceptor Acceptor) {
 }
 
 func (i *Index) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(i.type_)
+}
+
+func (i *Index) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&i.type_)
 }
 
@@ -693,7 +734,7 @@ func (i *Index) SetType(type_ types.Type) {
 // Member
 
 type Member struct {
-	range_ Range
+	range_ core.Range
 	type_  types.Type
 
 	Value Expr
@@ -704,26 +745,26 @@ func (m *Member) Token() scanner.Token {
 	return m.Name
 }
 
-func (m *Member) Range() Range {
+func (m *Member) Range() core.Range {
 	return m.range_
 }
 
 func (m *Member) SetRangeToken(start, end scanner.Token) {
-	m.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	m.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (m *Member) SetRangePos(start, end Pos) {
-	m.range_ = Range{
+func (m *Member) SetRangePos(start, end core.Pos) {
+	m.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (m *Member) SetRangeNode(start, end Node) {
-	m.range_ = Range{
+	m.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -740,6 +781,10 @@ func (m *Member) AcceptChildren(acceptor Acceptor) {
 }
 
 func (m *Member) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(m.type_)
+}
+
+func (m *Member) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&m.type_)
 }
 

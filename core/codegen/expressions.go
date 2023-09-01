@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
@@ -282,7 +283,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 		c.exprValue = value{
 			identifier: "",
-			type_:      types.Primitive(types.Void),
+			type_:      types.Primitive(types.Void, core.Range{}),
 		}
 	} else {
 		val := c.locals.unnamed(expr.Type())

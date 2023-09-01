@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
@@ -17,27 +18,38 @@ func (c *checker) VisitGroup(expr *ast.Group) {
 func (c *checker) VisitLiteral(expr *ast.Literal) {
 	expr.AcceptChildren(c)
 
+	var kind types.PrimitiveKind
+	pointer := false
+
 	switch expr.Value.Kind {
 	case scanner.Nil:
-		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.Void)})
+		kind = types.Void
+		pointer = true
 
 	case scanner.True, scanner.False:
-		expr.SetType(types.Primitive(types.Bool))
+		kind = types.Bool
 
 	case scanner.Number:
 		if strings.HasSuffix(expr.Value.Lexeme, "f") {
-			expr.SetType(types.Primitive(types.F32))
+			kind = types.F32
 		} else if strings.ContainsRune(expr.Value.Lexeme, '.') {
-			expr.SetType(types.Primitive(types.F64))
+			kind = types.F64
 		} else {
-			expr.SetType(types.Primitive(types.I32))
+			kind = types.I32
 		}
 
 	case scanner.Character:
-		expr.SetType(types.Primitive(types.U8))
+		kind = types.U8
 
 	case scanner.String:
-		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.U8)})
+		kind = types.U8
+		pointer = true
+	}
+
+	expr.SetType(types.Primitive(kind, core.Range{}))
+
+	if pointer {
+		expr.SetType(types.Pointer(expr.Type(), core.Range{}))
 	}
 }
 
@@ -50,7 +62,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			c.errorNode(expr, "Expected a 'bool' but got a '%s'.", expr.Right.Type())
 		}
 
-		expr.SetType(types.Primitive(types.Bool))
+		expr.SetType(types.Primitive(types.Bool, core.Range{}))
 
 	case scanner.Minus:
 		if v, ok := expr.Right.Type().(*types.PrimitiveType); ok {
@@ -60,11 +72,11 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 		}
 
-		expr.SetType(types.Primitive(types.I32))
+		expr.SetType(types.Primitive(types.I32, core.Range{}))
 		c.errorNode(expr, "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Type())
 
 	case scanner.Ampersand:
-		expr.SetType(&types.PointerType{Pointee: expr.Right.Type()})
+		expr.SetType(types.Pointer(expr.Right.Type().Copy(), core.Range{}))
 
 	default:
 		log.Fatalln("Invalid unary operator")
@@ -78,32 +90,32 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		// Arithmetic
 		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
 			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
-				if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left == right {
-					expr.SetType(expr.Left.Type())
+				if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left.Equals(right) {
+					expr.SetType(expr.Left.Type().Copy())
 					return
 				}
 			}
 		}
 
-		expr.SetType(types.Primitive(types.I32))
+		expr.SetType(types.Primitive(types.I32, core.Range{}))
 		c.errorNode(expr, "Expected two number types.")
 	} else if scanner.IsEquality(expr.Op.Kind) {
 		// Equality
-		expr.SetType(types.Primitive(types.Bool))
+		expr.SetType(types.Primitive(types.Bool, core.Range{}))
 	} else if scanner.IsComparison(expr.Op.Kind) {
 		// Comparison
-		expr.SetType(types.Primitive(types.Bool))
+		expr.SetType(types.Primitive(types.Bool, core.Range{}))
 
 		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
 			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
-				if !types.IsNumber(left.Kind) || !types.IsNumber(right.Kind) || left != right {
+				if !types.IsNumber(left.Kind) || !types.IsNumber(right.Kind) || !left.Equals(right) {
 					c.errorNode(expr, "Expected two number types.")
 				}
 			}
 		}
 	} else {
 		// Error
-		expr.SetType(types.Primitive(types.Void))
+		expr.SetType(types.Primitive(types.Void, core.Range{}))
 		c.errorNode(expr, "Invalid operator.")
 	}
 }
@@ -121,7 +133,7 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 	}
 
 	// Set type
-	expr.SetType(types.Primitive(types.Bool))
+	expr.SetType(types.Primitive(types.Bool, core.Range{}))
 }
 
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
@@ -155,12 +167,14 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Error
-	expr.SetType(types.Primitive(types.Void))
+	expr.SetType(types.Primitive(types.Void, core.Range{}))
 	c.errorNode(expr, "Unknown identifier.")
 }
 
 func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	expr.AcceptChildren(c)
+
+	expr.SetType(expr.Value.Type())
 }
 
 func (c *checker) VisitCast(expr *ast.Cast) {
@@ -193,9 +207,9 @@ func (c *checker) VisitCall(expr *ast.Call) {
 			}
 		}
 
-		expr.SetType(v.Returns)
+		expr.SetType(v.Returns.Copy())
 	} else {
-		expr.SetType(types.Primitive(types.Void))
+		expr.SetType(types.Primitive(types.Void, core.Range{}))
 		c.errorNode(expr, "Can't call type '%s'.", expr.Callee.Type())
 	}
 }
@@ -204,12 +218,12 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	expr.AcceptChildren(c)
 
 	if v, ok := expr.Value.Type().(*types.ArrayType); ok {
-		expr.SetType(v.Base)
+		expr.SetType(v.Base.Copy())
 	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
-		expr.SetType(v.Pointee)
+		expr.SetType(v.Pointee.Copy())
 	} else {
 		c.errorNode(expr, "Can only index into array and pointer types, not '%s'.", expr.Value.Type())
-		expr.SetType(&types.PointerType{Pointee: types.Primitive(types.Void)})
+		expr.SetType(types.Pointer(types.Primitive(types.Void, core.Range{}), core.Range{}))
 	}
 }
 
@@ -230,13 +244,13 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		_, field := s.GetField(expr.Name.Lexeme)
 
 		if field != nil {
-			expr.SetType(field.Type)
+			expr.SetType(field.Type.Copy())
 		} else {
 			c.errorNode(expr, "Struct '%s' does not contain member '%s'.", s, expr.Name)
-			expr.SetType(types.Primitive(types.Void))
+			expr.SetType(types.Primitive(types.Void, core.Range{}))
 		}
 	} else {
 		c.errorNode(expr, "Only structs and pointers to structs can have members, not '%s'.", expr.Value.Type())
-		expr.SetType(types.Primitive(types.Void))
+		expr.SetType(types.Primitive(types.Void, core.Range{}))
 	}
 }

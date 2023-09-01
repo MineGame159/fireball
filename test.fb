@@ -1,3 +1,5 @@
+struct Yo {}
+
 func main() i32 {
     printf("true  || true  = %d\n", true || true);
     printf("true  || false = %d\n", true || false);

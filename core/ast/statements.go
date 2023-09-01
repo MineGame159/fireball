@@ -1,7 +1,8 @@
 package ast
 
-import "fireball/core/scanner"
+import "fireball/core"
 import "fireball/core/types"
+import "fireball/core/scanner"
 
 //go:generate go run ../../gen/ast.go
 
@@ -25,7 +26,7 @@ type Stmt interface {
 // Block
 
 type Block struct {
-	range_ Range
+	range_ core.Range
 
 	Token_ scanner.Token
 	Stmts  []Stmt
@@ -35,26 +36,26 @@ func (b *Block) Token() scanner.Token {
 	return b.Token_
 }
 
-func (b *Block) Range() Range {
+func (b *Block) Range() core.Range {
 	return b.range_
 }
 
 func (b *Block) SetRangeToken(start, end scanner.Token) {
-	b.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	b.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (b *Block) SetRangePos(start, end Pos) {
-	b.range_ = Range{
+func (b *Block) SetRangePos(start, end core.Pos) {
+	b.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (b *Block) SetRangeNode(start, end Node) {
-	b.range_ = Range{
+	b.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -73,6 +74,9 @@ func (b *Block) AcceptChildren(acceptor Acceptor) {
 func (b *Block) AcceptTypes(visitor types.Visitor) {
 }
 
+func (b *Block) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
 func (b *Block) Leaf() bool {
 	return false
 }
@@ -80,7 +84,7 @@ func (b *Block) Leaf() bool {
 // Expression
 
 type Expression struct {
-	range_ Range
+	range_ core.Range
 
 	Token_ scanner.Token
 	Expr   Expr
@@ -90,26 +94,26 @@ func (e *Expression) Token() scanner.Token {
 	return e.Token_
 }
 
-func (e *Expression) Range() Range {
+func (e *Expression) Range() core.Range {
 	return e.range_
 }
 
 func (e *Expression) SetRangeToken(start, end scanner.Token) {
-	e.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	e.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (e *Expression) SetRangePos(start, end Pos) {
-	e.range_ = Range{
+func (e *Expression) SetRangePos(start, end core.Pos) {
+	e.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (e *Expression) SetRangeNode(start, end Node) {
-	e.range_ = Range{
+	e.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -128,6 +132,9 @@ func (e *Expression) AcceptChildren(acceptor Acceptor) {
 func (e *Expression) AcceptTypes(visitor types.Visitor) {
 }
 
+func (e *Expression) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
 func (e *Expression) Leaf() bool {
 	return false
 }
@@ -135,7 +142,7 @@ func (e *Expression) Leaf() bool {
 // Variable
 
 type Variable struct {
-	range_ Range
+	range_ core.Range
 
 	Type        types.Type
 	Name        scanner.Token
@@ -147,26 +154,26 @@ func (v *Variable) Token() scanner.Token {
 	return v.Name
 }
 
-func (v *Variable) Range() Range {
+func (v *Variable) Range() core.Range {
 	return v.range_
 }
 
 func (v *Variable) SetRangeToken(start, end scanner.Token) {
-	v.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	v.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (v *Variable) SetRangePos(start, end Pos) {
-	v.range_ = Range{
+func (v *Variable) SetRangePos(start, end core.Pos) {
+	v.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (v *Variable) SetRangeNode(start, end Node) {
-	v.range_ = Range{
+	v.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -183,6 +190,10 @@ func (v *Variable) AcceptChildren(acceptor Acceptor) {
 }
 
 func (v *Variable) AcceptTypes(visitor types.Visitor) {
+	visitor.VisitType(v.Type)
+}
+
+func (v *Variable) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&v.Type)
 }
 
@@ -193,7 +204,7 @@ func (v *Variable) Leaf() bool {
 // If
 
 type If struct {
-	range_ Range
+	range_ core.Range
 
 	Token_    scanner.Token
 	Condition Expr
@@ -205,26 +216,26 @@ func (i *If) Token() scanner.Token {
 	return i.Token_
 }
 
-func (i *If) Range() Range {
+func (i *If) Range() core.Range {
 	return i.range_
 }
 
 func (i *If) SetRangeToken(start, end scanner.Token) {
-	i.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	i.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (i *If) SetRangePos(start, end Pos) {
-	i.range_ = Range{
+func (i *If) SetRangePos(start, end core.Pos) {
+	i.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (i *If) SetRangeNode(start, end Node) {
-	i.range_ = Range{
+	i.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -249,6 +260,9 @@ func (i *If) AcceptChildren(acceptor Acceptor) {
 func (i *If) AcceptTypes(visitor types.Visitor) {
 }
 
+func (i *If) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
 func (i *If) Leaf() bool {
 	return false
 }
@@ -256,7 +270,7 @@ func (i *If) Leaf() bool {
 // For
 
 type For struct {
-	range_ Range
+	range_ core.Range
 
 	Token_    scanner.Token
 	Condition Expr
@@ -267,26 +281,26 @@ func (f *For) Token() scanner.Token {
 	return f.Token_
 }
 
-func (f *For) Range() Range {
+func (f *For) Range() core.Range {
 	return f.range_
 }
 
 func (f *For) SetRangeToken(start, end scanner.Token) {
-	f.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	f.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (f *For) SetRangePos(start, end Pos) {
-	f.range_ = Range{
+func (f *For) SetRangePos(start, end core.Pos) {
+	f.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (f *For) SetRangeNode(start, end Node) {
-	f.range_ = Range{
+	f.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -308,6 +322,9 @@ func (f *For) AcceptChildren(acceptor Acceptor) {
 func (f *For) AcceptTypes(visitor types.Visitor) {
 }
 
+func (f *For) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
 func (f *For) Leaf() bool {
 	return false
 }
@@ -315,7 +332,7 @@ func (f *For) Leaf() bool {
 // Return
 
 type Return struct {
-	range_ Range
+	range_ core.Range
 
 	Token_ scanner.Token
 	Expr   Expr
@@ -325,26 +342,26 @@ func (r *Return) Token() scanner.Token {
 	return r.Token_
 }
 
-func (r *Return) Range() Range {
+func (r *Return) Range() core.Range {
 	return r.range_
 }
 
 func (r *Return) SetRangeToken(start, end scanner.Token) {
-	r.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	r.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (r *Return) SetRangePos(start, end Pos) {
-	r.range_ = Range{
+func (r *Return) SetRangePos(start, end core.Pos) {
+	r.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (r *Return) SetRangeNode(start, end Node) {
-	r.range_ = Range{
+	r.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -363,6 +380,9 @@ func (r *Return) AcceptChildren(acceptor Acceptor) {
 func (r *Return) AcceptTypes(visitor types.Visitor) {
 }
 
+func (r *Return) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
 func (r *Return) Leaf() bool {
 	return false
 }
@@ -370,7 +390,7 @@ func (r *Return) Leaf() bool {
 // Break
 
 type Break struct {
-	range_ Range
+	range_ core.Range
 
 	Token_ scanner.Token
 }
@@ -379,26 +399,26 @@ func (b *Break) Token() scanner.Token {
 	return b.Token_
 }
 
-func (b *Break) Range() Range {
+func (b *Break) Range() core.Range {
 	return b.range_
 }
 
 func (b *Break) SetRangeToken(start, end scanner.Token) {
-	b.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	b.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (b *Break) SetRangePos(start, end Pos) {
-	b.range_ = Range{
+func (b *Break) SetRangePos(start, end core.Pos) {
+	b.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (b *Break) SetRangeNode(start, end Node) {
-	b.range_ = Range{
+	b.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -414,6 +434,9 @@ func (b *Break) AcceptChildren(acceptor Acceptor) {
 func (b *Break) AcceptTypes(visitor types.Visitor) {
 }
 
+func (b *Break) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
 func (b *Break) Leaf() bool {
 	return true
 }
@@ -421,7 +444,7 @@ func (b *Break) Leaf() bool {
 // Continue
 
 type Continue struct {
-	range_ Range
+	range_ core.Range
 
 	Token_ scanner.Token
 }
@@ -430,26 +453,26 @@ func (c *Continue) Token() scanner.Token {
 	return c.Token_
 }
 
-func (c *Continue) Range() Range {
+func (c *Continue) Range() core.Range {
 	return c.range_
 }
 
 func (c *Continue) SetRangeToken(start, end scanner.Token) {
-	c.range_ = Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
+	c.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (c *Continue) SetRangePos(start, end Pos) {
-	c.range_ = Range{
+func (c *Continue) SetRangePos(start, end core.Pos) {
+	c.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
 func (c *Continue) SetRangeNode(start, end Node) {
-	c.range_ = Range{
+	c.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
@@ -463,6 +486,9 @@ func (c *Continue) AcceptChildren(acceptor Acceptor) {
 }
 
 func (c *Continue) AcceptTypes(visitor types.Visitor) {
+}
+
+func (c *Continue) AcceptTypesPtr(visitor types.PtrVisitor) {
 }
 
 func (c *Continue) Leaf() bool {

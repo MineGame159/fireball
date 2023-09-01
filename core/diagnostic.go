@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fireball/core/ast"
 	"fmt"
 )
 
@@ -14,7 +13,7 @@ const (
 
 type Diagnostic struct {
 	Kind    DiagnosticKind
-	Range   ast.Range
+	Range   Range
 	Message string
 }
 

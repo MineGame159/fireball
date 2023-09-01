@@ -1,72 +1,68 @@
 package types
 
 import (
+	"fireball/core"
 	"log"
 )
 
-type PrimitiveKind = uint8
-
-const (
-	Void PrimitiveKind = iota
-	Bool
-
-	U8
-	U16
-	U32
-	U64
-
-	I8
-	I16
-	I32
-	I64
-
-	F32
-	F64
-)
-
-func IsNumber(kind PrimitiveKind) bool {
-	return kind != Void && kind != Bool
-}
+// PrimitiveType
 
 type PrimitiveType struct {
-	Kind PrimitiveKind
+	range_ core.Range
+	Kind   PrimitiveKind
 }
 
-var primitives [F64 + 1]PrimitiveType
-
-func init() {
-	for i := 0; i < len(primitives); i++ {
-		primitives[i] = PrimitiveType{Kind: PrimitiveKind(i)}
+func Primitive(kind PrimitiveKind, range_ core.Range) *PrimitiveType {
+	return &PrimitiveType{
+		range_: range_,
+		Kind:   kind,
 	}
 }
 
-func Primitive(kind PrimitiveKind) *PrimitiveType {
-	return &primitives[kind]
+func (p *PrimitiveType) Range() core.Range {
+	return p.range_
 }
 
 func (p *PrimitiveType) Size() int {
 	switch p.Kind {
 	case Void:
 		return 0
+
 	case Bool, U8, I8:
 		return 1
+
 	case U16, I16:
 		return 2
+
 	case U32, I32, F32:
 		return 4
+
 	case U64, I64, F64:
 		return 8
+
 	default:
-		log.Fatalln("Invalid primitive kind")
+		log.Fatalln("PrimitiveType.Size() - Invalid primitive kind")
 		return -1
 	}
+}
+
+func (p *PrimitiveType) Copy() Type {
+	return &PrimitiveType{
+		Kind: p.Kind,
+	}
+}
+
+func (p *PrimitiveType) Equals(other Type) bool {
+	return IsPrimitive(other, p.Kind)
 }
 
 func (p *PrimitiveType) CanAssignTo(other Type) bool {
 	return IsPrimitive(other, p.Kind)
 }
 
-func (p *PrimitiveType) AcceptTypes(visitor Visitor) {}
+func (p *PrimitiveType) AcceptChildren(visitor Visitor) {}
+
+func (p *PrimitiveType) AcceptChildrenPtr(visitor PtrVisitor) {}
 
 func (p *PrimitiveType) String() string {
 	switch p.Kind {
@@ -99,10 +95,12 @@ func (p *PrimitiveType) String() string {
 		return "f64"
 
 	default:
-		log.Fatalln("Invalid primitive kind")
+		log.Fatalln("PrimitiveType.String() - Invalid primitive kind")
 		return ""
 	}
 }
+
+// Helpers
 
 func IsPrimitive(type_ Type, kind PrimitiveKind) bool {
 	if v, ok := type_.(*PrimitiveType); ok {
@@ -110,6 +108,32 @@ func IsPrimitive(type_ Type, kind PrimitiveKind) bool {
 	}
 
 	return false
+}
+
+// Kind
+
+type PrimitiveKind = uint8
+
+const (
+	Void PrimitiveKind = iota
+	Bool
+
+	U8
+	U16
+	U32
+	U64
+
+	I8
+	I16
+	I32
+	I64
+
+	F32
+	F64
+)
+
+func IsNumber(kind PrimitiveKind) bool {
+	return kind != Void && kind != Bool
 }
 
 func IsFloating(kind PrimitiveKind) bool {

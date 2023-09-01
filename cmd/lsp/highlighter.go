@@ -1,24 +1,26 @@
 package lsp
 
 import (
+	"cmp"
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
+	"fireball/core/types"
+	"fmt"
+	"slices"
 )
 
 type highlighter struct {
 	functions map[string]struct{}
 	params    []ast.Param
 
-	data []uint32
-
-	lastLine   int
-	lastColumn int
+	tokens []semantic
 }
 
 func highlight(decls []ast.Decl) []uint32 {
 	h := &highlighter{
 		functions: make(map[string]struct{}),
-		data:      make([]uint32, 0, 256),
+		tokens:    make([]semantic, 0, 256),
 	}
 
 	for _, decl := range decls {
@@ -31,26 +33,26 @@ func highlight(decls []ast.Decl) []uint32 {
 		h.AcceptDecl(decl)
 	}
 
-	return h.data
+	return h.data()
 }
 
 // Declarations
 
 func (h *highlighter) VisitStruct(decl *ast.Struct) {
-	h.add(decl.Name, classKind)
+	h.addToken(decl.Name, classKind)
 
 	for _, field := range decl.Fields {
-		h.add(field.Name, propertyKind)
+		h.addToken(field.Name, propertyKind)
 	}
 
 	decl.AcceptChildren(h)
 }
 
 func (h *highlighter) VisitFunc(decl *ast.Func) {
-	h.add(decl.Name, functionKind)
+	h.addToken(decl.Name, functionKind)
 
 	for _, param := range decl.Params {
-		h.add(param.Name, parameterKind)
+		h.addToken(param.Name, parameterKind)
 	}
 
 	h.params = decl.Params
@@ -69,7 +71,7 @@ func (h *highlighter) VisitExpression(stmt *ast.Expression) {
 }
 
 func (h *highlighter) VisitVariable(stmt *ast.Variable) {
-	h.add(stmt.Name, variableKind)
+	h.addToken(stmt.Name, variableKind)
 
 	stmt.AcceptChildren(h)
 }
@@ -118,11 +120,11 @@ func (h *highlighter) VisitLogical(expr *ast.Logical) {
 
 func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
 	if _, ok := h.functions[expr.Identifier.Lexeme]; ok {
-		h.add(expr.Identifier, functionKind)
+		h.addToken(expr.Identifier, functionKind)
 	} else if h.isParameter(expr.Identifier) {
-		h.add(expr.Identifier, parameterKind)
+		h.addToken(expr.Identifier, parameterKind)
 	} else {
-		h.add(expr.Identifier, variableKind)
+		h.addToken(expr.Identifier, variableKind)
 	}
 
 	expr.AcceptChildren(h)
@@ -147,48 +149,127 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 func (h *highlighter) VisitMember(expr *ast.Member) {
 	expr.AcceptChildren(h)
 
-	h.add(expr.Name, propertyKind)
+	h.addToken(expr.Name, propertyKind)
+}
+
+// types.Visitor
+
+func (h *highlighter) VisitType(type_ types.Type) {
+	if type_ == nil {
+		fmt.Println()
+	}
+
+	if type_.Range().Valid() {
+		if _, ok := type_.(*types.PrimitiveType); ok {
+			h.addRange(type_.Range(), typeKind)
+		} else if _, ok := type_.(*types.StructType); ok {
+			h.addRange(type_.Range(), classKind)
+		} else {
+			type_.AcceptChildren(h)
+		}
+	}
 }
 
 // ast.Acceptor
 
 func (h *highlighter) AcceptDecl(decl ast.Decl) {
 	decl.Accept(h)
+	decl.AcceptTypes(h)
 }
 
 func (h *highlighter) AcceptStmt(stmt ast.Stmt) {
 	stmt.Accept(h)
+	stmt.AcceptTypes(h)
 }
 
 func (h *highlighter) AcceptExpr(expr ast.Expr) {
 	expr.Accept(h)
+	expr.AcceptTypes(h)
 }
 
 // Tokens
 
-type semanticKind uint32
+type semanticKind uint8
 
 const (
 	functionKind semanticKind = iota
 	parameterKind
 	variableKind
+	typeKind
 	classKind
 	propertyKind
 )
 
-func (h *highlighter) add(token scanner.Token, kind semanticKind) {
-	if h.lastLine != token.Line-1 {
-		h.lastColumn = 0
+type semantic struct {
+	line       uint16
+	column     uint8
+	lengthKind uint8
+}
+
+func newSemantic(line, column, length int, kind semanticKind) semantic {
+	return semantic{
+		line:       uint16(line - 1),
+		column:     uint8(column),
+		lengthKind: (uint8(length) & 0x0F) | ((uint8(kind) << 4) & 0xF0),
+	}
+}
+
+func (h *highlighter) addToken(token scanner.Token, kind semanticKind) {
+	length := len(token.Lexeme)
+
+	if token.Column < 256 && length < 128 {
+		h.tokens = append(h.tokens, newSemantic(token.Line, token.Column, len(token.Lexeme), kind))
+	}
+}
+
+func (h *highlighter) addRange(range_ core.Range, kind semanticKind) {
+	if range_.Start.Line == range_.End.Line {
+		length := range_.End.Column - range_.Start.Column
+
+		if range_.Start.Column < 256 && length < 128 {
+			h.tokens = append(h.tokens, newSemantic(range_.Start.Line, range_.Start.Column, length, kind))
+		}
+	}
+}
+
+func (h *highlighter) data() []uint32 {
+	// Sort tokens
+	slices.SortFunc(h.tokens, func(a, b semantic) int {
+		if a.line == b.line {
+			return cmp.Compare(a.column, b.column)
+		}
+
+		if a.line < b.line {
+			return -1
+		}
+
+		return 1
+	})
+
+	// Get data
+	data := make([]uint32, len(h.tokens)*5)
+
+	lastLine := uint16(0)
+	lastColumn := uint8(0)
+
+	for i, token := range h.tokens {
+		if lastLine != token.line {
+			lastColumn = 0
+		}
+
+		j := i * 5
+
+		data[j+0] = uint32(token.line - lastLine)
+		data[j+1] = uint32(token.column - lastColumn)
+		data[j+2] = uint32(token.lengthKind & 0x0F)
+		data[j+3] = uint32((token.lengthKind >> 4) & 0x0F)
+		data[j+4] = uint32(0)
+
+		lastLine = token.line
+		lastColumn = token.column
 	}
 
-	h.data = append(h.data, uint32(token.Line-1-h.lastLine))
-	h.data = append(h.data, uint32(token.Column-h.lastColumn))
-	h.data = append(h.data, uint32(len(token.Lexeme)))
-	h.data = append(h.data, uint32(kind))
-	h.data = append(h.data, 0)
-
-	h.lastLine = token.Line - 1
-	h.lastColumn = token.Column
+	return data
 }
 
 // Utils

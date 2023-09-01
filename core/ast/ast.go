@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fireball/core"
 	"fireball/core/scanner"
 	"fireball/core/types"
 )
@@ -8,13 +9,15 @@ import (
 type Node interface {
 	Token() scanner.Token
 
-	Range() Range
+	Range() core.Range
 	SetRangeToken(start, end scanner.Token)
-	SetRangePos(start, end Pos)
+	SetRangePos(start, end core.Pos)
 	SetRangeNode(start, end Node)
 
 	AcceptChildren(acceptor Acceptor)
+
 	AcceptTypes(visitor types.Visitor)
+	AcceptTypesPtr(visitor types.PtrVisitor)
 
 	Leaf() bool
 }
@@ -23,56 +26,6 @@ type Acceptor interface {
 	AcceptDecl(decl Decl)
 	AcceptStmt(stmt Stmt)
 	AcceptExpr(expr Expr)
-}
-
-type Range struct {
-	Start Pos
-	End   Pos
-}
-
-type Pos struct {
-	Line   int
-	Column int
-}
-
-func (r Range) Contains(pos Pos) bool {
-	// Check line
-	if pos.Line < r.Start.Line || pos.Line > r.End.Line {
-		return false
-	}
-
-	// Check start column
-	if pos.Line == r.Start.Line && pos.Column < r.Start.Column {
-		return false
-	}
-
-	// Check end column
-	if pos.Line == r.End.Line && pos.Column > r.End.Column {
-		return false
-	}
-
-	// True
-	return true
-}
-
-func TokenToRange(token scanner.Token) Range {
-	return Range{
-		Start: TokenToPos(token, false),
-		End:   TokenToPos(token, true),
-	}
-}
-
-func TokenToPos(token scanner.Token, end bool) Pos {
-	offset := 0
-
-	if end {
-		offset = len(token.Lexeme)
-	}
-
-	return Pos{
-		Line:   token.Line,
-		Column: token.Column + offset,
-	}
 }
 
 // Visit
@@ -120,7 +73,7 @@ func (v visitor[T]) AcceptExpr(expr Expr) {
 
 // GetLeaf
 
-func GetLeaf(node Node, pos Pos) Node {
+func GetLeaf(node Node, pos core.Pos) Node {
 	g := get{
 		pos: pos,
 	}
@@ -130,7 +83,7 @@ func GetLeaf(node Node, pos Pos) Node {
 }
 
 type get struct {
-	pos  Pos
+	pos  core.Pos
 	node Node
 }
 
@@ -152,12 +105,12 @@ func (v *get) Accept(node Node) {
 		node.AcceptChildren(v)
 
 		// TODO: Work around the fact that some nodes store names as scanner.Token which does not inherit ast.Node
-		if variable, ok := node.(*Variable); ok && TokenToRange(variable.Name).Contains(v.pos) {
+		if variable, ok := node.(*Variable); ok && core.TokenToRange(variable.Name).Contains(v.pos) {
 			v.node = node
 			return
 		}
 
-		if member, ok := node.(*Member); ok && TokenToRange(member.Name).Contains(v.pos) {
+		if member, ok := node.(*Member); ok && core.TokenToRange(member.Name).Contains(v.pos) {
 			v.node = node
 			return
 		}

@@ -56,6 +56,8 @@ func (p *parser) parseType() (types.Type, *core.Diagnostic) {
 }
 
 func (p *parser) parseArrayType() (types.Type, *core.Diagnostic) {
+	start := p.current
+
 	// Count
 	token, err := p.consume(scanner.Number, "Expected array size.")
 	if err != nil {
@@ -82,27 +84,33 @@ func (p *parser) parseArrayType() (types.Type, *core.Diagnostic) {
 		return nil, err
 	}
 
-	return &types.ArrayType{
-		Count: uint32(count),
-		Base:  base,
-	}, nil
+	// Return
+	return types.Array(uint32(count), base, core.TokensToRange(start, p.current)), nil
 }
 
 func (p *parser) parsePointerType() (types.Type, *core.Diagnostic) {
+	start := p.current
+
+	// Pointee
 	pointee, err := p.parseType()
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.PointerType{Pointee: pointee}, nil
+	// return
+	return types.Pointer(pointee, core.TokensToRange(start, p.current)), nil
 }
 
 func (p *parser) parseIdentifierType() (types.Type, *core.Diagnostic) {
+	// Name
 	ident, err := p.consume(scanner.Identifier, "Expected type name.")
 	if err != nil {
 		return nil, err
 	}
 
+	range_ := core.TokenToRange(ident)
+
+	// Select kind
 	var kind types.PrimitiveKind
 
 	switch ident.Lexeme {
@@ -135,10 +143,12 @@ func (p *parser) parseIdentifierType() (types.Type, *core.Diagnostic) {
 		kind = types.F64
 
 	default:
-		return &types.UnresolvedType{Identifier: ident}, nil
+		// Unresolved
+		return types.Unresolved(ident, range_), nil
 	}
 
-	return types.Primitive(kind), nil
+	// Primitive
+	return types.Primitive(kind, range_), nil
 }
 
 func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *core.Diagnostic) {
@@ -160,7 +170,7 @@ func (p *parser) consume2(kind scanner.TokenKind) scanner.Token {
 func (p *parser) error(token scanner.Token, format string, args ...any) *core.Diagnostic {
 	return &core.Diagnostic{
 		Kind:    core.ErrorKind,
-		Range:   ast.TokenToRange(token),
+		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	}
 }
@@ -168,7 +178,7 @@ func (p *parser) error(token scanner.Token, format string, args ...any) *core.Di
 func (p *parser) error2(token scanner.Token, format string, args ...any) {
 	p.reporter.Report(core.Diagnostic{
 		Kind:    core.ErrorKind,
-		Range:   ast.TokenToRange(token),
+		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	})
 }

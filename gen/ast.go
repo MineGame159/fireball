@@ -262,8 +262,9 @@ func main() {
 func generate(w *writer, kind string, items []item) {
 	w.write("package ast")
 	w.write("")
-	w.write("import \"fireball/core/scanner\"")
+	w.write("import \"fireball/core\"")
 	w.write("import \"fireball/core/types\"")
+	w.write("import \"fireball/core/scanner\"")
 
 	w.write("")
 	w.write("//go:generate go run ../../gen/ast.go")
@@ -307,7 +308,7 @@ func generate(w *writer, kind string, items []item) {
 		w.write("type %s struct {", item.name)
 
 		if item.ast {
-			w.write("range_ Range")
+			w.write("range_ core.Range")
 
 			if kind == "Expr" {
 				w.write("type_ types.Type")
@@ -343,23 +344,23 @@ func generate(w *writer, kind string, items []item) {
 			w.write("")
 
 			// Range
-			w.write("%s Range() Range {", method)
+			w.write("%s Range() core.Range {", method)
 			w.write("return %c.range_", short)
 			w.write("}")
 			w.write("")
 
 			// SetRangeToken
 			w.write("%s SetRangeToken(start, end scanner.Token) {", method)
-			w.write("%c.range_ = Range{", short)
-			w.write("Start: TokenToPos(start, false),")
-			w.write("End: TokenToPos(end, true),")
+			w.write("%c.range_ = core.Range{", short)
+			w.write("Start: core.TokenToPos(start, false),")
+			w.write("End: core.TokenToPos(end, true),")
 			w.write("}")
 			w.write("}")
 			w.write("")
 
 			// SetRangePos
-			w.write("%s SetRangePos(start, end Pos) {", method)
-			w.write("%c.range_ = Range{", short)
+			w.write("%s SetRangePos(start, end core.Pos) {", method)
+			w.write("%c.range_ = core.Range{", short)
 			w.write("Start: start,")
 			w.write("End: end,")
 			w.write("}")
@@ -368,7 +369,7 @@ func generate(w *writer, kind string, items []item) {
 
 			// SetRangeNode
 			w.write("%s SetRangeNode(start, end Node) {", method)
-			w.write("%c.range_ = Range{", short)
+			w.write("%c.range_ = core.Range{", short)
 			w.write("Start: start.Range().Start,")
 			w.write("End: end.Range().End,")
 			w.write("}")
@@ -413,52 +414,10 @@ func generate(w *writer, kind string, items []item) {
 			w.write("")
 
 			// AcceptTypes
-			w.write("%s AcceptTypes(visitor types.Visitor) {", method)
+			genAcceptTypes(w, kind, items, item, short, method, false)
 
-			if kind == "Expr" {
-				w.write("visitor.VisitType(&%c.type_)", short)
-			}
-
-			for _, f := range item.fields {
-				if strings.HasPrefix(f.type_, "[]") {
-					type_ := f.type_[2:]
-
-					if type_ == "Type" {
-						w.write("for i := range %c.%s {", short, f.name)
-						w.write("visitor.VisitType(&%c.%s[i])", short, f.name)
-						w.write("}")
-					} else {
-						fi := getItem(items, type_)
-
-						if fi != nil && fi.hasTypeField() {
-							w.write("for i := range %c.%s {", short, f.name)
-
-							for _, fif := range fi.fields {
-								if fif.type_ == "Type" {
-									w.write("visitor.VisitType(&%c.%s[i].%s)", short, f.name, fif.name)
-								}
-							}
-
-							w.write("}")
-						}
-					}
-				} else if f.type_ == "Type" {
-					w.write("visitor.VisitType(&%c.%s)", short, f.name)
-				} else {
-					fi := getItem(items, f.type_)
-
-					if fi != nil && fi.hasTypeField() {
-						for _, fif := range fi.fields {
-							if fif.type_ == "Type" {
-								w.write("visitor.VisitType(&%c.%s.%s)", short, f.name, fif.name)
-							}
-						}
-					}
-				}
-			}
-
-			w.write("}")
-			w.write("")
+			// AcceptTypesPtr
+			genAcceptTypes(w, kind, items, item, short, method, true)
 
 			// Leaf
 			w.write("%s Leaf() bool {", method)
@@ -482,6 +441,65 @@ func generate(w *writer, kind string, items []item) {
 			}
 		}
 	}
+}
+
+func genAcceptTypes(w *writer, kind string, items []item, item item, short uint8, method string, ptr bool) {
+	if ptr {
+		w.write("%s AcceptTypesPtr(visitor types.PtrVisitor) {", method)
+	} else {
+		w.write("%s AcceptTypes(visitor types.Visitor) {", method)
+	}
+
+	ptrStr := ""
+
+	if ptr {
+		ptrStr = "&"
+	}
+
+	if kind == "Expr" {
+		w.write("visitor.VisitType(%s%c.type_)", ptrStr, short)
+	}
+
+	for _, f := range item.fields {
+		if strings.HasPrefix(f.type_, "[]") {
+			type_ := f.type_[2:]
+
+			if type_ == "Type" {
+				w.write("for i := range %c.%s {", short, f.name)
+				w.write("visitor.VisitType(%s%c.%s[i])", ptrStr, short, f.name)
+				w.write("}")
+			} else {
+				fi := getItem(items, type_)
+
+				if fi != nil && fi.hasTypeField() {
+					w.write("for i := range %c.%s {", short, f.name)
+
+					for _, fif := range fi.fields {
+						if fif.type_ == "Type" {
+							w.write("visitor.VisitType(%s%c.%s[i].%s)", ptrStr, short, f.name, fif.name)
+						}
+					}
+
+					w.write("}")
+				}
+			}
+		} else if f.type_ == "Type" {
+			w.write("visitor.VisitType(%s%c.%s)", ptrStr, short, f.name)
+		} else {
+			fi := getItem(items, f.type_)
+
+			if fi != nil && fi.hasTypeField() {
+				for _, fif := range fi.fields {
+					if fif.type_ == "Type" {
+						w.write("visitor.VisitType(%s%c.%s.%s)", ptrStr, short, f.name, fif.name)
+					}
+				}
+			}
+		}
+	}
+
+	w.write("}")
+	w.write("")
 }
 
 func getItem(items []item, name string) *item {

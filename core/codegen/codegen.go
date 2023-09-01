@@ -18,13 +18,18 @@ type constant struct {
 	length int
 }
 
+type typeValuePair struct {
+	type_ types.Type
+	val   value
+}
+
 type codegen struct {
 	globals values
 	blocks  values
 	locals  values
 
 	constants []constant
-	types     map[types.Type]value
+	types     []typeValuePair
 	functions []function
 
 	scopes    []scope
@@ -63,7 +68,7 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 		blocks:  values{char: "bb_"},
 		locals:  values{char: "%_"},
 
-		types: make(map[types.Type]value),
+		types: make([]typeValuePair, 0, 64),
 
 		writer: writer,
 		depth:  0,
@@ -73,7 +78,11 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 	for _, decl := range decls {
 		if v, ok := decl.(*ast.Struct); ok {
 			val := c.globals.constant("%struct."+v.Name.Lexeme, v.Type)
-			c.types[v.Type] = val
+
+			c.types = append(c.types, typeValuePair{
+				type_: v.Type,
+				val:   val,
+			})
 
 			c.writeRaw(val.identifier)
 			c.writeRaw(" = type { ")
@@ -216,15 +225,23 @@ func (c *constant) escape() {
 // Types
 
 func (c *codegen) getType(type_ types.Type) value {
+	// TODO: Linear search for types, very bad
+
 	// Try cache
-	if v, ok := c.types[type_]; ok {
-		return v
+	for _, pair := range c.types {
+		if pair.type_.Equals(type_) {
+			return pair.val
+		}
 	}
 
 	// Array
 	if v, ok := type_.(*types.ArrayType); ok {
 		val := c.globals.constant(fmt.Sprintf("[%d x %s]", v.Count, c.getType(v.Base)), type_)
-		c.types[type_] = val
+
+		c.types = append(c.types, typeValuePair{
+			type_: type_,
+			val:   val,
+		})
 
 		return val
 	}
@@ -232,7 +249,11 @@ func (c *codegen) getType(type_ types.Type) value {
 	// Pointer
 	if _, ok := type_.(*types.PointerType); ok {
 		val := c.globals.constant("ptr", type_)
-		c.types[type_] = val
+
+		c.types = append(c.types, typeValuePair{
+			type_: type_,
+			val:   val,
+		})
 
 		return val
 	}
@@ -264,13 +285,17 @@ func (c *codegen) getType(type_ types.Type) value {
 		}
 
 		val := c.globals.constant(name, type_)
-		c.types[type_] = val
+
+		c.types = append(c.types, typeValuePair{
+			type_: type_,
+			val:   val,
+		})
 
 		return val
 	}
 
 	// Error
-	log.Fatalln("Invalid type")
+	log.Fatalln("codegen.getType() - Invalid type")
 	return value{}
 }
 

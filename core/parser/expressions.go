@@ -332,7 +332,7 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *core.Diagnostic) {
 		Args:   args,
 	}
 
-	expr.SetRangePos(callee.Range().Start, ast.TokenToPos(p.current, true))
+	expr.SetRangePos(callee.Range().Start, core.TokenToPos(p.current, true))
 	return expr, nil
 }
 
@@ -357,7 +357,7 @@ func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 		Index:  index,
 	}
 
-	expr.SetRangePos(value.Range().Start, ast.TokenToPos(p.current, true))
+	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	return expr, nil
 }
 
@@ -374,7 +374,7 @@ func (p *parser) finishMember(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 		Name:  name,
 	}
 
-	expr.SetRangePos(value.Range().Start, ast.TokenToPos(p.current, true))
+	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	return expr, nil
 }
 
@@ -393,7 +393,7 @@ func (p *parser) finishCast(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 		Expr:   value,
 	}
 
-	cast.SetRangePos(value.Range().Start, ast.TokenToPos(p.current, true))
+	cast.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	cast.SetType(type_)
 	return cast, nil
 }

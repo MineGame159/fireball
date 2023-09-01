@@ -57,11 +57,7 @@ func Check(reporter core.Reporter, decls []ast.Decl) {
 				}
 			}
 
-			type_ := &types.StructType{
-				Name:   s.Name.Lexeme,
-				Fields: fields,
-			}
-
+			type_ := types.Struct(s.Name.Lexeme, fields, core.Range{})
 			s.Type = type_
 
 			// Save in map and check name collision
@@ -138,27 +134,22 @@ func (c *checker) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
 }
 
-// types.Visitor
+// types.PtrVisitor
 
 func (c *checker) VisitType(type_ *types.Type) {
 	if v, ok := (*type_).(*types.UnresolvedType); ok {
 		t, ok := c.structs[v.Identifier.Lexeme]
 
 		if !ok {
-			// TODO: Range
-			c.reporter.Report(core.Diagnostic{
-				Kind:    core.ErrorKind,
-				Message: fmt.Sprintf("Unknown type '%s'.", v),
-			})
-
-			*type_ = types.Primitive(types.Void)
+			c.errorRange(v.Range(), "Unknown type '%s'.", v)
+			*type_ = types.Primitive(types.Void, v.Range())
 		} else {
-			*type_ = t
+			*type_ = types.Struct(t.Name, t.Fields, v.Range())
 		}
 	}
 
 	if *type_ != nil {
-		(*type_).AcceptTypes(c)
+		(*type_).AcceptChildrenPtr(c)
 	}
 }
 
@@ -166,22 +157,22 @@ func (c *checker) VisitType(type_ *types.Type) {
 
 func (c *checker) AcceptDecl(decl ast.Decl) {
 	decl.Accept(c)
-	decl.AcceptTypes(c)
+	decl.AcceptTypesPtr(c)
 }
 
 func (c *checker) AcceptStmt(stmt ast.Stmt) {
 	stmt.Accept(c)
-	stmt.AcceptTypes(c)
+	stmt.AcceptTypesPtr(c)
 }
 
 func (c *checker) AcceptExpr(expr ast.Expr) {
 	expr.Accept(c)
-	expr.AcceptTypes(c)
+	expr.AcceptTypesPtr(c)
 }
 
 // Diagnostics
 
-func (c *checker) errorRange(range_ ast.Range, format string, args ...any) {
+func (c *checker) errorRange(range_ core.Range, format string, args ...any) {
 	c.reporter.Report(core.Diagnostic{
 		Kind:    core.ErrorKind,
 		Range:   range_,
@@ -196,12 +187,12 @@ func (c *checker) errorNode(node ast.Node, format string, args ...any) {
 func (c *checker) errorToken(token scanner.Token, format string, args ...any) {
 	c.reporter.Report(core.Diagnostic{
 		Kind:    core.ErrorKind,
-		Range:   ast.TokenToRange(token),
+		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	})
 }
 
-func (c *checker) warningRange(range_ ast.Range, format string, args ...any) {
+func (c *checker) warningRange(range_ core.Range, format string, args ...any) {
 	c.reporter.Report(core.Diagnostic{
 		Kind:    core.WarningKind,
 		Range:   range_,
@@ -216,7 +207,7 @@ func (c *checker) warningNode(node ast.Node, format string, args ...any) {
 func (c *checker) warningToken(token scanner.Token, format string, args ...any) {
 	c.reporter.Report(core.Diagnostic{
 		Kind:    core.WarningKind,
-		Range:   ast.TokenToRange(token),
+		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	})
 }

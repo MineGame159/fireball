@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/types"
 )
@@ -23,7 +24,7 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 		if stmt.Initializer == nil {
 			c.errorNode(stmt, "Variable with no initializer needs to have an explicit type.")
 		} else {
-			stmt.Type = stmt.Initializer.Type()
+			stmt.Type = stmt.Initializer.Type().Copy()
 		}
 	} else {
 		if stmt.Initializer != nil && !stmt.Initializer.Type().CanAssignTo(stmt.Type) {
@@ -69,10 +70,12 @@ func (c *checker) VisitReturn(stmt *ast.Return) {
 	stmt.AcceptChildren(c)
 
 	// Check return type
-	var type_ types.Type = types.Primitive(types.Void)
+	var type_ types.Type
 
 	if stmt.Expr != nil {
-		type_ = stmt.Expr.Type()
+		type_ = stmt.Expr.Type().Copy()
+	} else {
+		type_ = types.Primitive(types.Void, core.Range{})
 	}
 
 	if !type_.CanAssignTo(c.function.Returns) {
