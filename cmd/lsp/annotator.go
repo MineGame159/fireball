@@ -4,17 +4,26 @@ import (
 	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
+	"fireball/core/types"
 	"fmt"
 	"github.com/MineGame159/protocol"
 )
 
 type annotator struct {
-	hints []protocol.InlayHint
+	functions map[string]*ast.Func
+	hints     []protocol.InlayHint
 }
 
 func annotate(decls []ast.Decl) []protocol.InlayHint {
 	a := annotator{
-		hints: make([]protocol.InlayHint, 0, 16),
+		functions: make(map[string]*ast.Func),
+		hints:     make([]protocol.InlayHint, 0, 16),
+	}
+
+	for _, decl := range decls {
+		if f, ok := decl.(*ast.Func); ok {
+			a.functions[f.Name.Lexeme] = f
+		}
 	}
 
 	for _, decl := range decls {
@@ -125,6 +134,23 @@ func (a *annotator) VisitCast(expr *ast.Cast) {
 }
 
 func (a *annotator) VisitCall(expr *ast.Call) {
+	if false {
+		if _, ok := expr.Callee.Type().(*types.FunctionType); ok {
+			if ident, ok := expr.Callee.(*ast.Identifier); ok {
+				if f, ok := a.functions[ident.Identifier.Lexeme]; ok {
+					for i, arg := range expr.Args {
+						if i >= len(f.Params) {
+							break
+						}
+
+						param := f.Params[i]
+						a.add(arg.Range().Start, param.Name.Lexeme+": ", protocol.InlayHintKindParameter)
+					}
+				}
+			}
+		}
+	}
+
 	expr.AcceptChildren(a)
 }
 
