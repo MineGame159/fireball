@@ -2,15 +2,19 @@ package codegen
 
 import (
 	"fireball/core/ast"
+	"fireball/core/scanner"
+	"fireball/core/types"
 )
 
 func (c *codegen) VisitBlock(stmt *ast.Block) {
 	c.pushScope()
+	c.debug.pushScope(c.debug.lexicalBlock(stmt.Token()))
 
 	for _, s := range stmt.Stmts {
 		c.acceptStmt(s)
 	}
 
+	c.debug.popScope()
 	c.popScope()
 }
 
@@ -20,14 +24,24 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 
 func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Variable
-	c.addVariable(stmt.Name, c.locals.named(stmt.Name.Lexeme, stmt.Type))
-	c.writeFmt("%%_%s = alloca %s\n", stmt.Name, c.getType(stmt.Type))
+	val := c.locals.named(stmt.Name.Lexeme, stmt.Type)
+	c.addVariable(stmt.Name, val)
+	c.writeFmt("%s = alloca %s\n", val, c.getType(stmt.Type))
 
 	// Initializer
 	if stmt.Initializer != nil {
-		val := c.load(c.acceptExpr(stmt.Initializer), stmt.Initializer.Type())
-		c.writeFmt("store %s %s, ptr %%_%s\n", c.getType(stmt.Initializer.Type()), val, stmt.Name)
+		init := c.load(c.acceptExpr(stmt.Initializer), stmt.Initializer.Type())
+		c.writeFmt("store %s %s, ptr %s\n", c.getType(stmt.Initializer.Type()), init, val)
 	}
+
+	// Debug
+	c.variableDebug(stmt.Name, val, stmt.Type, 0)
+}
+
+func (c *codegen) variableDebug(name scanner.Token, ptr value, type_ types.Type, arg int) {
+	dbg := c.debug.localVariable(name.Lexeme, c.getDbgType(type_), arg, name.Line)
+	loc := c.debug.location(name)
+	c.writeFmt("call void @llvm.dbg.declare(metadata ptr %s, metadata %s, metadata !DIExpression()), !dbg %s\n", ptr, dbg, loc)
 }
 
 func (c *codegen) VisitIf(stmt *ast.If) {
@@ -46,7 +60,9 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 
 	// Condition
 	condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
-	c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, then, else_)
+	loc := c.debug.location(stmt.Token())
+
+	c.writeFmt("br i1 %s, label %%%s, label %%%s, !dbg %s\n", condition, then, else_, loc)
 
 	// Then
 	c.writeBlock(then)
@@ -80,7 +96,9 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 		c.loopEnd = c.blocks.unnamedRaw()
 
 		condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
-		c.writeFmt("br i1 %s, label %%%s, label %%%s\n", condition, body, c.loopEnd)
+		loc := c.debug.location(stmt.Token())
+
+		c.writeFmt("br i1 %s, label %%%s, label %%%s, !dbg %s\n", condition, body, c.loopEnd, loc)
 	} else {
 		c.loopEnd = c.blocks.unnamedRaw()
 	}
@@ -102,20 +120,24 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 }
 
 func (c *codegen) VisitReturn(stmt *ast.Return) {
+	loc := c.debug.location(stmt.Token())
+
 	if stmt.Expr == nil {
 		// Void
-		c.writeStr("ret void\n")
+		c.writeFmt("ret void, !dbg %s\n", loc)
 	} else {
 		// Other
 		val := c.load(c.acceptExpr(stmt.Expr), stmt.Expr.Type())
-		c.writeFmt("ret %s %s\n", c.getType(stmt.Expr.Type()), val)
+		c.writeFmt("ret %s %s, !dbg %s\n", c.getType(stmt.Expr.Type()), val, loc)
 	}
 }
 
 func (c *codegen) VisitBreak(stmt *ast.Break) {
-	c.writeFmt("br label %%%s\n", c.loopEnd)
+	loc := c.debug.location(stmt.Token())
+	c.writeFmt("br label %%%s, !dbg %s\n", c.loopEnd, loc)
 }
 
 func (c *codegen) VisitContinue(stmt *ast.Continue) {
-	c.writeFmt("br label %%%s\n", c.loopStart)
+	loc := c.debug.location(stmt.Token())
+	c.writeFmt("br label %%%s, !dbg %s\n", c.loopStart, loc)
 }

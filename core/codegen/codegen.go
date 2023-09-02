@@ -23,7 +23,15 @@ type typeValuePair struct {
 	val   value
 }
 
+type typeDbgPair struct {
+	type_ types.Type
+	name  string
+}
+
 type codegen struct {
+	debug    debug
+	dbgTypes []typeDbgPair
+
 	globals values
 	blocks  values
 	locals  values
@@ -61,7 +69,7 @@ type variable struct {
 	val  value
 }
 
-func Emit(decls []ast.Decl, writer io.Writer) {
+func Emit(filename string, decls []ast.Decl, writer io.Writer) {
 	// Init codegen
 	c := &codegen{
 		globals: values{char: "@"},
@@ -73,6 +81,13 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 		writer: writer,
 		depth:  0,
 	}
+
+	// File metadata
+	c.writeFmt("source_filename = \"%s\"\n", filename)
+	c.writeRaw("\n")
+
+	file := c.debug.pushScope(c.debug.file(filename))
+	c.debug.compileUnit(file)
 
 	// Emit types
 	for _, decl := range decls {
@@ -127,6 +142,14 @@ func Emit(decls []ast.Decl, writer io.Writer) {
 	for _, co := range c.constants {
 		c.writeFmt("%s = private unnamed_addr constant [%d x i8] c\"%s\\00\"\n", co.identifier, co.length+1, co.data)
 	}
+
+	if len(c.constants) > 0 {
+		c.writeRaw("\n")
+	}
+
+	// Emit debug metadata
+	c.debug.popScope()
+	c.debug.write(c)
 }
 
 // IR
@@ -356,6 +379,131 @@ func (c *codegen) popScope() {
 
 func (c *codegen) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
+}
+
+// Debug
+
+func (c *codegen) getDbgType(type_ types.Type) string {
+	// TODO: Linear search for types, very bad
+
+	// Try cache
+	for _, pair := range c.dbgTypes {
+		if pair.type_.Equals(type_) {
+			return pair.name
+		}
+	}
+
+	// Struct
+	if v, ok := type_.(*types.StructType); ok {
+		members := make([]string, len(v.Fields))
+		offset := 0
+
+		for i, field := range v.Fields {
+			size := field.Type.Size() * 8
+			members[i] = c.debug.derivedType(MemberDTag, field.Name, c.getDbgType(field.Type), size, offset)
+			offset += size
+		}
+
+		name := c.debug.compositeType(StructureTypeCTag, "", v.Range().Start.Line, v.Size()*8, c.debug.tuple(members))
+		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
+			type_: type_,
+			name:  name,
+		})
+
+		return name
+	}
+
+	// Array
+	if v, ok := type_.(*types.ArrayType); ok {
+		subRange := c.debug.subrange(int(v.Count), 0)
+		name := c.debug.compositeType(ArrayTypeCTag, c.getDbgType(v.Base), v.Range().Start.Line, v.Size()*8, "!{"+subRange+"}")
+
+		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
+			type_: type_,
+			name:  name,
+		})
+
+		return name
+	}
+
+	// Pointer
+	if v, ok := type_.(*types.PointerType); ok {
+		name := c.debug.derivedType(PointerTypeDTag, "", c.getDbgType(v.Pointee), v.Size()*8, 0)
+		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
+			type_: type_,
+			name:  name,
+		})
+
+		return name
+	}
+
+	// Primitive
+	if v, ok := type_.(*types.PrimitiveType); ok {
+		var size int
+		var encoding Encoding
+
+		switch v.Kind {
+		case types.Void:
+			c.dbgTypes = append(c.dbgTypes, typeDbgPair{
+				type_: type_,
+				name:  "null",
+			})
+
+			return "null"
+
+		case types.Bool:
+			size = 1
+			encoding = BooleanEncoding
+
+		case types.U8:
+			size = 8
+			encoding = UnsignedEncoding
+		case types.U16:
+			size = 16
+			encoding = UnsignedEncoding
+		case types.U32:
+			size = 32
+			encoding = UnsignedEncoding
+		case types.U64:
+			size = 64
+			encoding = UnsignedEncoding
+
+		case types.I8:
+			size = 8
+			encoding = SignedEncoding
+		case types.I16:
+			size = 16
+			encoding = SignedEncoding
+		case types.I32:
+			size = 32
+			encoding = SignedEncoding
+		case types.I64:
+			size = 64
+			encoding = SignedEncoding
+
+		case types.F32:
+			size = 32
+			encoding = FloatEncoding
+		case types.F64:
+			size = 64
+			encoding = FloatEncoding
+
+		default:
+			log.Fatalln("codegen.getDbgType() - Invalid primitive type kind")
+		}
+
+		name := c.debug.basicType(v.String(), size, encoding)
+		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
+			type_: type_,
+			name:  name,
+		})
+
+		return name
+	}
+
+	// Error
+	log.Fatalln("codegen.getDbgType() - Invalid type")
+	return ""
 }
 
 // Accept

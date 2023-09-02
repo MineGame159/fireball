@@ -14,6 +14,24 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	c.pushScope()
 	c.locals.reset()
 
+	// Debug
+	var dbg string
+
+	if !decl.Extern {
+		dbgTypes := make([]string, len(decl.Params)+1)
+
+		dbgTypes[0] = c.getDbgType(decl.Returns)
+
+		for i, param := range decl.Params {
+			dbgTypes[i+1] = c.getDbgType(param.Type)
+		}
+
+		type_ := c.debug.subroutineType(c.debug.tuple(dbgTypes))
+		dbg = c.debug.subprogram(decl.Name.Lexeme, type_, decl.Name.Line)
+
+		c.debug.pushScope(dbg)
+	}
+
 	// Signature
 	c.writeFmt("%s %s @%s(", ternary(decl.Extern, "declare", "define"), c.getType(decl.Returns), decl.Name)
 
@@ -37,10 +55,10 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	if decl.Extern {
 		c.writeStr(")\n\n")
 	} else {
-		c.writeStr(") {\n")
+		c.writeFmt(") !dbg %s {\n", dbg)
 		c.writeBlock(c.blocks.unnamedRaw())
 
-		for _, param := range decl.Params {
+		for i, param := range decl.Params {
 			val := c.locals.named(param.Name.Lexeme+".var", param.Type)
 			type_ := c.getType(param.Type)
 
@@ -48,6 +66,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 			c.writeFmt("store %s %%%s, ptr %s\n", type_, param.Name, val)
 
 			c.addVariable(param.Name, val)
+			c.variableDebug(param.Name, val, param.Type, i+1)
 		}
 
 		for _, stmt := range decl.Body {
@@ -62,5 +81,9 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	}
 
 	// Restore state
+	if !decl.Extern {
+		c.debug.popScope()
+	}
+
 	c.popScope()
 }

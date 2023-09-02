@@ -72,7 +72,7 @@ func buildExecutable(input string) string {
 	_ = os.Mkdir("build", 0750)
 	irFile, _ := os.Create(output + ".ll")
 
-	codegen.Emit(decls, irFile)
+	codegen.Emit(input, decls, irFile)
 
 	// Compile to object file
 	c := build.Compiler{

@@ -76,8 +76,10 @@ func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 		value := c.load(c.acceptExpr(field.Value), field.Value.Type())
 
 		ptr := c.locals.unnamed(expr.Type())
+		loc := c.debug.location(field.Name)
+
 		c.writeFmt("%s = getelementptr inbounds %s, ptr %s, i32 0, i32 %d\n", ptr, type_, res, i)
-		c.writeFmt("store %s %s, ptr %s\n", c.getType(field.Value.Type()), value, ptr)
+		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(field.Value.Type()), value, ptr, loc)
 	}
 
 	// Return
@@ -86,12 +88,13 @@ func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 }
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
+	loc := c.debug.location(expr.Token())
 	c.acceptExpr(expr.Right)
 
 	switch expr.Op.Kind {
 	case scanner.Bang:
 		res := c.locals.unnamed(expr.Right.Type())
-		c.writeFmt("%s = xor i1 %s, true\n", res, c.load(c.exprValue, expr.Right.Type()))
+		c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", res, c.load(c.exprValue, expr.Right.Type()), loc)
 		c.exprValue = res
 
 	case scanner.Minus:
@@ -101,15 +104,15 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 			if types.IsFloating(v.Kind) {
 				// floating
-				c.writeFmt("%s = fneg %s %s\n", res, c.getType(expr.Right.Type()), val)
+				c.writeFmt("%s = fneg %s %s, !dbg %s\n", res, c.getType(expr.Right.Type()), val, loc)
 			} else {
 				// signed
-				c.writeFmt("%s = sub nsw %s 0, %s\n", res, c.getType(expr.Right.Type()), val)
+				c.writeFmt("%s = sub nsw %s 0, %s, !dbg %s\n", res, c.getType(expr.Right.Type()), val, loc)
 			}
 
 			c.exprValue = res
 		} else {
-			log.Fatalln("Invalid type")
+			log.Fatalln("codegen.VisitUnary() - Invalid type")
 		}
 
 	case scanner.Ampersand:
@@ -119,7 +122,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		}
 
 	default:
-		log.Fatalln("Invalid unary operator")
+		log.Fatalln("codegen.VisitUnary() - Invalid unary operator")
 	}
 }
 
@@ -127,10 +130,12 @@ func (c *codegen) VisitBinary(expr *ast.Binary) {
 	left := c.acceptExpr(expr.Left)
 	right := c.acceptExpr(expr.Right)
 
-	c.exprValue = c.binary(expr.Op.Kind, left, expr.Left.Type(), right, expr.Right.Type())
+	c.exprValue = c.binary(expr.Op, left, expr.Left.Type(), right, expr.Right.Type())
 }
 
 func (c *codegen) VisitLogical(expr *ast.Logical) {
+	loc := c.debug.location(expr.Token())
+
 	left := c.load(c.acceptExpr(expr.Left), expr.Left.Type())
 	right := c.load(c.acceptExpr(expr.Right), expr.Right.Type())
 
@@ -151,7 +156,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 		c.writeBlock(end)
 
 		res := c.locals.unnamed(expr.Type())
-		c.writeFmt("%s = phi i1 [ true, %%%s ], [ %s, %%%s ]\n", res, startBlock, right, false_)
+		c.writeFmt("%s = phi i1 [ true, %%%s ], [ %s, %%%s ], !dbg %s\n", res, startBlock, right, false_, loc)
 
 		c.exprValue = res
 
@@ -171,7 +176,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 		c.writeBlock(end)
 
 		res := c.locals.unnamed(expr.Type())
-		c.writeFmt("%s = phi i1 [ false, %%%s ], [ %s, %%%s ]\n", res, startBlock, right, true_)
+		c.writeFmt("%s = phi i1 [ false, %%%s ], [ %s, %%%s ], !dbg %s\n", res, startBlock, right, true_, loc)
 
 		c.exprValue = res
 
@@ -209,15 +214,18 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
 
 	if expr.Op.Kind != scanner.Equal {
-		val = c.binary(expr.Op.Kind, c.load(assignee, expr.Assignee.Type()), expr.Assignee.Type(), val, expr.Value.Type())
+		val = c.binary(expr.Op, c.load(assignee, expr.Assignee.Type()), expr.Assignee.Type(), val, expr.Value.Type())
 	}
 
 	// Store
-	c.writeFmt("store %s %s, ptr %s\n", c.getType(expr.Value.Type()), val, assignee)
+	loc := c.debug.location(expr.Token())
+	c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(expr.Value.Type()), val, assignee, loc)
+
 	c.exprValue = assignee
 }
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
+	loc := c.debug.location(expr.Token())
 	val := c.load(c.acceptExpr(expr.Expr), expr.Expr.Type())
 
 	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
@@ -228,46 +236,46 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 			if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsInteger(to.Kind) {
 				// integer / bool to integer
 				if from.Size() > to.Size() {
-					c.writeFmt("%s = trunc %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = trunc %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				} else {
-					c.writeFmt("%s = zext %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = zext %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				}
 
 				return
 			} else if types.IsFloating(from.Kind) && types.IsFloating(to.Kind) {
 				// floating to floating
 				if from.Size() > to.Size() {
-					c.writeFmt("%s = fptrunc %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = fptrunc %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				} else {
-					c.writeFmt("%s = fpext %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = fpext %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				}
 
 				return
 			} else if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsFloating(to.Kind) {
 				// integer / bool to floating
 				if types.IsSigned(from.Kind) {
-					c.writeFmt("%s = sitofp %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = sitofp %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				} else {
-					c.writeFmt("%s = uitofp %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = uitofp %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				}
 
 				return
 			} else if types.IsFloating(from.Kind) && types.IsInteger(to.Kind) {
 				// floating to integer
 				if types.IsSigned(to.Kind) {
-					c.writeFmt("%s = fptosi %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = fptosi %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				} else {
-					c.writeFmt("%s = fptoui %s %s to %s\n", res, c.getType(from), val, c.getType(to))
+					c.writeFmt("%s = fptoui %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
 				}
 
 				return
 			} else if types.IsInteger(from.Kind) && to.Kind == types.Bool {
 				// integer to bool
-				c.writeFmt("%s = icmp ne %s %s, 0\n", res, c.getType(from), val)
+				c.writeFmt("%s = icmp ne %s %s, 0, !dbg %s\n", res, c.getType(from), val, loc)
 				return
 			} else if types.IsFloating(from.Kind) && to.Kind == types.Bool {
 				// floating to bool
-				c.writeFmt("%s = fcmp une %s %s, 0\n", res, c.getType(from), val)
+				c.writeFmt("%s = fcmp une %s %s, 0, !dbg %s\n", res, c.getType(from), val, loc)
 				return
 			}
 		}
@@ -324,7 +332,9 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 		builder.WriteString(fmt.Sprintf("%s %s", c.getType(expr.Args[i].Type()), arg))
 	}
 
-	builder.WriteString(")\n")
+	builder.WriteString("), !dbg ")
+	builder.WriteString(c.debug.location(expr.Token()))
+	builder.WriteRune('\n')
 	c.writeStr(builder.String())
 }
 
@@ -344,7 +354,8 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	res := c.locals.unnamed(expr.Type())
 	res.needsLoading = true
 
-	c.writeFmt("%s = getelementptr inbounds %s, %s %s, %s %s\n", res, type_, c.getType(val.type_), val, c.getType(expr.Index.Type()), index)
+	loc := c.debug.location(expr.Token())
+	c.writeFmt("%s = getelementptr inbounds %s, %s %s, %s %s, !debg %s\n", res, type_, c.getType(val.type_), val, c.getType(expr.Index.Type()), index, loc)
 
 	c.exprValue = res
 }
@@ -376,14 +387,15 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	res := c.locals.unnamed(expr.Type())
 	res.needsLoading = true
 
-	c.writeFmt("%s = getelementptr inbounds %s, %s %s, i32 0, i32 %d\n", res, c.getType(s), c.getType(val.type_), val, i)
+	loc := c.debug.location(expr.Token())
+	c.writeFmt("%s = getelementptr inbounds %s, %s %s, i32 0, i32 %d, !dbg %s\n", res, c.getType(s), c.getType(val.type_), val, i, loc)
 
 	c.exprValue = res
 }
 
 // Utils
 
-func (c *codegen) binary(op scanner.TokenKind, left value, leftType types.Type, right value, rightType types.Type) value {
+func (c *codegen) binary(op scanner.Token, left value, leftType types.Type, right value, rightType types.Type) value {
 	// Load arguments in case they are pointers
 	left = c.load(left, leftType)
 	right = c.load(right, rightType)
@@ -400,7 +412,7 @@ func (c *codegen) binary(op scanner.TokenKind, left value, leftType types.Type, 
 	// Select correct instruction
 	inst := ""
 
-	switch op {
+	switch op.Kind {
 	case scanner.Plus, scanner.PlusEqual:
 		inst = ternary(floating, "fadd", "add")
 	case scanner.Minus, scanner.MinusEqual:
@@ -432,7 +444,9 @@ func (c *codegen) binary(op scanner.TokenKind, left value, leftType types.Type, 
 
 	// Emit
 	val := c.locals.unnamed(left.type_)
-	c.writeFmt("%s = %s %s %s, %s\n", val, inst, c.getType(left.type_), left, right)
+
+	loc := c.debug.location(op)
+	c.writeFmt("%s = %s %s %s, %s, !dbg %s\n", val, inst, c.getType(left.type_), left, right, loc)
 
 	return val
 }

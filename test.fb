@@ -4,13 +4,18 @@ struct Vec2 {
 }
 
 func main() i32 {
-    var point = Vec2 {
-        x: 1,
-        y: 5
-    };
+    var pos = Vec2 { x: 2, y: 6 };
+    print(pos.x);
 
-    printf("X: %d, Y: %d\n", point.x, point.y);
+    var numbers [2]i32;
+    numbers[0] = 9;
+    numbers[1] = 19;
+
     return 0;
+}
+
+func print(a i32) {
+    printf("Number: %d\n", a);
 }
 
 extern func printf(format *u8, ...) void
