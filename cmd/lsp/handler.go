@@ -273,12 +273,31 @@ func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (resu
 		Column: int(params.Position.Character),
 	}
 
-	// GetLeaf node under cursor
+	// Get node under cursor
 	for _, decl := range doc.Decls {
 		node := ast.GetLeaf(decl, pos)
 
 		if expr, ok := node.(ast.Expr); ok {
-			// ast.Expt
+			// ast.Member that is an enum
+			if m, ok := node.(*ast.Member); ok {
+				if _, ok := m.Value.Type().(*types.EnumType); ok {
+					if e, ok := m.Type().(*types.EnumType); ok {
+						case_ := e.GetCase(m.Name.Lexeme)
+
+						if case_ != nil {
+							return &protocol.Hover{
+								Contents: protocol.MarkupContent{
+									Kind:  protocol.PlainText,
+									Value: strconv.Itoa(case_.Value),
+								},
+								Range: convertRangePtr(expr.Range()),
+							}, nil
+						}
+					}
+				}
+			}
+
+			// ast.Expr
 			text := expr.Type().String()
 
 			// Ignore literal expressions
