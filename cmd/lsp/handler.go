@@ -8,6 +8,7 @@ import (
 	"fireball/core/types"
 	"github.com/MineGame159/protocol"
 	"go.uber.org/zap"
+	"strconv"
 	"strings"
 )
 
@@ -47,7 +48,9 @@ func (h *handler) Initialize(ctx context.Context, params *protocol.InitializePar
 						protocol.SemanticTokenVariable,
 						protocol.SemanticTokenType,
 						protocol.SemanticTokenClass,
+						protocol.SemanticTokenEnum,
 						protocol.SemanticTokenProperty,
+						protocol.SemanticTokenEnumMember,
 					},
 					TokenModifiers: []protocol.SemanticTokenModifiers{},
 				},
@@ -302,6 +305,22 @@ func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (resu
 				},
 				Range: convertRangePtr(core.TokenToRange(variable.Name)),
 			}, nil
+		} else if enum, ok := node.(*ast.Enum); ok {
+			// ast.Enum
+
+			for _, case_ := range enum.Cases {
+				range_ := core.TokenToRange(case_.Name)
+
+				if range_.Contains(pos) {
+					return &protocol.Hover{
+						Contents: protocol.MarkupContent{
+							Kind:  protocol.PlainText,
+							Value: strconv.Itoa(case_.Value),
+						},
+						Range: convertRangePtr(range_),
+					}, nil
+				}
+			}
 		}
 	}
 
@@ -439,30 +458,16 @@ func (h *handler) Moniker(ctx context.Context, params *protocol.MonikerParams) (
 func (h *handler) InlayHint(ctx context.Context, params *protocol.InlayHintParams) (result []protocol.InlayHint, err error) {
 	h.logger.Debug("handle InlayHint")
 
-	// GetLeaf document
+	// Get document
 	doc, err := h.docs.Get(params.TextDocument.URI)
 	if err != nil {
 		return nil, err
 	}
 
-	doc.EnsureParsed()
+	doc.EnsureChecked()
 
-	// GetLeaf hints
-	hints := make([]protocol.InlayHint, 0, 8)
-
-	for _, decl := range doc.Decls {
-		ast.VisitStmts[*ast.Variable](decl, func(stmt *ast.Variable) {
-			if stmt.InferType {
-				hints = append(hints, protocol.InlayHint{
-					Position: convertPos(core.TokenToPos(stmt.Name, true)),
-					Label:    " " + stmt.Type.String(),
-					Kind:     protocol.InlayHintKindType,
-				})
-			}
-		})
-	}
-
-	return hints, nil
+	// Get hints
+	return annotate(doc.Decls), nil
 }
 
 func (h *handler) Request(ctx context.Context, method string, params interface{}) (result interface{}, err error) {

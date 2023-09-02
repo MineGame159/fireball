@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
@@ -38,6 +39,7 @@ type codegen struct {
 
 	constants []constant
 	types     []typeValuePair
+	enums     core.Set[string]
 	functions []function
 
 	scopes    []scope
@@ -77,6 +79,7 @@ func Emit(filename string, decls []ast.Decl, writer io.Writer) {
 		locals:  values{char: "%_"},
 
 		types: make([]typeValuePair, 0, 64),
+		enums: core.NewSet[string](),
 
 		writer: writer,
 		depth:  0,
@@ -116,9 +119,11 @@ func Emit(filename string, decls []ast.Decl, writer io.Writer) {
 
 	c.writeRaw("\n")
 
-	// Find all functions
+	// Find all enums and functions
 	for _, decl := range decls {
-		if f, ok := decl.(*ast.Func); ok {
+		if e, ok := decl.(*ast.Enum); ok {
+			c.enums.Add(e.Name.Lexeme)
+		} else if f, ok := decl.(*ast.Func); ok {
 			params := make([]types.Type, len(f.Params))
 
 			for i, param := range f.Params {
@@ -255,6 +260,11 @@ func (c *codegen) getType(type_ types.Type) value {
 		if pair.type_.Equals(type_) {
 			return pair.val
 		}
+	}
+
+	// Enum
+	if v, ok := type_.(*types.EnumType); ok {
+		return c.getType(v.Type)
 	}
 
 	// Array
@@ -405,6 +415,17 @@ func (c *codegen) getDbgType(type_ types.Type) string {
 		}
 
 		name := c.debug.compositeType(StructureTypeCTag, "", v.Range().Start.Line, v.Size()*8, c.debug.tuple(members))
+		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
+			type_: type_,
+			name:  name,
+		})
+
+		return name
+	}
+
+	// Enum
+	if v, ok := type_.(*types.EnumType); ok {
+		name := c.debug.derivedType(TypedefDTag, v.Name, c.getDbgType(v.Type), v.Size()*8, 0)
 		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
 			type_: type_,
 			name:  name,

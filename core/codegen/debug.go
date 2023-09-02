@@ -138,8 +138,16 @@ func (d *debug) subroutineType(types string) string {
 }
 
 func (d *debug) derivedType(tag DTag, name string, baseType string, size int, offset int) string {
-	if name == "" && offset == 0 {
-		return d.node("!DIDerivedType(tag: %s, baseType: %s, size: %d)", tag, baseType, size)
+	if name == "" {
+		if offset == 0 {
+			return d.node("!DIDerivedType(tag: %s, baseType: %s, size: %d)", tag, baseType, size)
+		}
+
+		return d.node("!DIDerivedType(tag: %s, baseType: %s, size: %d, offset: %d)", tag, baseType, size, offset)
+	}
+
+	if offset == 0 {
+		return d.node("!DIDerivedType(tag: %s, name: \"%s\", baseType: %s, size: %d)", tag, name, baseType, size)
 	}
 
 	return d.node("!DIDerivedType(tag: %s, name: \"%s\", baseType: %s, size: %d, offset: %d)", tag, name, baseType, size, offset)

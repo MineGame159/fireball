@@ -3,13 +3,18 @@ struct Vec2 {
     y i32
 }
 
+enum Animal {
+    Dog = 9,
+    Cat
+}
+
 func main() i32 {
     var pos = Vec2 { x: 2, y: 6 };
     print(pos.x);
 
-    var numbers [2]i32;
-    numbers[0] = 9;
-    numbers[1] = 19;
+    var animal = 9 as Animal;
+    printf("Dog: %d\n", animal == Animal.Dog);
+    printf("Cat: %d\n", animal == Animal.Cat);
 
     return 0;
 }

@@ -36,6 +36,17 @@ func (p *printer) VisitStruct(decl *Struct) {
 	}
 }
 
+func (p *printer) VisitEnum(decl *Enum) {
+	p.print("enum %s %s", decl.Name, decl.Type)
+	p.depth++
+
+	for _, case_ := range decl.Cases {
+		p.print("%s = %d", case_.Name, case_.Value)
+	}
+
+	p.depth--
+}
+
 func (p *printer) VisitFunc(decl *Func) {
 	str := strings.Builder{}
 

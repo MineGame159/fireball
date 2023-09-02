@@ -8,6 +8,7 @@ import "fireball/core/scanner"
 
 type DeclVisitor interface {
 	VisitStruct(decl *Struct)
+	VisitEnum(decl *Enum)
 	VisitFunc(decl *Func)
 }
 
@@ -90,6 +91,75 @@ func (s *Struct) Leaf() bool {
 type Field struct {
 	Name scanner.Token
 	Type types.Type
+}
+
+// Enum
+
+type Enum struct {
+	range_ core.Range
+
+	Name      scanner.Token
+	Type      types.Type
+	InferType bool
+	Cases     []EnumCase
+}
+
+func (e *Enum) Token() scanner.Token {
+	return e.Name
+}
+
+func (e *Enum) Range() core.Range {
+	return e.range_
+}
+
+func (e *Enum) SetRangeToken(start, end scanner.Token) {
+	e.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
+	}
+}
+
+func (e *Enum) SetRangePos(start, end core.Pos) {
+	e.range_ = core.Range{
+		Start: start,
+		End:   end,
+	}
+}
+
+func (e *Enum) SetRangeNode(start, end Node) {
+	e.range_ = core.Range{
+		Start: start.Range().Start,
+		End:   end.Range().End,
+	}
+}
+
+func (e *Enum) Accept(visitor DeclVisitor) {
+	visitor.VisitEnum(e)
+}
+
+func (e *Enum) AcceptChildren(visitor Acceptor) {
+}
+
+func (e *Enum) AcceptTypes(visitor types.Visitor) {
+	if e.Type != nil {
+		visitor.VisitType(e.Type)
+	}
+}
+
+func (e *Enum) AcceptTypesPtr(visitor types.PtrVisitor) {
+	visitor.VisitType(&e.Type)
+}
+
+func (e *Enum) Leaf() bool {
+	return true
+}
+
+// EnumCase
+
+type EnumCase struct {
+	Name       scanner.Token
+	Value      int
+	InferValue bool
 }
 
 // Func

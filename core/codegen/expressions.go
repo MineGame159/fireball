@@ -186,18 +186,20 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 }
 
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
-	// Functions
-	f := c.getFunction(expr.Identifier)
+	// Enum
+	if _, ok := expr.Type().(*types.EnumType); ok && c.enums.Contains(expr.Identifier.Lexeme) {
+		c.exprValue = value{identifier: "$enum$"}
+		return
+	}
 
-	if f != nil {
+	// Functions
+	if f := c.getFunction(expr.Identifier); f != nil {
 		c.exprValue = f.val
 		return
 	}
 
 	// Variables
-	v := c.getVariable(expr.Identifier)
-
-	if v != nil {
+	if v := c.getVariable(expr.Identifier); v != nil {
 		c.exprValue = v.val
 		return
 	}
@@ -226,58 +228,29 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
 	loc := c.debug.location(expr.Token())
-	val := c.load(c.acceptExpr(expr.Expr), expr.Expr.Type())
+	val := c.acceptExpr(expr.Expr)
 
 	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
 		if to, ok := expr.Type().(*types.PrimitiveType); ok {
-			res := c.locals.unnamed(expr.Type())
-			c.exprValue = res
+			// primitive to primitive
+			c.castPrimitiveToPrimitive(val, loc, from, to, from.Kind, to.Kind)
+			return
+		}
+	}
 
-			if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsInteger(to.Kind) {
-				// integer / bool to integer
-				if from.Size() > to.Size() {
-					c.writeFmt("%s = trunc %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				} else {
-					c.writeFmt("%s = zext %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				}
+	if from, ok := expr.Expr.Type().(*types.EnumType); ok {
+		if to, ok := expr.Type().(*types.PrimitiveType); ok {
+			// enum to integer
+			c.castPrimitiveToPrimitive(val, loc, from, to, from.Type.(*types.PrimitiveType).Kind, to.Kind)
+			return
+		}
+	}
 
-				return
-			} else if types.IsFloating(from.Kind) && types.IsFloating(to.Kind) {
-				// floating to floating
-				if from.Size() > to.Size() {
-					c.writeFmt("%s = fptrunc %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				} else {
-					c.writeFmt("%s = fpext %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				}
-
-				return
-			} else if (types.IsInteger(from.Kind) || from.Kind == types.Bool) && types.IsFloating(to.Kind) {
-				// integer / bool to floating
-				if types.IsSigned(from.Kind) {
-					c.writeFmt("%s = sitofp %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				} else {
-					c.writeFmt("%s = uitofp %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				}
-
-				return
-			} else if types.IsFloating(from.Kind) && types.IsInteger(to.Kind) {
-				// floating to integer
-				if types.IsSigned(to.Kind) {
-					c.writeFmt("%s = fptosi %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				} else {
-					c.writeFmt("%s = fptoui %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
-				}
-
-				return
-			} else if types.IsInteger(from.Kind) && to.Kind == types.Bool {
-				// integer to bool
-				c.writeFmt("%s = icmp ne %s %s, 0, !dbg %s\n", res, c.getType(from), val, loc)
-				return
-			} else if types.IsFloating(from.Kind) && to.Kind == types.Bool {
-				// floating to bool
-				c.writeFmt("%s = fcmp une %s %s, 0, !dbg %s\n", res, c.getType(from), val, loc)
-				return
-			}
+	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
+		if to, ok := expr.Type().(*types.EnumType); ok {
+			// integer to enum
+			c.castPrimitiveToPrimitive(val, loc, from, to, from.Kind, to.Type.(*types.PrimitiveType).Kind)
+			return
 		}
 	}
 
@@ -291,6 +264,54 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 
 	// Error
 	log.Fatalln("Invalid cast")
+}
+
+func (c *codegen) castPrimitiveToPrimitive(val value, loc string, from, to types.Type, fromKind, toKind types.PrimitiveKind) {
+	if fromKind == toKind {
+		c.exprValue = val
+		return
+	}
+
+	val = c.load(val, from)
+
+	res := c.locals.unnamed(to)
+	c.exprValue = res
+
+	if (types.IsInteger(fromKind) || fromKind == types.Bool) && types.IsInteger(toKind) {
+		// integer / bool to integer
+		if from.Size() > to.Size() {
+			c.writeFmt("%s = trunc %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		} else {
+			c.writeFmt("%s = zext %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		}
+	} else if types.IsFloating(fromKind) && types.IsFloating(toKind) {
+		// floating to floating
+		if from.Size() > to.Size() {
+			c.writeFmt("%s = fptrunc %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		} else {
+			c.writeFmt("%s = fpext %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		}
+	} else if (types.IsInteger(fromKind) || fromKind == types.Bool) && types.IsFloating(toKind) {
+		// integer / bool to floating
+		if types.IsSigned(fromKind) {
+			c.writeFmt("%s = sitofp %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		} else {
+			c.writeFmt("%s = uitofp %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		}
+	} else if types.IsFloating(fromKind) && types.IsInteger(toKind) {
+		// floating to integer
+		if types.IsSigned(toKind) {
+			c.writeFmt("%s = fptosi %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		} else {
+			c.writeFmt("%s = fptoui %s %s to %s, !dbg %s\n", res, c.getType(from), val, c.getType(to), loc)
+		}
+	} else if types.IsInteger(fromKind) && toKind == types.Bool {
+		// integer to bool
+		c.writeFmt("%s = icmp ne %s %s, 0, !dbg %s\n", res, c.getType(from), val, loc)
+	} else if types.IsFloating(fromKind) && toKind == types.Bool {
+		// floating to bool
+		c.writeFmt("%s = fcmp une %s %s, 0, !dbg %s\n", res, c.getType(from), val, loc)
+	}
 }
 
 func (c *codegen) VisitCall(expr *ast.Call) {
@@ -361,36 +382,45 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 }
 
 func (c *codegen) VisitMember(expr *ast.Member) {
-	val := c.toPtrOrLoad(c.acceptExpr(expr.Value), expr.Value.Type())
+	value := c.acceptExpr(expr.Value)
 
-	var s *types.StructType
+	if value.identifier == "$enum$" {
+		// Enum
+		case_ := expr.Value.Type().(*types.EnumType).GetCase(expr.Name.Lexeme)
+		c.exprValue = c.locals.constant(strconv.Itoa(case_.Value), expr.Type())
+	} else {
+		// Member
+		val := c.toPtrOrLoad(value, expr.Value.Type())
 
-	if v, ok := expr.Value.Type().(*types.StructType); ok {
-		s = v
-	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
-		if v, ok := v.Pointee.(*types.StructType); ok {
+		var s *types.StructType
+
+		if v, ok := expr.Value.Type().(*types.StructType); ok {
 			s = v
+		} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
+			if v, ok := v.Pointee.(*types.StructType); ok {
+				s = v
 
-			res := c.locals.unnamed(val.type_)
-			c.writeFmt("%s = load ptr, ptr %s\n", res, val)
+				res := c.locals.unnamed(val.type_)
+				c.writeFmt("%s = load ptr, ptr %s\n", res, val)
 
-			val = res
+				val = res
+			}
 		}
+
+		if s == nil {
+			log.Fatalln("Invalid member value")
+		}
+
+		i, _ := s.GetField(expr.Name.Lexeme)
+
+		res := c.locals.unnamed(expr.Type())
+		res.needsLoading = true
+
+		loc := c.debug.location(expr.Token())
+		c.writeFmt("%s = getelementptr inbounds %s, %s %s, i32 0, i32 %d, !dbg %s\n", res, c.getType(s), c.getType(val.type_), val, i, loc)
+
+		c.exprValue = res
 	}
-
-	if s == nil {
-		log.Fatalln("Invalid member value")
-	}
-
-	i, _ := s.GetField(expr.Name.Lexeme)
-
-	res := c.locals.unnamed(expr.Type())
-	res.needsLoading = true
-
-	loc := c.debug.location(expr.Token())
-	c.writeFmt("%s = getelementptr inbounds %s, %s %s, i32 0, i32 %d, !dbg %s\n", res, c.getType(s), c.getType(val.type_), val, i, loc)
-
-	c.exprValue = res
 }
 
 // Utils

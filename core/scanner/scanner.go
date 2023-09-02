@@ -118,6 +118,8 @@ func (s *Scanner) identifierKind() TokenKind {
 			switch s.text[s.startI+1] {
 			case 'l':
 				return s.checkKeyword(2, "se", Else)
+			case 'n':
+				return s.checkKeyword(2, "um", Enum)
 			case 'x':
 				return s.checkKeyword(2, "tern", Extern)
 			}

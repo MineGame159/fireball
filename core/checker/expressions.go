@@ -139,6 +139,31 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		c.errorRange(expr.Range(), "Expected two number types.")
 	} else if scanner.IsEquality(expr.Op.Kind) {
 		// Equality
+		valid := false
+
+		if expr.Left.Type().Equals(expr.Right.Type()) {
+			// left type == right type
+			valid = true
+		} else if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
+			// integer == integer || floating == floating
+			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
+				if (types.IsInteger(left.Kind) && types.IsInteger(right.Kind)) || (types.IsFloating(left.Kind) && types.IsFloating(right.Kind)) {
+					valid = true
+				}
+			}
+		} else if left, ok := expr.Left.Type().(*types.PointerType); ok {
+			if right, ok := expr.Right.Type().(*types.PointerType); ok {
+				// *void == *? || *? == *void
+				if types.IsPrimitive(left.Pointee, types.Void) || types.IsPrimitive(right.Pointee, types.Void) {
+					valid = true
+				}
+			}
+		}
+
+		if !valid {
+			c.errorRange(expr.Range(), "Cannot check equality for '%s' and '%s'.", expr.Left.Type(), expr.Right.Type())
+		}
+
 		expr.SetType(types.Primitive(types.Bool, core.Range{}))
 	} else if scanner.IsComparison(expr.Op.Kind) {
 		// Comparison
@@ -176,10 +201,15 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	expr.AcceptChildren(c)
 
-	// Function
-	function := c.getFunction(expr.Identifier)
+	// Enum
+	// TODO: Needs parent node support to correctly check enums
+	if enum, ok := c.enums[expr.Identifier.Lexeme]; ok {
+		expr.SetType(enum.Copy())
+		return
+	}
 
-	if function != nil {
+	// Function
+	if function := c.getFunction(expr.Identifier); function != nil {
 		params := make([]types.Type, len(function.Params))
 
 		for i, param := range function.Params {
@@ -195,9 +225,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Variable
-	variable := c.getVariable(expr.Identifier)
-
-	if variable != nil {
+	if variable := c.getVariable(expr.Identifier); variable != nil {
 		variable.used = true
 		expr.SetType(variable.type_.Copy())
 		return
@@ -260,7 +288,18 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(c)
 
 	if types.IsPrimitive(expr.Expr.Type(), types.Void) || types.IsPrimitive(expr.Type(), types.Void) {
+		// void
 		c.errorRange(expr.Range(), "Cannot cast to or from type 'void'.")
+	} else if _, ok := expr.Expr.Type().(*types.EnumType); ok {
+		// enum to non integer
+		if to, ok := expr.Type().(*types.PrimitiveType); !ok || !types.IsInteger(to.Kind) {
+			c.errorRange(expr.Range(), "Can only cast enums to integers, not '%s'.", to)
+		}
+	} else if _, ok := expr.Type().(*types.EnumType); ok {
+		// non integer to enum
+		if from, ok := expr.Expr.Type().(*types.PrimitiveType); !ok || !types.IsInteger(from.Kind) {
+			c.errorRange(expr.Range(), "Can only cast to enums from integers, not '%s'.", from)
+		}
 	}
 }
 
@@ -322,6 +361,19 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 func (c *checker) VisitMember(expr *ast.Member) {
 	expr.AcceptChildren(c)
 
+	if v, ok := expr.Value.Type().(*types.EnumType); ok {
+		// Enum
+		if _, ok := expr.Value.(*ast.Identifier); ok {
+			if case_ := v.GetCase(expr.Name.Lexeme); case_ == nil {
+				c.errorToken(expr.Name, "Enum '%s' does not contain case '%s'.", v, expr.Name)
+			}
+
+			expr.SetType(v.Copy())
+			return
+		}
+	}
+
+	// Struct
 	var s *types.StructType
 
 	if v, ok := expr.Value.Type().(*types.StructType); ok {

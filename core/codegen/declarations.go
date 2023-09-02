@@ -6,7 +6,9 @@ import (
 )
 
 func (c *codegen) VisitStruct(decl *ast.Struct) {
+}
 
+func (c *codegen) VisitEnum(decl *ast.Enum) {
 }
 
 func (c *codegen) VisitFunc(decl *ast.Func) {

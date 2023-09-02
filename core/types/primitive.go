@@ -3,6 +3,7 @@ package types
 import (
 	"fireball/core"
 	"log"
+	"math"
 )
 
 // PrimitiveType
@@ -140,14 +141,71 @@ func IsFloating(kind PrimitiveKind) bool {
 	return kind == F32 || kind == F64
 }
 
-func IsSigned(kind PrimitiveKind) bool {
-	return kind == I8 || kind == I16 || kind == I32 || kind == I64
-}
-
 func IsUnsigned(kind PrimitiveKind) bool {
 	return kind == U8 || kind == U16 || kind == U32 || kind == U64
 }
 
+func IsSigned(kind PrimitiveKind) bool {
+	return kind == I8 || kind == I16 || kind == I32 || kind == I64
+}
+
 func IsInteger(kind PrimitiveKind) bool {
 	return IsSigned(kind) || IsUnsigned(kind)
+}
+
+func GetUnsignedRange(kind PrimitiveKind) (min, max uint64) {
+	switch kind {
+	case U8:
+		return 0, math.MaxUint8
+	case U16:
+		return 0, math.MaxUint16
+	case U32:
+		return 0, math.MaxUint32
+	case U64:
+		return 0, math.MaxUint64
+
+	default:
+		return 0, 0
+	}
+}
+
+func GetSignedRange(kind PrimitiveKind) (min, max int64) {
+	switch kind {
+	case I8:
+		return math.MinInt8, math.MaxInt8
+	case I16:
+		return math.MinInt16, math.MaxInt16
+	case I32:
+		return math.MinInt32, math.MaxInt32
+	case I64:
+		return math.MinInt64, math.MaxInt64
+
+	default:
+		return 0, 0
+	}
+}
+
+func GetRangeTrunc(kind PrimitiveKind) (min, max int64) {
+	switch kind {
+	case U8:
+		return 0, math.MaxUint8
+	case U16:
+		return 0, math.MaxUint16
+	case U32:
+		return 0, math.MaxUint32
+	case U64:
+		return 0, math.MaxInt64
+
+	case I8:
+		return math.MinInt8, math.MaxInt8
+	case I16:
+		return math.MinInt16, math.MaxInt16
+	case I32:
+		return math.MinInt32, math.MaxInt32
+	case I64:
+		return math.MinInt64, math.MaxInt64
+
+	default:
+		return 0, 0
+	}
 }

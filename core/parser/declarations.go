@@ -5,6 +5,7 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"strconv"
 )
 
 func (p *parser) declaration() ast.Decl {
@@ -13,7 +14,9 @@ func (p *parser) declaration() ast.Decl {
 	if p.match(scanner.Struct) {
 		return p.struct_()
 	}
-
+	if p.match(scanner.Enum) {
+		return p.enum()
+	}
 	if p.match(scanner.Func) {
 		return p.function()
 	}
@@ -108,6 +111,115 @@ func (p *parser) struct_() ast.Decl {
 	return decl
 }
 
+func (p *parser) enum() ast.Decl {
+	start := p.current
+
+	// Name
+	name := p.consume2(scanner.Identifier)
+
+	if name.IsError() {
+		p.error2(p.next, "Expected enum name.")
+		p.syncToDecl()
+		return nil
+	}
+
+	// Type
+	var type_ types.Type
+
+	if !p.check(scanner.LeftBrace) {
+		type__, err := p.parseType()
+
+		if err != nil {
+			p.reporter.Report(*err)
+		}
+
+		type_ = type__
+	}
+
+	// Left brace
+	if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
+		p.error2(p.next, "Expected '{' before enum cases.")
+		p.syncToDecl()
+		return nil
+	}
+
+	// Enum cases
+	cases := make([]ast.EnumCase, 0, 8)
+	lastValue := -1
+
+	for !p.check(scanner.RightBrace) {
+		// Comma
+		if len(cases) > 0 {
+			if comma := p.consume2(scanner.Comma); comma.IsError() {
+				p.error2(p.next, "Expected ',' before next enum case.")
+				p.syncToDecl()
+				return nil
+			}
+		}
+
+		// Name
+		name := p.consume2(scanner.Identifier)
+
+		if name.IsError() {
+			p.error2(p.next, "Expected enum case name.")
+			p.syncToDecl()
+			return nil
+		}
+
+		// Value
+		value := lastValue + 1
+		inferValue := true
+
+		if p.match(scanner.Equal) {
+			literal := p.consume2(scanner.Number)
+
+			if literal.IsError() {
+				p.error2(p.next, "Enum case values can only be integers.")
+				p.syncToDecl()
+				return nil
+			}
+
+			number, err := strconv.Atoi(literal.Lexeme)
+
+			if err != nil {
+				p.error2(literal, "Invalid integer.")
+				p.syncToDecl()
+				return nil
+			}
+
+			value = number
+			inferValue = false
+		}
+
+		lastValue = value
+
+		// Add
+		cases = append(cases, ast.EnumCase{
+			Name:       name,
+			Value:      value,
+			InferValue: inferValue,
+		})
+	}
+
+	// Right brace
+	if brace := p.consume2(scanner.RightBrace); brace.IsError() {
+		p.error2(p.next, "Expected '}' after enum cases.")
+		p.syncToDecl()
+		return nil
+	}
+
+	// Return
+	decl := &ast.Enum{
+		Name:      name,
+		Type:      type_,
+		InferType: type_ == nil,
+		Cases:     cases,
+	}
+
+	decl.SetRangeToken(start, p.current)
+	return decl
+}
+
 func (p *parser) function() ast.Decl {
 	start := p.current
 
@@ -116,18 +228,14 @@ func (p *parser) function() ast.Decl {
 
 	if name.IsError() {
 		p.error2(p.next, "Expected function name.")
-		if !p.syncToDecl() {
-			return nil
-		}
+		p.syncToDecl()
 		return nil
 	}
 
 	// Parameters
 	if paren := p.consume2(scanner.LeftParen); paren.IsError() {
 		p.error2(p.next, "Expected '(' after function name.")
-		if !p.syncToDecl() {
-			return nil
-		}
+		p.syncToDecl()
 		return nil
 	}
 
@@ -138,18 +246,14 @@ func (p *parser) function() ast.Decl {
 		name := p.consume2(scanner.Identifier)
 		if name.IsError() {
 			p.error2(p.next, "Expected parameter name.")
-			if !p.syncToDecl() {
-				return nil
-			}
+			p.syncToDecl()
 			return nil
 		}
 
 		type_, err := p.parseType()
 		if err != nil {
 			p.reporter.Report(*err)
-			if !p.syncToDecl() {
-				return nil
-			}
+			p.syncToDecl()
 			return nil
 		}
 
@@ -168,9 +272,7 @@ func (p *parser) function() ast.Decl {
 
 				if !p.extern {
 					p.error2(dot, "Only extern functions can be variadic.")
-					if !p.syncToDecl() {
-						return nil
-					}
+					p.syncToDecl()
 					return nil
 				}
 			}
@@ -179,9 +281,7 @@ func (p *parser) function() ast.Decl {
 
 	if paren := p.consume2(scanner.RightParen); paren.IsError() {
 		p.error2(p.next, "Expected ')' after function parameters.")
-		if !p.syncToDecl() {
-			return nil
-		}
+		p.syncToDecl()
 		return nil
 	}
 
@@ -192,9 +292,7 @@ func (p *parser) function() ast.Decl {
 		type_, err := p.parseType()
 		if err != nil {
 			p.reporter.Report(*err)
-			if !p.syncToDecl() {
-				return nil
-			}
+			p.syncToDecl()
 			return nil
 		}
 
@@ -211,9 +309,7 @@ func (p *parser) function() ast.Decl {
 
 		if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
 			p.error2(p.next, "Expected '{' before function body.")
-			if !p.syncToDecl() {
-				return nil
-			}
+			p.syncToDecl()
 			return nil
 		}
 
@@ -233,9 +329,7 @@ func (p *parser) function() ast.Decl {
 
 		if brace := p.consume2(scanner.RightBrace); brace.IsError() {
 			p.error2(p.next, "Expected '}' after function body.")
-			if !p.syncToDecl() {
-				return nil
-			}
+			p.syncToDecl()
 			return nil
 		}
 	}

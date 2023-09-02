@@ -38,6 +38,26 @@ var decls = []item{
 		ast: false,
 	},
 	{
+		name: "Enum",
+		fields: []field{
+			{name: "Name", type_: "Token"},
+			{name: "Type", type_: "Type"},
+			{name: "InferType", type_: "bool"},
+			{name: "Cases", type_: "[]EnumCase"},
+		},
+		token: "Name",
+		ast:   true,
+	},
+	{
+		name: "EnumCase",
+		fields: []field{
+			{name: "Name", type_: "Token"},
+			{name: "Value", type_: "int"},
+			{name: "InferValue", type_: "bool"},
+		},
+		ast: false,
+	},
+	{
 		name: "Func",
 		fields: []field{
 			{name: "Extern", type_: "bool"},

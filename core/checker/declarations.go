@@ -25,6 +25,26 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 	}
 }
 
+func (c *checker) VisitEnum(decl *ast.Enum) {
+	decl.AcceptChildren(c)
+
+	// Check type
+	if decl.Type != nil {
+		if v, ok := decl.Type.(*types.PrimitiveType); !ok || !types.IsInteger(v.Kind) {
+			c.errorRange(decl.Type.Range(), "Invalid type '%s', can only be a signed or unsigned integer.", decl.Type)
+		} else {
+			// Check if all cases fit inside the type
+			min_, max_ := types.GetRangeTrunc(v.Kind)
+
+			for _, case_ := range decl.Cases {
+				if int64(case_.Value) < min_ || int64(case_.Value) > max_ {
+					c.errorToken(case_.Name, "Value '%d' does not fit inside the range of '%s'.", case_.Value, decl.Type)
+				}
+			}
+		}
+	}
+}
+
 func (c *checker) VisitFunc(decl *ast.Func) {
 	// Push scope
 	c.function = decl

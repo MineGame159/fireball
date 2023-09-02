@@ -54,6 +54,7 @@ const (
 	Break
 	Return
 	Struct
+	Enum
 
 	Number
 	Character
@@ -102,12 +103,4 @@ func IsArithmetic(kind TokenKind) bool {
 	default:
 		return false
 	}
-}
-
-func IsKeyword(kind TokenKind) bool {
-	return kind >= 29 && kind <= 45
-}
-
-func IsOperator(kind TokenKind) bool {
-	return kind >= 10 && kind <= 28
 }

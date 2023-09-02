@@ -11,7 +11,9 @@ import (
 )
 
 type highlighter struct {
-	functions map[string]struct{}
+	enums core.Set[string]
+
+	functions core.Set[string]
 	params    []ast.Param
 
 	tokens []semantic
@@ -19,13 +21,16 @@ type highlighter struct {
 
 func highlight(decls []ast.Decl) []uint32 {
 	h := &highlighter{
-		functions: make(map[string]struct{}),
+		enums:     core.NewSet[string](),
+		functions: core.NewSet[string](),
 		tokens:    make([]semantic, 0, 256),
 	}
 
 	for _, decl := range decls {
-		if v, ok := decl.(*ast.Func); ok {
-			h.functions[v.Name.Lexeme] = struct{}{}
+		if v, ok := decl.(*ast.Enum); ok {
+			h.enums.Add(v.Name.Lexeme)
+		} else if v, ok := decl.(*ast.Func); ok {
+			h.functions.Add(v.Name.Lexeme)
 		}
 	}
 
@@ -43,6 +48,16 @@ func (h *highlighter) VisitStruct(decl *ast.Struct) {
 
 	for _, field := range decl.Fields {
 		h.addToken(field.Name, propertyKind)
+	}
+
+	decl.AcceptChildren(h)
+}
+
+func (h *highlighter) VisitEnum(decl *ast.Enum) {
+	h.addToken(decl.Name, enumKind)
+
+	for _, case_ := range decl.Cases {
+		h.addToken(case_.Name, enumMemberKind)
 	}
 
 	decl.AcceptChildren(h)
@@ -125,7 +140,9 @@ func (h *highlighter) VisitLogical(expr *ast.Logical) {
 }
 
 func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
-	if _, ok := h.functions[expr.Identifier.Lexeme]; ok {
+	if h.enums.Contains(expr.Identifier.Lexeme) {
+		h.addToken(expr.Identifier, enumKind)
+	} else if h.functions.Contains(expr.Identifier.Lexeme) {
 		h.addToken(expr.Identifier, functionKind)
 	} else if h.isParameter(expr.Identifier) {
 		h.addToken(expr.Identifier, parameterKind)
@@ -153,9 +170,13 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 }
 
 func (h *highlighter) VisitMember(expr *ast.Member) {
-	expr.AcceptChildren(h)
+	if _, ok := expr.Type().(*types.EnumType); ok {
+		h.addToken(expr.Name, enumMemberKind)
+	} else {
+		h.addToken(expr.Name, propertyKind)
+	}
 
-	h.addToken(expr.Name, propertyKind)
+	expr.AcceptChildren(h)
 }
 
 // types.Visitor
@@ -170,6 +191,8 @@ func (h *highlighter) VisitType(type_ types.Type) {
 			h.addRange(type_.Range(), typeKind)
 		} else if _, ok := type_.(*types.StructType); ok {
 			h.addRange(type_.Range(), classKind)
+		} else if _, ok := type_.(*types.EnumType); ok {
+			h.addRange(type_.Range(), enumKind)
 		} else {
 			type_.AcceptChildren(h)
 		}
@@ -203,7 +226,9 @@ const (
 	variableKind
 	typeKind
 	classKind
+	enumKind
 	propertyKind
+	enumMemberKind
 )
 
 type semantic struct {
