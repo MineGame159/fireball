@@ -89,18 +89,18 @@ func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
 	loc := c.debug.location(expr.Token())
-	c.acceptExpr(expr.Right)
+	val := c.acceptExpr(expr.Right)
 
 	switch expr.Op.Kind {
 	case scanner.Bang:
 		res := c.locals.unnamed(expr.Right.Type())
-		c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", res, c.load(c.exprValue, expr.Right.Type()), loc)
+		c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", res, c.load(val, expr.Right.Type()), loc)
 		c.exprValue = res
 
 	case scanner.Minus:
 		if v, ok := expr.Right.Type().(*types.PrimitiveType); ok {
 			res := c.locals.unnamed(expr.Right.Type())
-			val := c.load(c.exprValue, expr.Right.Type())
+			val := c.load(val, expr.Right.Type())
 
 			if types.IsFloating(v.Kind) {
 				// floating
@@ -117,9 +117,14 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 	case scanner.Ampersand:
 		c.exprValue = value{
-			identifier: c.exprValue.identifier,
-			type_:      &types.PointerType{Pointee: c.exprValue.type_},
+			identifier: val.identifier,
+			type_:      &types.PointerType{Pointee: val.type_},
 		}
+
+	case scanner.Star:
+		res := c.locals.unnamed(expr.Type())
+		c.writeFmt("%s = load %s, ptr %s, !dbg %s\n", res, c.getType(expr.Type()), c.load(val, expr.Right.Type()), loc)
+		c.exprValue = res
 
 	default:
 		log.Fatalln("codegen.VisitUnary() - Invalid unary operator")

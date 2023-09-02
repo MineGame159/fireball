@@ -241,8 +241,8 @@ func (p *parser) factor() (ast.Expr, *core.Diagnostic) {
 }
 
 func (p *parser) unary() (ast.Expr, *core.Diagnostic) {
-	// ! - &
-	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand) {
+	// ! - & *
+	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand, scanner.Star) {
 		op := p.current
 
 		// Cascade

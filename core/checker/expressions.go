@@ -110,11 +110,19 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 		}
 
-		expr.SetType(types.Primitive(types.I32, core.Range{}))
 		c.errorRange(expr.Right.Range(), "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Type())
+		expr.SetType(types.Primitive(types.I32, core.Range{}))
 
 	case scanner.Ampersand:
 		expr.SetType(types.Pointer(expr.Right.Type().Copy(), core.Range{}))
+
+	case scanner.Star:
+		if p, ok := expr.Right.Type().(*types.PointerType); ok {
+			expr.SetType(p.Pointee.Copy())
+		} else {
+			c.errorRange(expr.Right.Range(), "Can only dereference pointer types, not '%s'.", expr.Right.Type())
+			expr.SetType(types.Primitive(types.Void, core.Range{}))
+		}
 
 	default:
 		log.Fatalln("checker.VisitUnary() - Invalid unary operator")
