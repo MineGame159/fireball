@@ -32,7 +32,7 @@ func (s *Scanner) Next() Token {
 	if isAlpha(c) {
 		return s.identifier()
 	}
-	if isDigit(c) {
+	if isDigit(c) || (c == '-' && isDigit(s.peek())) {
 		return s.number()
 	}
 
