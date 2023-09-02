@@ -28,6 +28,11 @@
         "scopeName": "source.fb",
         "path": "./fireball.tmGrammar.json"
       }
+    ],
+    "breakpoints": [
+      {
+        "language": "fireball"
+      }
     ]
   },
   "scripts": {
