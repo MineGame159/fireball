@@ -116,8 +116,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 	case scanner.Ampersand:
 		valid := false
 
-		// TODO: Fix this when I improve identifier resolution / variable tracking
-		if i, ok := expr.Right.(*ast.Identifier); ok && c.getVariable(i.Identifier) != nil {
+		if i, ok := expr.Right.(*ast.Identifier); ok && ast.IsIdentifierKindVariable(i.Kind) {
 			// Variable
 			valid = true
 		} else if _, ok := expr.Right.(*ast.Index); ok {
@@ -125,9 +124,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			valid = true
 		} else if m, ok := expr.Right.(*ast.Member); ok {
 			// Member
-			i, ok := m.Value.(*ast.Identifier)
-
-			if _, okEnum := c.enums[i.Identifier.Lexeme]; !ok || !okEnum {
+			if i, ok := m.Value.(*ast.Identifier); !ok || ast.IsIdentifierKindVariable(i.Kind) {
 				valid = true
 			}
 		}
@@ -231,33 +228,49 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	expr.AcceptChildren(c)
 
-	// Enum
-	// TODO: Needs parent node support to correctly check enums
-	if enum, ok := c.enums[expr.Identifier.Lexeme]; ok {
-		expr.SetType(enum.Copy())
+	// Function
+	if parent, ok := expr.Parent().(*ast.Call); ok && parent.Callee == expr {
+		if function := c.getFunction(expr.Identifier); function != nil {
+			params := make([]types.Type, len(function.Params))
+
+			for i, param := range function.Params {
+				params[i] = param.Type
+			}
+
+			expr.SetType(&types.FunctionType{
+				Params:   params,
+				Variadic: function.Variadic,
+				Returns:  function.Returns,
+			})
+		} else {
+			c.errorToken(expr.Identifier, "Function with the name '%s' does not exist.", expr.Identifier)
+			expr.SetType(types.Primitive(types.Void, core.Range{}))
+		}
+
+		expr.Kind = ast.FunctionKind
 		return
 	}
 
-	// Function
-	if function := c.getFunction(expr.Identifier); function != nil {
-		params := make([]types.Type, len(function.Params))
+	// Enum
+	if enum, ok := c.enums[expr.Identifier.Lexeme]; ok {
+		expr.SetType(enum.Copy())
+		expr.Kind = ast.EnumKind
 
-		for i, param := range function.Params {
-			params[i] = param.Type
-		}
-
-		expr.SetType(&types.FunctionType{
-			Params:   params,
-			Variadic: function.Variadic,
-			Returns:  function.Returns,
-		})
 		return
 	}
 
 	// Variable
 	if variable := c.getVariable(expr.Identifier); variable != nil {
 		variable.used = true
+
 		expr.SetType(variable.type_.Copy())
+
+		if variable.param {
+			expr.Kind = ast.ParameterKind
+		} else {
+			expr.Kind = ast.VariableKind
+		}
+
 		return
 	}
 
@@ -274,15 +287,17 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	// Check assignee
 	validAssignee := false
 
-	if v, ok := expr.Assignee.(*ast.Identifier); ok {
-		if _, ok := v.Type().(*types.FunctionType); !ok {
-			validAssignee = true
-		}
+	if v, ok := expr.Assignee.(*ast.Identifier); ok && ast.IsIdentifierKindVariable(v.Kind) {
+		// Variable
+		validAssignee = true
 	} else if _, ok := expr.Assignee.(*ast.Member); ok {
+		// Member
 		validAssignee = true
 	} else if _, ok := expr.Assignee.(*ast.Index); ok {
+		// Index
 		validAssignee = true
 	} else if _, ok := expr.Assignee.Type().(*types.PointerType); ok {
+		// Pointer
 		validAssignee = true
 	}
 
@@ -391,16 +406,17 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 func (c *checker) VisitMember(expr *ast.Member) {
 	expr.AcceptChildren(c)
 
-	if v, ok := expr.Value.Type().(*types.EnumType); ok {
+	if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 		// Enum
-		if _, ok := expr.Value.(*ast.Identifier); ok {
+		if v, ok := expr.Value.Type().(*types.EnumType); ok {
 			if case_ := v.GetCase(expr.Name.Lexeme); case_ == nil {
 				c.errorToken(expr.Name, "Enum '%s' does not contain case '%s'.", v, expr.Name)
 			}
 
 			expr.SetType(v.Copy())
-			return
 		}
+
+		return
 	}
 
 	// Struct

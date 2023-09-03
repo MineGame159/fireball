@@ -7,10 +7,13 @@ import (
 )
 
 type item struct {
-	name   string
+	name string
+
 	fields []field
-	token  string
-	ast    bool
+	cases  []string
+
+	token string
+	ast   bool
 }
 
 type field struct {
@@ -226,9 +229,20 @@ var exprs = []item{
 		name: "Identifier",
 		fields: []field{
 			{name: "Identifier", type_: "Token"},
+			{name: "Kind", type_: "IdentifierKind"},
 		},
 		token: "Identifier",
 		ast:   true,
+	},
+	{
+		name: "IdentifierKind",
+		cases: []string{
+			"FunctionKind",
+			"EnumKind",
+			"VariableKind",
+			"ParameterKind",
+		},
+		ast: false,
 	},
 	{
 		name: "Assignment",
@@ -342,149 +356,165 @@ func generate(w *writer, kind string, items []item) {
 		w.write("// %s", item.name)
 		w.write("")
 
-		// Struct
-		w.write("type %s struct {", item.name)
+		if item.cases != nil {
+			// Enum
+			w.write("type %s uint8", item.name)
+			w.write("")
+			w.write("const (")
+			w.depth++
 
-		if item.ast {
-			w.write("range_ core.Range")
-			w.write("parent Node")
-
-			if kind == "Expr" {
-				w.write("type_ types.Type")
+			for i, case_ := range item.cases {
+				w.write("%s %s = %d", case_, item.name, i)
 			}
 
+			w.depth--
+			w.write(")")
 			w.write("")
-		}
+		} else {
+			// Struct
+			w.write("type %s struct {", item.name)
 
-		for _, field := range item.fields {
-			type_ := field.type_
+			if item.ast {
+				w.write("range_ core.Range")
+				w.write("parent Node")
 
-			if type_ == "Token" {
-				type_ = "scanner.Token"
-			} else if type_ == "Type" {
-				type_ = "types.Type"
-			}
+				if kind == "Expr" {
+					w.write("type_ types.Type")
+				}
 
-			w.write("%s %s", field.name, type_)
-		}
-
-		w.write("}")
-		w.write("")
-
-		// Node
-		if item.ast {
-			short := strings.ToLower(item.name)[0]
-			method := fmt.Sprintf("func (%c *%s)", short, item.name)
-
-			// Token
-			w.write("%s Token() scanner.Token {", method)
-			w.write("return %c.%s", short, item.token)
-			w.write("}")
-			w.write("")
-
-			// Range
-			w.write("%s Range() core.Range {", method)
-			w.write("return %c.range_", short)
-			w.write("}")
-			w.write("")
-
-			// SetRangeToken
-			w.write("%s SetRangeToken(start, end scanner.Token) {", method)
-			w.write("%c.range_ = core.Range{", short)
-			w.write("Start: core.TokenToPos(start, false),")
-			w.write("End: core.TokenToPos(end, true),")
-			w.write("}")
-			w.write("}")
-			w.write("")
-
-			// SetRangePos
-			w.write("%s SetRangePos(start, end core.Pos) {", method)
-			w.write("%c.range_ = core.Range{", short)
-			w.write("Start: start,")
-			w.write("End: end,")
-			w.write("}")
-			w.write("}")
-			w.write("")
-
-			// SetRangeNode
-			w.write("%s SetRangeNode(start, end Node) {", method)
-			w.write("%c.range_ = core.Range{", short)
-			w.write("Start: start.Range().Start,")
-			w.write("End: end.Range().End,")
-			w.write("}")
-			w.write("}")
-			w.write("")
-
-			// Parent
-			w.write("%s Parent() Node {", method)
-			w.write("return %c.parent", short)
-			w.write("}")
-			w.write("")
-
-			// SetParent
-			w.write("%s SetParent(parent Node) {", method)
-			w.write("if %c.parent != nil && parent != nil {", short)
-			w.write("log.Fatalln(\"%s.SetParent() - Node already has a parent\")", item.name)
-			w.write("}")
-			w.write("%c.parent = parent", short)
-			w.write("}")
-			w.write("")
-
-			// Accept
-			w.write("%s Accept(visitor %sVisitor) {", method, kind)
-			w.write("visitor.Visit%s(%c)", item.name, short)
-			w.write("}")
-			w.write("")
-
-			// AcceptChildren
-			leaf := !genVisitor(w, kind, items, item, short, method, "AcceptChildren", false, "Acceptor", "Accept?", func(target string) bool {
-				return target == "Decl" || target == "Stmt" || target == "Expr"
-			})
-
-			// AcceptTypes
-			genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(taget string) bool {
-				return taget == "Type"
-			})
-
-			// AcceptTypesPtr
-			genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(taget string) bool {
-				return taget == "Type"
-			})
-
-			// Leaf
-			w.write("%s Leaf() bool {", method)
-			w.write("return %t", leaf)
-			w.write("}")
-			w.write("")
-
-			// Expr
-			if kind == "Expr" {
-				// Type
-				w.write("%s Type() types.Type {", method)
-				w.write("return %c.type_", short)
-				w.write("}")
-				w.write("")
-
-				// SetType
-				w.write("%s SetType(type_ types.Type) {", method)
-				w.write("%c.type_ = type_", short)
-				w.write("}")
 				w.write("")
 			}
 
-			// SetChildrenParent
-			w.write("%s SetChildrenParent() {", method)
+			for _, field := range item.fields {
+				type_ := field.type_
 
-			visitRecursive(w, items, item, string(short), func(target string) bool {
-				return target == "Decl" || target == "Stmt" || target == "Expr"
-			}, func(path, type_ string) {
-				w.write("if %s != nil {", path)
-				w.write("%s.SetParent(%c)", path, short)
-				w.write("}")
-			})
+				if type_ == "Token" {
+					type_ = "scanner.Token"
+				} else if type_ == "Type" {
+					type_ = "types.Type"
+				}
+
+				w.write("%s %s", field.name, type_)
+			}
 
 			w.write("}")
 			w.write("")
+
+			// Node
+			if item.ast {
+				short := strings.ToLower(item.name)[0]
+				method := fmt.Sprintf("func (%c *%s)", short, item.name)
+
+				// Token
+				w.write("%s Token() scanner.Token {", method)
+				w.write("return %c.%s", short, item.token)
+				w.write("}")
+				w.write("")
+
+				// Range
+				w.write("%s Range() core.Range {", method)
+				w.write("return %c.range_", short)
+				w.write("}")
+				w.write("")
+
+				// SetRangeToken
+				w.write("%s SetRangeToken(start, end scanner.Token) {", method)
+				w.write("%c.range_ = core.Range{", short)
+				w.write("Start: core.TokenToPos(start, false),")
+				w.write("End: core.TokenToPos(end, true),")
+				w.write("}")
+				w.write("}")
+				w.write("")
+
+				// SetRangePos
+				w.write("%s SetRangePos(start, end core.Pos) {", method)
+				w.write("%c.range_ = core.Range{", short)
+				w.write("Start: start,")
+				w.write("End: end,")
+				w.write("}")
+				w.write("}")
+				w.write("")
+
+				// SetRangeNode
+				w.write("%s SetRangeNode(start, end Node) {", method)
+				w.write("%c.range_ = core.Range{", short)
+				w.write("Start: start.Range().Start,")
+				w.write("End: end.Range().End,")
+				w.write("}")
+				w.write("}")
+				w.write("")
+
+				// Parent
+				w.write("%s Parent() Node {", method)
+				w.write("return %c.parent", short)
+				w.write("}")
+				w.write("")
+
+				// SetParent
+				w.write("%s SetParent(parent Node) {", method)
+				w.write("if %c.parent != nil && parent != nil {", short)
+				w.write("log.Fatalln(\"%s.SetParent() - Node already has a parent\")", item.name)
+				w.write("}")
+				w.write("%c.parent = parent", short)
+				w.write("}")
+				w.write("")
+
+				// Accept
+				w.write("%s Accept(visitor %sVisitor) {", method, kind)
+				w.write("visitor.Visit%s(%c)", item.name, short)
+				w.write("}")
+				w.write("")
+
+				// AcceptChildren
+				leaf := !genVisitor(w, kind, items, item, short, method, "AcceptChildren", false, "Acceptor", "Accept?", func(target string) bool {
+					return target == "Decl" || target == "Stmt" || target == "Expr"
+				})
+
+				// AcceptTypes
+				genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(taget string) bool {
+					return taget == "Type"
+				})
+
+				// AcceptTypesPtr
+				genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(taget string) bool {
+					return taget == "Type"
+				})
+
+				// Leaf
+				w.write("%s Leaf() bool {", method)
+				w.write("return %t", leaf)
+				w.write("}")
+				w.write("")
+
+				// Expr
+				if kind == "Expr" {
+					// Type
+					w.write("%s Type() types.Type {", method)
+					w.write("return %c.type_", short)
+					w.write("}")
+					w.write("")
+
+					// SetType
+					w.write("%s SetType(type_ types.Type) {", method)
+					w.write("%c.type_ = type_", short)
+					w.write("}")
+					w.write("")
+				}
+
+				// SetChildrenParent
+				w.write("%s SetChildrenParent() {", method)
+
+				visitRecursive(w, items, item, string(short), func(target string) bool {
+					return target == "Decl" || target == "Stmt" || target == "Expr"
+				}, func(path, type_ string) {
+					w.write("if %s != nil {", path)
+					w.write("%s.SetParent(%c)", path, short)
+					w.write("}")
+				})
+
+				w.write("}")
+				w.write("")
+			}
 		}
 	}
 }

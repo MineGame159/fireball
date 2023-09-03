@@ -191,25 +191,26 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 }
 
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
-	// Enum
-	if _, ok := expr.Type().(*types.EnumType); ok && c.enums.Contains(expr.Identifier.Lexeme) {
-		c.exprValue = value{identifier: "$enum$"}
-		return
+	switch expr.Kind {
+	case ast.FunctionKind:
+		if f := c.getFunction(expr.Identifier); f != nil {
+			c.exprValue = f.val
+			return
+		}
+
+	case ast.EnumKind:
+		if _, ok := expr.Type().(*types.EnumType); ok && c.enums.Contains(expr.Identifier.Lexeme) {
+			c.exprValue = value{identifier: "$enum$"}
+			return
+		}
+
+	case ast.VariableKind, ast.ParameterKind:
+		if v := c.getVariable(expr.Identifier); v != nil {
+			c.exprValue = v.val
+			return
+		}
 	}
 
-	// Functions
-	if f := c.getFunction(expr.Identifier); f != nil {
-		c.exprValue = f.val
-		return
-	}
-
-	// Variables
-	if v := c.getVariable(expr.Identifier); v != nil {
-		c.exprValue = v.val
-		return
-	}
-
-	// Error
 	log.Fatalln("Invalid identifier")
 }
 

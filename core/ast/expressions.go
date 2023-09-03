@@ -591,6 +591,7 @@ type Identifier struct {
 	type_  types.Type
 
 	Identifier scanner.Token
+	Kind       IdentifierKind
 }
 
 func (i *Identifier) Token() scanner.Token {
@@ -664,6 +665,17 @@ func (i *Identifier) SetType(type_ types.Type) {
 
 func (i *Identifier) SetChildrenParent() {
 }
+
+// IdentifierKind
+
+type IdentifierKind uint8
+
+const (
+	FunctionKind  IdentifierKind = 0
+	EnumKind      IdentifierKind = 1
+	VariableKind  IdentifierKind = 2
+	ParameterKind IdentifierKind = 3
+)
 
 // Assignment
 

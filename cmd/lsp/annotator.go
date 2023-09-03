@@ -4,7 +4,6 @@ import (
 	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
-	"fireball/core/types"
 	"fmt"
 	"github.com/MineGame159/protocol"
 )
@@ -135,17 +134,15 @@ func (a *annotator) VisitCast(expr *ast.Cast) {
 
 func (a *annotator) VisitCall(expr *ast.Call) {
 	if false {
-		if _, ok := expr.Callee.Type().(*types.FunctionType); ok {
-			if ident, ok := expr.Callee.(*ast.Identifier); ok {
-				if f, ok := a.functions[ident.Identifier.Lexeme]; ok {
-					for i, arg := range expr.Args {
-						if i >= len(f.Params) {
-							break
-						}
-
-						param := f.Params[i]
-						a.add(arg.Range().Start, param.Name.Lexeme+": ", protocol.InlayHintKindParameter)
+		if i, ok := expr.Callee.(*ast.Identifier); ok && i.Kind == ast.FunctionKind {
+			if f, ok := a.functions[i.Identifier.Lexeme]; ok {
+				for i, arg := range expr.Args {
+					if i >= len(f.Params) {
+						break
 					}
+
+					param := f.Params[i]
+					a.add(arg.Range().Start, param.Name.Lexeme+": ", protocol.InlayHintKindParameter)
 				}
 			}
 		}

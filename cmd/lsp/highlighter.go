@@ -140,15 +140,23 @@ func (h *highlighter) VisitLogical(expr *ast.Logical) {
 }
 
 func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
-	if h.enums.Contains(expr.Identifier.Lexeme) {
-		h.addToken(expr.Identifier, enumKind)
-	} else if h.functions.Contains(expr.Identifier.Lexeme) {
-		h.addToken(expr.Identifier, functionKind)
-	} else if h.isParameter(expr.Identifier) {
-		h.addToken(expr.Identifier, parameterKind)
-	} else {
-		h.addToken(expr.Identifier, variableKind)
+	var kind semanticKind
+
+	switch expr.Kind {
+	case ast.FunctionKind:
+		kind = functionKind
+
+	case ast.EnumKind:
+		kind = enumKind
+
+	case ast.VariableKind:
+		kind = variableKind
+
+	case ast.ParameterKind:
+		kind = parameterKind
 	}
+
+	h.addToken(expr.Identifier, kind)
 
 	expr.AcceptChildren(h)
 }

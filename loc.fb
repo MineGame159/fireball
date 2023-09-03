@@ -78,7 +78,7 @@ func getLineCount(path *u8) i32 {
 
 func count(str *u8, len i32, char u8) i32 {
     var i = 0;
-    var cnt = 0;
+    var count = 0;
 
     for {
         if (i >= len) {
@@ -86,13 +86,13 @@ func count(str *u8, len i32, char u8) i32 {
         }
 
         if (str[i] == char) {
-            cnt += 1;
+            count += 1;
         }
 
         i += 1;
     }
 
-    return cnt;
+    return count;
 }
 
 func combine(left *u8, right *u8) *u8 {

@@ -31,6 +31,12 @@ type Acceptor interface {
 	AcceptExpr(expr Expr)
 }
 
+// Utils
+
+func IsIdentifierKindVariable(kind IdentifierKind) bool {
+	return kind == VariableKind || kind == ParameterKind
+}
+
 // Visit
 
 func VisitStmts[T Stmt](node Node, callback func(stmt T)) {
