@@ -1,5 +1,6 @@
 package ast
 
+import "log"
 import "fireball/core"
 import "fireball/core/types"
 import "fireball/core/scanner"
@@ -22,6 +23,7 @@ type Decl interface {
 
 type Struct struct {
 	range_ core.Range
+	parent Node
 
 	Name   scanner.Token
 	Fields []Field
@@ -57,6 +59,17 @@ func (s *Struct) SetRangeNode(start, end Node) {
 	}
 }
 
+func (s *Struct) Parent() Node {
+	return s.parent
+}
+
+func (s *Struct) SetParent(parent Node) {
+	if s.parent != nil && parent != nil {
+		log.Fatalln("Struct.SetParent() - Node already has a parent")
+	}
+	s.parent = parent
+}
+
 func (s *Struct) Accept(visitor DeclVisitor) {
 	visitor.VisitStruct(s)
 }
@@ -86,6 +99,9 @@ func (s *Struct) Leaf() bool {
 	return true
 }
 
+func (s *Struct) SetChildrenParent() {
+}
+
 // Field
 
 type Field struct {
@@ -97,6 +113,7 @@ type Field struct {
 
 type Enum struct {
 	range_ core.Range
+	parent Node
 
 	Name      scanner.Token
 	Type      types.Type
@@ -133,6 +150,17 @@ func (e *Enum) SetRangeNode(start, end Node) {
 	}
 }
 
+func (e *Enum) Parent() Node {
+	return e.parent
+}
+
+func (e *Enum) SetParent(parent Node) {
+	if e.parent != nil && parent != nil {
+		log.Fatalln("Enum.SetParent() - Node already has a parent")
+	}
+	e.parent = parent
+}
+
 func (e *Enum) Accept(visitor DeclVisitor) {
 	visitor.VisitEnum(e)
 }
@@ -154,6 +182,9 @@ func (e *Enum) Leaf() bool {
 	return true
 }
 
+func (e *Enum) SetChildrenParent() {
+}
+
 // EnumCase
 
 type EnumCase struct {
@@ -166,6 +197,7 @@ type EnumCase struct {
 
 type Func struct {
 	range_ core.Range
+	parent Node
 
 	Extern   bool
 	Name     scanner.Token
@@ -204,6 +236,17 @@ func (f *Func) SetRangeNode(start, end Node) {
 	}
 }
 
+func (f *Func) Parent() Node {
+	return f.parent
+}
+
+func (f *Func) SetParent(parent Node) {
+	if f.parent != nil && parent != nil {
+		log.Fatalln("Func.SetParent() - Node already has a parent")
+	}
+	f.parent = parent
+}
+
 func (f *Func) Accept(visitor DeclVisitor) {
 	visitor.VisitFunc(f)
 }
@@ -236,6 +279,14 @@ func (f *Func) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (f *Func) Leaf() bool {
 	return false
+}
+
+func (f *Func) SetChildrenParent() {
+	for i_ := range f.Body {
+		if f.Body[i_] != nil {
+			f.Body[i_].SetParent(f)
+		}
+	}
 }
 
 // Param

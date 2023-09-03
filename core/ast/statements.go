@@ -1,5 +1,6 @@
 package ast
 
+import "log"
 import "fireball/core"
 import "fireball/core/types"
 import "fireball/core/scanner"
@@ -27,6 +28,7 @@ type Stmt interface {
 
 type Block struct {
 	range_ core.Range
+	parent Node
 
 	Token_ scanner.Token
 	Stmts  []Stmt
@@ -61,6 +63,17 @@ func (b *Block) SetRangeNode(start, end Node) {
 	}
 }
 
+func (b *Block) Parent() Node {
+	return b.parent
+}
+
+func (b *Block) SetParent(parent Node) {
+	if b.parent != nil && parent != nil {
+		log.Fatalln("Block.SetParent() - Node already has a parent")
+	}
+	b.parent = parent
+}
+
 func (b *Block) Accept(visitor StmtVisitor) {
 	visitor.VisitBlock(b)
 }
@@ -83,10 +96,19 @@ func (b *Block) Leaf() bool {
 	return false
 }
 
+func (b *Block) SetChildrenParent() {
+	for i_ := range b.Stmts {
+		if b.Stmts[i_] != nil {
+			b.Stmts[i_].SetParent(b)
+		}
+	}
+}
+
 // Expression
 
 type Expression struct {
 	range_ core.Range
+	parent Node
 
 	Token_ scanner.Token
 	Expr   Expr
@@ -121,6 +143,17 @@ func (e *Expression) SetRangeNode(start, end Node) {
 	}
 }
 
+func (e *Expression) Parent() Node {
+	return e.parent
+}
+
+func (e *Expression) SetParent(parent Node) {
+	if e.parent != nil && parent != nil {
+		log.Fatalln("Expression.SetParent() - Node already has a parent")
+	}
+	e.parent = parent
+}
+
 func (e *Expression) Accept(visitor StmtVisitor) {
 	visitor.VisitExpression(e)
 }
@@ -141,10 +174,17 @@ func (e *Expression) Leaf() bool {
 	return false
 }
 
+func (e *Expression) SetChildrenParent() {
+	if e.Expr != nil {
+		e.Expr.SetParent(e)
+	}
+}
+
 // Variable
 
 type Variable struct {
 	range_ core.Range
+	parent Node
 
 	Type        types.Type
 	Name        scanner.Token
@@ -181,6 +221,17 @@ func (v *Variable) SetRangeNode(start, end Node) {
 	}
 }
 
+func (v *Variable) Parent() Node {
+	return v.parent
+}
+
+func (v *Variable) SetParent(parent Node) {
+	if v.parent != nil && parent != nil {
+		log.Fatalln("Variable.SetParent() - Node already has a parent")
+	}
+	v.parent = parent
+}
+
 func (v *Variable) Accept(visitor StmtVisitor) {
 	visitor.VisitVariable(v)
 }
@@ -205,10 +256,17 @@ func (v *Variable) Leaf() bool {
 	return false
 }
 
+func (v *Variable) SetChildrenParent() {
+	if v.Initializer != nil {
+		v.Initializer.SetParent(v)
+	}
+}
+
 // If
 
 type If struct {
 	range_ core.Range
+	parent Node
 
 	Token_    scanner.Token
 	Condition Expr
@@ -245,6 +303,17 @@ func (i *If) SetRangeNode(start, end Node) {
 	}
 }
 
+func (i *If) Parent() Node {
+	return i.parent
+}
+
+func (i *If) SetParent(parent Node) {
+	if i.parent != nil && parent != nil {
+		log.Fatalln("If.SetParent() - Node already has a parent")
+	}
+	i.parent = parent
+}
+
 func (i *If) Accept(visitor StmtVisitor) {
 	visitor.VisitIf(i)
 }
@@ -271,10 +340,23 @@ func (i *If) Leaf() bool {
 	return false
 }
 
+func (i *If) SetChildrenParent() {
+	if i.Condition != nil {
+		i.Condition.SetParent(i)
+	}
+	if i.Then != nil {
+		i.Then.SetParent(i)
+	}
+	if i.Else != nil {
+		i.Else.SetParent(i)
+	}
+}
+
 // For
 
 type For struct {
 	range_ core.Range
+	parent Node
 
 	Token_    scanner.Token
 	Condition Expr
@@ -310,6 +392,17 @@ func (f *For) SetRangeNode(start, end Node) {
 	}
 }
 
+func (f *For) Parent() Node {
+	return f.parent
+}
+
+func (f *For) SetParent(parent Node) {
+	if f.parent != nil && parent != nil {
+		log.Fatalln("For.SetParent() - Node already has a parent")
+	}
+	f.parent = parent
+}
+
 func (f *For) Accept(visitor StmtVisitor) {
 	visitor.VisitFor(f)
 }
@@ -333,10 +426,20 @@ func (f *For) Leaf() bool {
 	return false
 }
 
+func (f *For) SetChildrenParent() {
+	if f.Condition != nil {
+		f.Condition.SetParent(f)
+	}
+	if f.Body != nil {
+		f.Body.SetParent(f)
+	}
+}
+
 // Return
 
 type Return struct {
 	range_ core.Range
+	parent Node
 
 	Token_ scanner.Token
 	Expr   Expr
@@ -371,6 +474,17 @@ func (r *Return) SetRangeNode(start, end Node) {
 	}
 }
 
+func (r *Return) Parent() Node {
+	return r.parent
+}
+
+func (r *Return) SetParent(parent Node) {
+	if r.parent != nil && parent != nil {
+		log.Fatalln("Return.SetParent() - Node already has a parent")
+	}
+	r.parent = parent
+}
+
 func (r *Return) Accept(visitor StmtVisitor) {
 	visitor.VisitReturn(r)
 }
@@ -391,10 +505,17 @@ func (r *Return) Leaf() bool {
 	return false
 }
 
+func (r *Return) SetChildrenParent() {
+	if r.Expr != nil {
+		r.Expr.SetParent(r)
+	}
+}
+
 // Break
 
 type Break struct {
 	range_ core.Range
+	parent Node
 
 	Token_ scanner.Token
 }
@@ -428,6 +549,17 @@ func (b *Break) SetRangeNode(start, end Node) {
 	}
 }
 
+func (b *Break) Parent() Node {
+	return b.parent
+}
+
+func (b *Break) SetParent(parent Node) {
+	if b.parent != nil && parent != nil {
+		log.Fatalln("Break.SetParent() - Node already has a parent")
+	}
+	b.parent = parent
+}
+
 func (b *Break) Accept(visitor StmtVisitor) {
 	visitor.VisitBreak(b)
 }
@@ -445,10 +577,14 @@ func (b *Break) Leaf() bool {
 	return true
 }
 
+func (b *Break) SetChildrenParent() {
+}
+
 // Continue
 
 type Continue struct {
 	range_ core.Range
+	parent Node
 
 	Token_ scanner.Token
 }
@@ -482,6 +618,17 @@ func (c *Continue) SetRangeNode(start, end Node) {
 	}
 }
 
+func (c *Continue) Parent() Node {
+	return c.parent
+}
+
+func (c *Continue) SetParent(parent Node) {
+	if c.parent != nil && parent != nil {
+		log.Fatalln("Continue.SetParent() - Node already has a parent")
+	}
+	c.parent = parent
+}
+
 func (c *Continue) Accept(visitor StmtVisitor) {
 	visitor.VisitContinue(c)
 }
@@ -497,4 +644,7 @@ func (c *Continue) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (c *Continue) Leaf() bool {
 	return true
+}
+
+func (c *Continue) SetChildrenParent() {
 }

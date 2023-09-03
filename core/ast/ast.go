@@ -14,6 +14,9 @@ type Node interface {
 	SetRangePos(start, end core.Pos)
 	SetRangeNode(start, end Node)
 
+	Parent() Node
+	SetParent(parent Node)
+
 	AcceptChildren(acceptor Acceptor)
 
 	AcceptTypes(visitor types.Visitor)

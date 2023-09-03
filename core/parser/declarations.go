@@ -108,6 +108,8 @@ func (p *parser) struct_() ast.Decl {
 	}
 
 	decl.SetRangeToken(start, p.current)
+	decl.SetChildrenParent()
+
 	return decl
 }
 
@@ -217,6 +219,8 @@ func (p *parser) enum() ast.Decl {
 	}
 
 	decl.SetRangeToken(start, p.current)
+	decl.SetChildrenParent()
+
 	return decl
 }
 
@@ -345,6 +349,8 @@ func (p *parser) function() ast.Decl {
 	}
 
 	decl.SetRangeToken(start, p.current)
+	decl.SetChildrenParent()
+
 	return decl
 }
 

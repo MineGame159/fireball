@@ -60,6 +60,8 @@ func (p *parser) block() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }
 
@@ -91,6 +93,8 @@ func (p *parser) expressionStmt() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }
 
@@ -143,6 +147,8 @@ func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(start, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }
 
@@ -192,6 +198,8 @@ func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }
 
@@ -230,6 +238,8 @@ func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }
 
@@ -259,6 +269,8 @@ func (p *parser) return_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }
 
@@ -293,5 +305,7 @@ func (p *parser) continue_() (ast.Stmt, *core.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
+	stmt.SetChildrenParent()
+
 	return stmt, nil
 }

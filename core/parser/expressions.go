@@ -35,6 +35,8 @@ func (p *parser) assignment() (ast.Expr, *core.Diagnostic) {
 		}
 
 		expr.SetRangeNode(expr.Assignee, expr.Value)
+		expr.SetChildrenParent()
+
 		return expr, nil
 	}
 
@@ -60,15 +62,16 @@ func (p *parser) or() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Set
-		left := expr
-
-		expr = &ast.Logical{
-			Left:  left,
+		logical := &ast.Logical{
+			Left:  expr,
 			Op:    op,
 			Right: right,
 		}
 
-		expr.SetRangeNode(left, right)
+		logical.SetRangeNode(expr, right)
+		logical.SetChildrenParent()
+
+		expr = logical
 	}
 
 	// Return
@@ -93,15 +96,16 @@ func (p *parser) and() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Set
-		left := expr
-
-		expr = &ast.Logical{
-			Left:  left,
+		logical := &ast.Logical{
+			Left:  expr,
 			Op:    op,
 			Right: right,
 		}
 
-		expr.SetRangeNode(left, right)
+		logical.SetRangeNode(expr, right)
+		logical.SetChildrenParent()
+
+		expr = logical
 	}
 
 	// Return
@@ -126,15 +130,16 @@ func (p *parser) equality() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Set
-		left := expr
-
-		expr = &ast.Binary{
-			Left:  left,
+		binary := &ast.Binary{
+			Left:  expr,
 			Op:    op,
 			Right: right,
 		}
 
-		expr.SetRangeNode(left, right)
+		binary.SetRangeNode(expr, right)
+		binary.SetChildrenParent()
+
+		expr = binary
 	}
 
 	// Return
@@ -159,15 +164,16 @@ func (p *parser) comparison() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Set
-		left := expr
-
-		expr = &ast.Binary{
-			Left:  left,
+		binary := &ast.Binary{
+			Left:  expr,
 			Op:    op,
 			Right: right,
 		}
 
-		expr.SetRangeNode(left, right)
+		binary.SetRangeNode(expr, right)
+		binary.SetChildrenParent()
+
+		expr = binary
 	}
 
 	// Return
@@ -192,15 +198,16 @@ func (p *parser) term() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Set
-		left := expr
-
-		expr = &ast.Binary{
-			Left:  left,
+		binary := &ast.Binary{
+			Left:  expr,
 			Op:    op,
 			Right: right,
 		}
 
-		expr.SetRangeNode(left, right)
+		binary.SetRangeNode(expr, right)
+		binary.SetChildrenParent()
+
+		expr = binary
 	}
 
 	// Return
@@ -225,15 +232,16 @@ func (p *parser) factor() (ast.Expr, *core.Diagnostic) {
 		}
 
 		// Set
-		left := expr
-
-		expr = &ast.Binary{
-			Left:  left,
+		binary := &ast.Binary{
+			Left:  expr,
 			Op:    op,
 			Right: right,
 		}
 
-		expr.SetRangeNode(left, right)
+		binary.SetRangeNode(expr, right)
+		binary.SetChildrenParent()
+
+		expr = binary
 	}
 
 	// Return
@@ -258,6 +266,8 @@ func (p *parser) unary() (ast.Expr, *core.Diagnostic) {
 		}
 
 		expr.SetRangeToken(op, p.current)
+		expr.SetChildrenParent()
+
 		return expr, nil
 	}
 
@@ -333,6 +343,8 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *core.Diagnostic) {
 	}
 
 	expr.SetRangePos(callee.Range().Start, core.TokenToPos(p.current, true))
+	expr.SetChildrenParent()
+
 	return expr, nil
 }
 
@@ -358,6 +370,8 @@ func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 	}
 
 	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
+	expr.SetChildrenParent()
+
 	return expr, nil
 }
 
@@ -375,6 +389,8 @@ func (p *parser) finishMember(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 	}
 
 	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
+	expr.SetChildrenParent()
+
 	return expr, nil
 }
 
@@ -388,14 +404,16 @@ func (p *parser) finishCast(value ast.Expr) (ast.Expr, *core.Diagnostic) {
 	}
 
 	// Return
-	cast := &ast.Cast{
+	expr := &ast.Cast{
 		Token_: token,
 		Expr:   value,
 	}
 
-	cast.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
-	cast.SetType(type_)
-	return cast, nil
+	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
+	expr.SetChildrenParent()
+	expr.SetType(type_)
+
+	return expr, nil
 }
 
 func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
@@ -406,6 +424,8 @@ func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 		}
 
 		expr.SetRangeToken(p.current, p.current)
+		expr.SetChildrenParent()
+
 		return expr, nil
 	}
 
@@ -424,6 +444,8 @@ func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 		}
 
 		expr.SetRangeToken(token, token)
+		expr.SetChildrenParent()
+
 		return expr, nil
 	}
 
@@ -449,6 +471,8 @@ func (p *parser) primary() (ast.Expr, *core.Diagnostic) {
 		}
 
 		group.SetRangeToken(token, p.current)
+		group.SetChildrenParent()
+
 		return group, nil
 	}
 
@@ -504,5 +528,7 @@ func (p *parser) initializer(name scanner.Token) (ast.Expr, *core.Diagnostic) {
 	}
 
 	expr.SetRangeToken(name, p.current)
+	expr.SetChildrenParent()
+
 	return expr, nil
 }

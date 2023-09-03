@@ -299,6 +299,7 @@ func main() {
 func generate(w *writer, kind string, items []item) {
 	w.write("package ast")
 	w.write("")
+	w.write("import \"log\"")
 	w.write("import \"fireball/core\"")
 	w.write("import \"fireball/core/types\"")
 	w.write("import \"fireball/core/scanner\"")
@@ -346,6 +347,7 @@ func generate(w *writer, kind string, items []item) {
 
 		if item.ast {
 			w.write("range_ core.Range")
+			w.write("parent Node")
 
 			if kind == "Expr" {
 				w.write("type_ types.Type")
@@ -413,6 +415,21 @@ func generate(w *writer, kind string, items []item) {
 			w.write("}")
 			w.write("")
 
+			// Parent
+			w.write("%s Parent() Node {", method)
+			w.write("return %c.parent", short)
+			w.write("}")
+			w.write("")
+
+			// SetParent
+			w.write("%s SetParent(parent Node) {", method)
+			w.write("if %c.parent != nil && parent != nil {", short)
+			w.write("log.Fatalln(\"%s.SetParent() - Node already has a parent\")", item.name)
+			w.write("}")
+			w.write("%c.parent = parent", short)
+			w.write("}")
+			w.write("")
+
 			// Accept
 			w.write("%s Accept(visitor %sVisitor) {", method, kind)
 			w.write("visitor.Visit%s(%c)", item.name, short)
@@ -420,18 +437,18 @@ func generate(w *writer, kind string, items []item) {
 			w.write("")
 
 			// AcceptChildren
-			leaf := !genVisitor(w, kind, items, item, short, method, "AcceptChildren", false, "Acceptor", "Accept?", func(s string) bool {
-				return s == "Decl" || s == "Stmt" || s == "Expr"
+			leaf := !genVisitor(w, kind, items, item, short, method, "AcceptChildren", false, "Acceptor", "Accept?", func(target string) bool {
+				return target == "Decl" || target == "Stmt" || target == "Expr"
 			})
 
 			// AcceptTypes
-			genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(s string) bool {
-				return s == "Type"
+			genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(taget string) bool {
+				return taget == "Type"
 			})
 
 			// AcceptTypesPtr
-			genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(s string) bool {
-				return s == "Type"
+			genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(taget string) bool {
+				return taget == "Type"
 			})
 
 			// Leaf
@@ -454,6 +471,20 @@ func generate(w *writer, kind string, items []item) {
 				w.write("}")
 				w.write("")
 			}
+
+			// SetChildrenParent
+			w.write("%s SetChildrenParent() {", method)
+
+			visitRecursive(w, items, item, string(short), func(target string) bool {
+				return target == "Decl" || target == "Stmt" || target == "Expr"
+			}, func(path, type_ string) {
+				w.write("if %s != nil {", path)
+				w.write("%s.SetParent(%c)", path, short)
+				w.write("}")
+			})
+
+			w.write("}")
+			w.write("")
 		}
 	}
 }
@@ -469,53 +500,17 @@ func genVisitor(w *writer, kind string, items []item, item item, short uint8, me
 	}
 
 	if kind == "Expr" && target("Type") {
-		visit(w, ptr, "VisitType", fmt.Sprintf("%s%c.type_", ptrStr, short))
+		genVisit(w, ptr, "VisitType", fmt.Sprintf("%s%c.type_", ptrStr, short))
 	}
 
-	for _, f := range item.fields {
-		if strings.HasPrefix(f.type_, "[]") {
-			type_ := f.type_[2:]
-
-			if target(type_) {
-				w.write("for i_ := range %c.%s {", short, f.name)
-				visit(w, ptr, formatVisit(visitFormat, type_), fmt.Sprintf("%s%c.%s[i_]", ptrStr, short, f.name))
-				w.write("}")
-
-				hasChildren = true
-			} else {
-				fi := getItem(items, type_)
-
-				if fi != nil && fi.hasFieldWithType(target) {
-					w.write("for i_ := range %c.%s {", short, f.name)
-
-					for _, fif := range fi.fields {
-						if target(fif.type_) {
-							visit(w, ptr, formatVisit(visitFormat, fif.type_), fmt.Sprintf("%s%c.%s[i_].%s", ptrStr, short, f.name, fif.name))
-						}
-					}
-
-					w.write("}")
-
-					hasChildren = true
-				}
-			}
-		} else if target(f.type_) {
-			visit(w, ptr, formatVisit(visitFormat, f.type_), fmt.Sprintf("%s%c.%s", ptrStr, short, f.name))
-			hasChildren = true
-		} else {
-			fi := getItem(items, f.type_)
-
-			if fi != nil && fi.hasFieldWithType(target) {
-				for _, fif := range fi.fields {
-					if target(fif.type_) {
-						visit(w, ptr, formatVisit(visitFormat, fif.type_), fmt.Sprintf("%s%c.%s.%s", ptrStr, short, f.name, fif.name))
-					}
-				}
-
-				hasChildren = true
-			}
+	visitRecursive(w, items, item, string(short), target, func(path, type_ string) {
+		if ptr {
+			path = "&" + path
 		}
-	}
+
+		genVisit(w, ptr, formatVisit(visitFormat, type_), path)
+		hasChildren = true
+	})
 
 	w.write("}")
 	w.write("")
@@ -523,7 +518,7 @@ func genVisitor(w *writer, kind string, items []item, item item, short uint8, me
 	return hasChildren
 }
 
-func visit(w *writer, ptr bool, visit string, arg string) {
+func genVisit(w *writer, ptr bool, visit string, arg string) {
 	if !ptr {
 		w.write("if %s != nil {", arg)
 	}
@@ -541,6 +536,46 @@ func formatVisit(format, kind string) string {
 	}
 
 	return format
+}
+
+func visitRecursive(w *writer, items []item, item item, base string, target func(target string) bool, callback func(path, type_ string)) {
+	for _, f := range item.fields {
+		if strings.HasPrefix(f.type_, "[]") {
+			type_ := f.type_[2:]
+
+			if target(type_) {
+				w.write("for i_ := range %s.%s {", base, f.name)
+				callback(fmt.Sprintf("%s.%s[i_]", base, f.name), type_)
+				w.write("}")
+			} else {
+				fi := getItem(items, type_)
+
+				if fi != nil && fi.hasFieldWithType(target) {
+					w.write("for i_ := range %s.%s {", base, f.name)
+
+					for _, fif := range fi.fields {
+						if target(fif.type_) {
+							callback(fmt.Sprintf("%s.%s[i_].%s", base, f.name, fif.name), fif.type_)
+						}
+					}
+
+					w.write("}")
+				}
+			}
+		} else if target(f.type_) {
+			callback(fmt.Sprintf("%s.%s", base, f.name), f.type_)
+		} else {
+			fi := getItem(items, f.type_)
+
+			if fi != nil && fi.hasFieldWithType(target) {
+				for _, fif := range fi.fields {
+					if target(fif.type_) {
+						callback(fmt.Sprintf("%s.%s.%s", base, f.name, fif.name), fif.type_)
+					}
+				}
+			}
+		}
+	}
 }
 
 func getItem(items []item, name string) *item {

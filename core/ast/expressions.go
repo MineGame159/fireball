@@ -1,5 +1,6 @@
 package ast
 
+import "log"
 import "fireball/core"
 import "fireball/core/types"
 import "fireball/core/scanner"
@@ -34,6 +35,7 @@ type Expr interface {
 
 type Group struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -69,6 +71,17 @@ func (g *Group) SetRangeNode(start, end Node) {
 	}
 }
 
+func (g *Group) Parent() Node {
+	return g.parent
+}
+
+func (g *Group) SetParent(parent Node) {
+	if g.parent != nil && parent != nil {
+		log.Fatalln("Group.SetParent() - Node already has a parent")
+	}
+	g.parent = parent
+}
+
 func (g *Group) Accept(visitor ExprVisitor) {
 	visitor.VisitGroup(g)
 }
@@ -101,10 +114,17 @@ func (g *Group) SetType(type_ types.Type) {
 	g.type_ = type_
 }
 
+func (g *Group) SetChildrenParent() {
+	if g.Expr != nil {
+		g.Expr.SetParent(g)
+	}
+}
+
 // Literal
 
 type Literal struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Value scanner.Token
@@ -139,6 +159,17 @@ func (l *Literal) SetRangeNode(start, end Node) {
 	}
 }
 
+func (l *Literal) Parent() Node {
+	return l.parent
+}
+
+func (l *Literal) SetParent(parent Node) {
+	if l.parent != nil && parent != nil {
+		log.Fatalln("Literal.SetParent() - Node already has a parent")
+	}
+	l.parent = parent
+}
+
 func (l *Literal) Accept(visitor ExprVisitor) {
 	visitor.VisitLiteral(l)
 }
@@ -168,10 +199,14 @@ func (l *Literal) SetType(type_ types.Type) {
 	l.type_ = type_
 }
 
+func (l *Literal) SetChildrenParent() {
+}
+
 // Initializer
 
 type Initializer struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Name   scanner.Token
@@ -205,6 +240,17 @@ func (i *Initializer) SetRangeNode(start, end Node) {
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
+}
+
+func (i *Initializer) Parent() Node {
+	return i.parent
+}
+
+func (i *Initializer) SetParent(parent Node) {
+	if i.parent != nil && parent != nil {
+		log.Fatalln("Initializer.SetParent() - Node already has a parent")
+	}
+	i.parent = parent
 }
 
 func (i *Initializer) Accept(visitor ExprVisitor) {
@@ -241,6 +287,14 @@ func (i *Initializer) SetType(type_ types.Type) {
 	i.type_ = type_
 }
 
+func (i *Initializer) SetChildrenParent() {
+	for i_ := range i.Fields {
+		if i.Fields[i_].Value != nil {
+			i.Fields[i_].Value.SetParent(i)
+		}
+	}
+}
+
 // InitField
 
 type InitField struct {
@@ -252,6 +306,7 @@ type InitField struct {
 
 type Unary struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Op    scanner.Token
@@ -287,6 +342,17 @@ func (u *Unary) SetRangeNode(start, end Node) {
 	}
 }
 
+func (u *Unary) Parent() Node {
+	return u.parent
+}
+
+func (u *Unary) SetParent(parent Node) {
+	if u.parent != nil && parent != nil {
+		log.Fatalln("Unary.SetParent() - Node already has a parent")
+	}
+	u.parent = parent
+}
+
 func (u *Unary) Accept(visitor ExprVisitor) {
 	visitor.VisitUnary(u)
 }
@@ -319,10 +385,17 @@ func (u *Unary) SetType(type_ types.Type) {
 	u.type_ = type_
 }
 
+func (u *Unary) SetChildrenParent() {
+	if u.Right != nil {
+		u.Right.SetParent(u)
+	}
+}
+
 // Binary
 
 type Binary struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Left  Expr
@@ -357,6 +430,17 @@ func (b *Binary) SetRangeNode(start, end Node) {
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
+}
+
+func (b *Binary) Parent() Node {
+	return b.parent
+}
+
+func (b *Binary) SetParent(parent Node) {
+	if b.parent != nil && parent != nil {
+		log.Fatalln("Binary.SetParent() - Node already has a parent")
+	}
+	b.parent = parent
 }
 
 func (b *Binary) Accept(visitor ExprVisitor) {
@@ -394,10 +478,20 @@ func (b *Binary) SetType(type_ types.Type) {
 	b.type_ = type_
 }
 
+func (b *Binary) SetChildrenParent() {
+	if b.Left != nil {
+		b.Left.SetParent(b)
+	}
+	if b.Right != nil {
+		b.Right.SetParent(b)
+	}
+}
+
 // Logical
 
 type Logical struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Left  Expr
@@ -432,6 +526,17 @@ func (l *Logical) SetRangeNode(start, end Node) {
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
+}
+
+func (l *Logical) Parent() Node {
+	return l.parent
+}
+
+func (l *Logical) SetParent(parent Node) {
+	if l.parent != nil && parent != nil {
+		log.Fatalln("Logical.SetParent() - Node already has a parent")
+	}
+	l.parent = parent
 }
 
 func (l *Logical) Accept(visitor ExprVisitor) {
@@ -469,10 +574,20 @@ func (l *Logical) SetType(type_ types.Type) {
 	l.type_ = type_
 }
 
+func (l *Logical) SetChildrenParent() {
+	if l.Left != nil {
+		l.Left.SetParent(l)
+	}
+	if l.Right != nil {
+		l.Right.SetParent(l)
+	}
+}
+
 // Identifier
 
 type Identifier struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Identifier scanner.Token
@@ -507,6 +622,17 @@ func (i *Identifier) SetRangeNode(start, end Node) {
 	}
 }
 
+func (i *Identifier) Parent() Node {
+	return i.parent
+}
+
+func (i *Identifier) SetParent(parent Node) {
+	if i.parent != nil && parent != nil {
+		log.Fatalln("Identifier.SetParent() - Node already has a parent")
+	}
+	i.parent = parent
+}
+
 func (i *Identifier) Accept(visitor ExprVisitor) {
 	visitor.VisitIdentifier(i)
 }
@@ -536,10 +662,14 @@ func (i *Identifier) SetType(type_ types.Type) {
 	i.type_ = type_
 }
 
+func (i *Identifier) SetChildrenParent() {
+}
+
 // Assignment
 
 type Assignment struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Assignee Expr
@@ -574,6 +704,17 @@ func (a *Assignment) SetRangeNode(start, end Node) {
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
+}
+
+func (a *Assignment) Parent() Node {
+	return a.parent
+}
+
+func (a *Assignment) SetParent(parent Node) {
+	if a.parent != nil && parent != nil {
+		log.Fatalln("Assignment.SetParent() - Node already has a parent")
+	}
+	a.parent = parent
 }
 
 func (a *Assignment) Accept(visitor ExprVisitor) {
@@ -611,10 +752,20 @@ func (a *Assignment) SetType(type_ types.Type) {
 	a.type_ = type_
 }
 
+func (a *Assignment) SetChildrenParent() {
+	if a.Assignee != nil {
+		a.Assignee.SetParent(a)
+	}
+	if a.Value != nil {
+		a.Value.SetParent(a)
+	}
+}
+
 // Cast
 
 type Cast struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -650,6 +801,17 @@ func (c *Cast) SetRangeNode(start, end Node) {
 	}
 }
 
+func (c *Cast) Parent() Node {
+	return c.parent
+}
+
+func (c *Cast) SetParent(parent Node) {
+	if c.parent != nil && parent != nil {
+		log.Fatalln("Cast.SetParent() - Node already has a parent")
+	}
+	c.parent = parent
+}
+
 func (c *Cast) Accept(visitor ExprVisitor) {
 	visitor.VisitCast(c)
 }
@@ -682,10 +844,17 @@ func (c *Cast) SetType(type_ types.Type) {
 	c.type_ = type_
 }
 
+func (c *Cast) SetChildrenParent() {
+	if c.Expr != nil {
+		c.Expr.SetParent(c)
+	}
+}
+
 // Call
 
 type Call struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -720,6 +889,17 @@ func (c *Call) SetRangeNode(start, end Node) {
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
+}
+
+func (c *Call) Parent() Node {
+	return c.parent
+}
+
+func (c *Call) SetParent(parent Node) {
+	if c.parent != nil && parent != nil {
+		log.Fatalln("Call.SetParent() - Node already has a parent")
+	}
+	c.parent = parent
 }
 
 func (c *Call) Accept(visitor ExprVisitor) {
@@ -759,10 +939,22 @@ func (c *Call) SetType(type_ types.Type) {
 	c.type_ = type_
 }
 
+func (c *Call) SetChildrenParent() {
+	if c.Callee != nil {
+		c.Callee.SetParent(c)
+	}
+	for i_ := range c.Args {
+		if c.Args[i_] != nil {
+			c.Args[i_].SetParent(c)
+		}
+	}
+}
+
 // Index
 
 type Index struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Token_ scanner.Token
@@ -797,6 +989,17 @@ func (i *Index) SetRangeNode(start, end Node) {
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
+}
+
+func (i *Index) Parent() Node {
+	return i.parent
+}
+
+func (i *Index) SetParent(parent Node) {
+	if i.parent != nil && parent != nil {
+		log.Fatalln("Index.SetParent() - Node already has a parent")
+	}
+	i.parent = parent
 }
 
 func (i *Index) Accept(visitor ExprVisitor) {
@@ -834,10 +1037,20 @@ func (i *Index) SetType(type_ types.Type) {
 	i.type_ = type_
 }
 
+func (i *Index) SetChildrenParent() {
+	if i.Value != nil {
+		i.Value.SetParent(i)
+	}
+	if i.Index != nil {
+		i.Index.SetParent(i)
+	}
+}
+
 // Member
 
 type Member struct {
 	range_ core.Range
+	parent Node
 	type_  types.Type
 
 	Value Expr
@@ -873,6 +1086,17 @@ func (m *Member) SetRangeNode(start, end Node) {
 	}
 }
 
+func (m *Member) Parent() Node {
+	return m.parent
+}
+
+func (m *Member) SetParent(parent Node) {
+	if m.parent != nil && parent != nil {
+		log.Fatalln("Member.SetParent() - Node already has a parent")
+	}
+	m.parent = parent
+}
+
 func (m *Member) Accept(visitor ExprVisitor) {
 	visitor.VisitMember(m)
 }
@@ -903,4 +1127,10 @@ func (m *Member) Type() types.Type {
 
 func (m *Member) SetType(type_ types.Type) {
 	m.type_ = type_
+}
+
+func (m *Member) SetChildrenParent() {
+	if m.Value != nil {
+		m.Value.SetParent(m)
+	}
 }
