@@ -114,6 +114,28 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		expr.SetType(types.Primitive(types.I32, core.Range{}))
 
 	case scanner.Ampersand:
+		valid := false
+
+		// TODO: Fix this when I improve identifier resolution / variable tracking
+		if i, ok := expr.Right.(*ast.Identifier); ok && c.getVariable(i.Identifier) != nil {
+			// Variable
+			valid = true
+		} else if _, ok := expr.Right.(*ast.Index); ok {
+			// Index
+			valid = true
+		} else if m, ok := expr.Right.(*ast.Member); ok {
+			// Member
+			i, ok := m.Value.(*ast.Identifier)
+
+			if _, okEnum := c.enums[i.Identifier.Lexeme]; !ok || !okEnum {
+				valid = true
+			}
+		}
+
+		if !valid {
+			c.errorRange(expr.Right.Range(), "Cannot take address of this expression.")
+		}
+
 		expr.SetType(types.Pointer(expr.Right.Type().Copy(), core.Range{}))
 
 	case scanner.Star:
