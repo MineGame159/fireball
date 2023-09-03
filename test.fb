@@ -12,11 +12,28 @@ func main() i32 {
     var pos = Vec2 { x: 2, y: 6 };
     print(&pos.x);
 
+    printf("\n");
+
     var animal = 9 as Animal;
     printf("Dog: %d\n", animal == Animal.Dog);
     printf("Cat: %d\n", animal == Animal.Cat);
 
+    printf("\n");
+    shadowing();
+
     return 0;
+}
+
+func shadowing() {
+    var text = "outer\n";
+
+    {
+        printf(text);
+        var text = "inner\n";
+        printf(text);
+    }
+
+    printf(text);
 }
 
 func print(a *i32) {

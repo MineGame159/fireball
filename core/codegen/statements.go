@@ -24,7 +24,9 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 
 func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Variable
-	val := c.locals.named(stmt.Name.Lexeme, stmt.Type)
+	val := c.locals.unnamed(stmt.Type)
+	val.identifier += "." + stmt.Name.Lexeme
+
 	c.addVariable(stmt.Name, val)
 	c.writeFmt("%s = alloca %s\n", val, c.getType(stmt.Type))
 

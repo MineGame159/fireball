@@ -34,8 +34,8 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 	}
 
 	// Check name collision
-	if var_ := c.getVariable(stmt.Name); var_ != nil {
-		c.errorToken(stmt.Name, "Variable with the name '%s' already exists.", stmt.Name)
+	if c.hasVariableInScope(stmt.Name) {
+		c.errorToken(stmt.Name, "Variable with the name '%s' already exists in the current scope.", stmt.Name)
 	} else {
 		c.addVariable(stmt.Name, stmt.Type)
 	}

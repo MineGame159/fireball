@@ -154,6 +154,18 @@ func (c *checker) getFunction(name scanner.Token) *ast.Func {
 
 // Scope / Variables
 
+func (c *checker) hasVariableInScope(name scanner.Token) bool {
+	scope := c.peekScope()
+
+	for i := scope.variableCount - 1; i >= 0; i-- {
+		if c.variables[scope.variableI+i].name.Lexeme == name.Lexeme {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (c *checker) getVariable(name scanner.Token) *variable {
 	for i := len(c.variables) - 1; i >= 0; i-- {
 		if c.variables[i].name.Lexeme == name.Lexeme {

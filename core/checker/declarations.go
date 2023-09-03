@@ -52,7 +52,11 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	// Params
 	for _, param := range decl.Params {
-		c.addVariable(param.Name, param.Type).param = true
+		if c.hasVariableInScope(param.Name) {
+			c.errorToken(param.Name, "Parameter with the name '%s' already exists.", param.Name)
+		} else {
+			c.addVariable(param.Name, param.Type).param = true
+		}
 	}
 
 	// Body
