@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type handler struct {
@@ -32,7 +33,7 @@ type SemanticTokensFull struct {
 }
 
 func (h *handler) Initialize(ctx context.Context, params *protocol.InitializeParams) (result *protocol.InitializeResult, err error) {
-	h.logger.Debug("handle Initialize")
+	defer stop(start(h, "Initialize"))
 
 	return &protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
@@ -70,18 +71,18 @@ func (h *handler) Initialize(ctx context.Context, params *protocol.InitializePar
 }
 
 func (h *handler) Initialized(ctx context.Context, params *protocol.InitializedParams) (err error) {
-	h.logger.Debug("handle Initialized")
+	defer stop(start(h, "Initialized"))
 
 	return nil
 }
 
 func (h *handler) Shutdown(ctx context.Context) (err error) {
-	h.logger.Debug("handle Shutdown")
+	defer stop(start(h, "Shutdown"))
 	return nil
 }
 
 func (h *handler) Exit(ctx context.Context) (err error) {
-	h.logger.Debug("handle Exit")
+	defer stop(start(h, "Exit"))
 	return nil
 }
 
@@ -130,7 +131,7 @@ func (h *handler) Definition(ctx context.Context, params *protocol.DefinitionPar
 }
 
 func (h *handler) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) (err error) {
-	h.logger.Debug("handle DidChange")
+	defer stop(start(h, "DidChange"))
 
 	doc, err := h.docs.Get(params.TextDocument.URI)
 	if err != nil {
@@ -153,16 +154,16 @@ func (h *handler) DidChangeWorkspaceFolders(ctx context.Context, params *protoco
 }
 
 func (h *handler) DidClose(ctx context.Context, params *protocol.DidCloseTextDocumentParams) (err error) {
-	h.logger.Debug("handle DidClose")
-	h.docs.Remove(params.TextDocument.URI)
+	defer stop(start(h, "DidClose"))
 
+	h.docs.Remove(params.TextDocument.URI)
 	return nil
 }
 
 func (h *handler) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) (err error) {
-	h.logger.Debug("handle DidOpen")
-	doc := h.docs.Add(params.TextDocument.URI)
+	defer stop(start(h, "DidOpen"))
 
+	doc := h.docs.Add(params.TextDocument.URI)
 	return doc.SetText(ctx, params.TextDocument.Text)
 }
 
@@ -187,7 +188,7 @@ func (h *handler) DocumentLinkResolve(ctx context.Context, params *protocol.Docu
 }
 
 func (h *handler) DocumentSymbol(ctx context.Context, params *protocol.DocumentSymbolParams) (result []interface{}, err error) {
-	h.logger.Debug("handle DocumentSymbol")
+	defer stop(start(h, "DocumentSymbol"))
 
 	// GetLeaf document
 	doc, err := h.docs.Get(params.TextDocument.URI)
@@ -257,7 +258,7 @@ func (h *handler) Formatting(ctx context.Context, params *protocol.DocumentForma
 }
 
 func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (result *protocol.Hover, err error) {
-	h.logger.Debug("handle Hover")
+	defer stop(start(h, "Hover"))
 
 	// GetLeaf document
 	doc, err := h.docs.Get(params.TextDocument.URI)
@@ -436,7 +437,7 @@ func (h *handler) OutgoingCalls(ctx context.Context, params *protocol.CallHierar
 }
 
 func (h *handler) SemanticTokensFull(ctx context.Context, params *protocol.SemanticTokensParams) (result *protocol.SemanticTokens, err error) {
-	h.logger.Debug("handle SemanticTokensFull")
+	defer stop(start(h, "SemanticTokensFull"))
 
 	// GetLeaf document
 	doc, err := h.docs.Get(params.TextDocument.URI)
@@ -475,7 +476,7 @@ func (h *handler) Moniker(ctx context.Context, params *protocol.MonikerParams) (
 }
 
 func (h *handler) InlayHint(ctx context.Context, params *protocol.InlayHintParams) (result []protocol.InlayHint, err error) {
-	h.logger.Debug("handle InlayHint")
+	defer stop(start(h, "InlayHint"))
 
 	// Get document
 	doc, err := h.docs.Get(params.TextDocument.URI)
@@ -494,6 +495,25 @@ func (h *handler) Request(ctx context.Context, method string, params interface{}
 }
 
 // Utils
+
+type request struct {
+	h     *handler
+	name  string
+	start time.Time
+}
+
+func start(h *handler, name string) request {
+	return request{
+		h:     h,
+		name:  name,
+		start: time.Now(),
+	}
+}
+
+func stop(req request) {
+	duration := time.Now().Sub(req.start)
+	req.h.logger.Debug(req.name, zap.Duration("duration", duration))
+}
 
 func convertRange(r core.Range) protocol.Range {
 	return protocol.Range{

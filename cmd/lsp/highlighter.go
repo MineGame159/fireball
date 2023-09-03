@@ -178,7 +178,7 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 }
 
 func (h *highlighter) VisitMember(expr *ast.Member) {
-	if _, ok := expr.Type().(*types.EnumType); ok {
+	if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 		h.addToken(expr.Name, enumMemberKind)
 	} else {
 		h.addToken(expr.Name, propertyKind)
