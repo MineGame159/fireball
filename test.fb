@@ -21,6 +21,9 @@ func main() i32 {
     printf("\n");
     shadowing();
 
+    printf("\n");
+    printf("4 << 2 = %d\n", 4 << 2);
+
     return 0;
 }
 

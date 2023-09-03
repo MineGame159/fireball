@@ -14,7 +14,6 @@ const (
 	Comma
 	Colon
 	Semicolon
-	Ampersand
 
 	Plus
 	Minus
@@ -36,6 +35,11 @@ const (
 	LessEqual
 	Greater
 	GreaterEqual
+
+	Pipe
+	Ampersand
+	LessLess
+	GreaterGreater
 
 	Nil
 	True
@@ -98,6 +102,16 @@ func IsComparison(kind TokenKind) bool {
 func IsArithmetic(kind TokenKind) bool {
 	switch kind {
 	case Plus, Minus, Star, Slash, Percentage:
+		return true
+
+	default:
+		return false
+	}
+}
+
+func IsBitwise(kind TokenKind) bool {
+	switch kind {
+	case Pipe, Ampersand, LessLess, GreaterGreater:
 		return true
 
 	default:

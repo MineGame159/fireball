@@ -12,7 +12,7 @@ func (p *parser) expression() (ast.Expr, *core.Diagnostic) {
 
 func (p *parser) assignment() (ast.Expr, *core.Diagnostic) {
 	// Cascade
-	expr, err := p.or()
+	expr, err := p.logicalOr()
 	if err != nil {
 		return nil, err
 	}
@@ -44,9 +44,9 @@ func (p *parser) assignment() (ast.Expr, *core.Diagnostic) {
 	return expr, nil
 }
 
-func (p *parser) or() (ast.Expr, *core.Diagnostic) {
+func (p *parser) logicalOr() (ast.Expr, *core.Diagnostic) {
 	// Cascade
-	expr, err := p.and()
+	expr, err := p.logicalAnd()
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (p *parser) or() (ast.Expr, *core.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.and()
+		right, err := p.logicalAnd()
 		if err != nil {
 			return nil, err
 		}
@@ -78,9 +78,9 @@ func (p *parser) or() (ast.Expr, *core.Diagnostic) {
 	return expr, nil
 }
 
-func (p *parser) and() (ast.Expr, *core.Diagnostic) {
+func (p *parser) logicalAnd() (ast.Expr, *core.Diagnostic) {
 	// Cascade
-	expr, err := p.equality()
+	expr, err := p.bitwiseOr()
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +90,81 @@ func (p *parser) and() (ast.Expr, *core.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.equality()
+		right, err := p.bitwiseOr()
 		if err != nil {
 			return nil, err
 		}
 
 		// Set
 		logical := &ast.Logical{
+			Left:  expr,
+			Op:    op,
+			Right: right,
+		}
+
+		logical.SetRangeNode(expr, right)
+		logical.SetChildrenParent()
+
+		expr = logical
+	}
+
+	// Return
+	return expr, nil
+}
+
+func (p *parser) bitwiseOr() (ast.Expr, *core.Diagnostic) {
+	// Cascade
+	expr, err := p.bitwiseAnd()
+	if err != nil {
+		return nil, err
+	}
+
+	// |
+	for p.match(scanner.Pipe) {
+		op := p.current
+
+		// Cascade
+		right, err := p.bitwiseAnd()
+		if err != nil {
+			return nil, err
+		}
+
+		// Set
+		logical := &ast.Binary{
+			Left:  expr,
+			Op:    op,
+			Right: right,
+		}
+
+		logical.SetRangeNode(expr, right)
+		logical.SetChildrenParent()
+
+		expr = logical
+	}
+
+	// Return
+	return expr, nil
+}
+
+func (p *parser) bitwiseAnd() (ast.Expr, *core.Diagnostic) {
+	// Cascade
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	// &
+	for p.match(scanner.Ampersand) {
+		op := p.current
+
+		// Cascade
+		right, err := p.equality()
+		if err != nil {
+			return nil, err
+		}
+
+		// Set
+		logical := &ast.Binary{
 			Left:  expr,
 			Op:    op,
 			Right: right,
@@ -148,13 +216,47 @@ func (p *parser) equality() (ast.Expr, *core.Diagnostic) {
 
 func (p *parser) comparison() (ast.Expr, *core.Diagnostic) {
 	// Cascade
-	expr, err := p.term()
+	expr, err := p.shift()
 	if err != nil {
 		return nil, err
 	}
 
 	// < <= > >=
 	for p.match(scanner.Less, scanner.LessEqual, scanner.Greater, scanner.GreaterEqual) {
+		op := p.current
+
+		// Cascade
+		right, err := p.shift()
+		if err != nil {
+			return nil, err
+		}
+
+		// Set
+		binary := &ast.Binary{
+			Left:  expr,
+			Op:    op,
+			Right: right,
+		}
+
+		binary.SetRangeNode(expr, right)
+		binary.SetChildrenParent()
+
+		expr = binary
+	}
+
+	// Return
+	return expr, nil
+}
+
+func (p *parser) shift() (ast.Expr, *core.Diagnostic) {
+	// Cascade
+	expr, err := p.term()
+	if err != nil {
+		return nil, err
+	}
+
+	// << >>
+	for p.match(scanner.LessLess, scanner.GreaterGreater) {
 		op := p.current
 
 		// Cascade

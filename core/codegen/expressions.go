@@ -474,6 +474,15 @@ func (c *codegen) binary(op scanner.Token, left value, leftType types.Type, righ
 	case scanner.GreaterEqual:
 		inst = ternary(floating, "fcmp oge", ternary(signed, "icmp sge", "icmp uge"))
 
+	case scanner.Pipe:
+		inst = "or"
+	case scanner.Ampersand:
+		inst = "and"
+	case scanner.LessLess:
+		inst = "shl"
+	case scanner.GreaterGreater:
+		inst = ternary(signed, "ashr", "lshr")
+
 	default:
 		log.Fatalln("Invalid operator kind")
 	}

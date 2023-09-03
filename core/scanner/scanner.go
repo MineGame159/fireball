@@ -59,15 +59,6 @@ func (s *Scanner) Next() Token {
 	case ';':
 		return s.make(Semicolon)
 
-	case '|':
-		if s.match('|') {
-			return s.make(Or)
-		}
-
-		return s.error("Unexpected character.")
-	case '&':
-		return s.matchToken('&', And, Ampersand)
-
 	case '+':
 		return s.matchToken('=', PlusEqual, Plus)
 	case '-':
@@ -84,9 +75,24 @@ func (s *Scanner) Next() Token {
 	case '!':
 		return s.matchToken('=', BangEqual, Bang)
 	case '<':
+		if s.peek() == '<' {
+			s.advance()
+			return s.make(LessLess)
+		}
+
 		return s.matchToken('=', LessEqual, Less)
 	case '>':
+		if s.peek() == '>' {
+			s.advance()
+			return s.make(GreaterGreater)
+		}
+
 		return s.matchToken('=', GreaterEqual, Greater)
+
+	case '|':
+		return s.matchToken('|', Or, Pipe)
+	case '&':
+		return s.matchToken('&', And, Ampersand)
 
 	case '\'':
 		return s.character()

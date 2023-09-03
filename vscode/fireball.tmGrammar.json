@@ -63,7 +63,7 @@
       "name": "comment.block.fb"
     },
     "operator": {
-      "match": "\\+=|-=|\\*=|\\/=|%=|\\+|-|\\*|\\/|%|&",
+      "match": "\\+=|-=|\\*=|\\/=|%=|<=|>=|==|!=|\\+|-|\\*|\\/|%|<|>|\\||&",
       "name": "keyword.operator.fb"
     },
     "terminator": {

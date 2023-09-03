@@ -203,6 +203,19 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 				}
 			}
 		}
+	} else if scanner.IsBitwise(expr.Op.Kind) {
+		// Bitwise
+		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
+			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
+				if left.Equals(right) && types.IsInteger(left.Kind) {
+					expr.SetType(expr.Left.Type().Copy())
+					return
+				}
+			}
+		}
+
+		expr.SetType(types.Primitive(types.I32, core.Range{}))
+		c.errorRange(expr.Range(), "Expected two identical integer types.")
 	} else {
 		// Error
 		log.Fatalln("checker.VisitBinary() - Invalid operator kind")
