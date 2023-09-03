@@ -113,7 +113,21 @@ func (v *get) Accept(node Node) {
 		// Children
 		node.AcceptChildren(v)
 
+		// Propagate node up the tree
+		if v.node != nil {
+			return
+		}
+
 		// TODO: Work around the fact that some nodes store names as scanner.Token which does not inherit ast.Node
+		if initializer, ok := node.(*Initializer); ok {
+			for _, field := range initializer.Fields {
+				if core.TokenToRange(field.Name).Contains(v.pos) {
+					v.node = node
+					return
+				}
+			}
+		}
+
 		if variable, ok := node.(*Variable); ok && core.TokenToRange(variable.Name).Contains(v.pos) {
 			v.node = node
 			return

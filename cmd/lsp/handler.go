@@ -8,7 +8,6 @@ import (
 	"fireball/core/types"
 	"github.com/MineGame159/protocol"
 	"go.uber.org/zap"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -274,78 +273,8 @@ func (h *handler) Hover(ctx context.Context, params *protocol.HoverParams) (resu
 		Column: int(params.Position.Character),
 	}
 
-	// Get node under cursor
-	for _, decl := range doc.Decls {
-		node := ast.GetLeaf(decl, pos)
-
-		if expr, ok := node.(ast.Expr); ok {
-			// ast.Member that is an enum
-			if m, ok := node.(*ast.Member); ok {
-				if _, ok := m.Value.Type().(*types.EnumType); ok {
-					if e, ok := m.Type().(*types.EnumType); ok {
-						case_ := e.GetCase(m.Name.Lexeme)
-
-						if case_ != nil {
-							return &protocol.Hover{
-								Contents: protocol.MarkupContent{
-									Kind:  protocol.PlainText,
-									Value: strconv.Itoa(case_.Value),
-								},
-								Range: convertRangePtr(expr.Range()),
-							}, nil
-						}
-					}
-				}
-			}
-
-			// ast.Expr
-			text := expr.Type().String()
-
-			// Ignore literal expressions
-			if _, ok := expr.(*ast.Literal); ok {
-				text = ""
-			}
-
-			// Return
-			if text != "" {
-				return &protocol.Hover{
-					Contents: protocol.MarkupContent{
-						Kind:  protocol.PlainText,
-						Value: text,
-					},
-					Range: convertRangePtr(expr.Range()),
-				}, nil
-			}
-		} else if variable, ok := node.(*ast.Variable); ok {
-			// ast.Variable
-			return &protocol.Hover{
-				Contents: protocol.MarkupContent{
-					Kind:  protocol.PlainText,
-					Value: variable.Type.String(),
-				},
-				Range: convertRangePtr(core.TokenToRange(variable.Name)),
-			}, nil
-		} else if enum, ok := node.(*ast.Enum); ok {
-			// ast.Enum
-
-			for _, case_ := range enum.Cases {
-				range_ := core.TokenToRange(case_.Name)
-
-				if range_.Contains(pos) {
-					return &protocol.Hover{
-						Contents: protocol.MarkupContent{
-							Kind:  protocol.PlainText,
-							Value: strconv.Itoa(case_.Value),
-						},
-						Range: convertRangePtr(range_),
-					}, nil
-				}
-			}
-		}
-	}
-
-	// Return nil
-	return nil, nil
+	// Get hover
+	return getHover(doc.Decls, pos), nil
 }
 
 func (h *handler) Implementation(ctx context.Context, params *protocol.ImplementationParams) (result []protocol.Location, err error) {
