@@ -27,11 +27,12 @@ jobs:
           cache-dependency-path: "vscode/package-lock.json"
 
       - name: Install VSCE
-        run: npm install -g vsce
+        run: npm install -g @vscode/vsce
 
       - name: Package VS Code extension
         run: |
           cd vscode
+          npm install
           vsce package
 
       - name: Upload build artifact
