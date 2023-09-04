@@ -19,7 +19,23 @@ jobs:
       - name: Build
         run: go build -o fireball ./cmd
 
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: "npm"
+
+      - name: Install VSCE
+        run: npm install -g vsce
+
+      - name: Package VS Code extension
+        run: |
+          cd vscode
+          vsce package
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v3.1.2
         with:
-          path: fireball
+          path: |
+            fireball
+            vscode/*.vsix
