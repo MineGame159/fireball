@@ -24,6 +24,7 @@ jobs:
         with:
           node-version: 18.x
           cache: "npm"
+          cache-dependency-path: "vscode/package-lock.json"
 
       - name: Install VSCE
         run: npm install -g vsce
