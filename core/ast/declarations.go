@@ -1,7 +1,9 @@
 package ast
 
-import "log"
-import "fireball/core"
+import (
+	"fireball/core"
+	"log"
+)
 import "fireball/core/types"
 import "fireball/core/scanner"
 

@@ -5,6 +5,7 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"fireball/core/utils"
 	"log"
 	"strings"
 )
@@ -57,9 +58,15 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 	expr.AcceptChildren(c)
 
 	// Check struct
-	type_, ok := c.structs[expr.Name.Lexeme]
+	var type_ *types.StructType
 
-	if !ok {
+	if t := c.resolver.GetType(expr.Name.Lexeme); t != nil {
+		if s, ok := t.(*types.StructType); ok {
+			type_ = s
+		}
+	}
+
+	if type_ == nil {
 		c.errorToken(expr.Name, "Unknown type '%s'.", expr.Name)
 		expr.SetType(types.Primitive(types.Void, core.Range{}))
 
@@ -69,7 +76,7 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 	expr.SetType(type_)
 
 	// Check fields
-	assignedFields := core.NewSet[string]()
+	assignedFields := utils.NewSet[string]()
 
 	for _, initField := range expr.Fields {
 		// Check name collision
@@ -243,18 +250,8 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 
 	// Function
 	if parent, ok := expr.Parent().(*ast.Call); ok && parent.Callee == expr {
-		if function := c.getFunction(expr.Identifier); function != nil {
-			params := make([]types.Type, len(function.Params))
-
-			for i, param := range function.Params {
-				params[i] = param.Type
-			}
-
-			expr.SetType(&types.FunctionType{
-				Params:   params,
-				Variadic: function.Variadic,
-				Returns:  function.Returns,
-			})
+		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
+			expr.SetType(f.Copy())
 		} else {
 			c.errorToken(expr.Identifier, "Function with the name '%s' does not exist.", expr.Identifier)
 			expr.SetType(types.Primitive(types.Void, core.Range{}))
@@ -265,11 +262,13 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Enum
-	if enum, ok := c.enums[expr.Identifier.Lexeme]; ok {
-		expr.SetType(enum.Copy())
-		expr.Kind = ast.EnumKind
+	if t := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
+		if e, ok := t.(*types.EnumType); ok {
+			expr.SetType(e.Copy())
+			expr.Kind = ast.EnumKind
 
-		return
+			return
+		}
 	}
 
 	// Variable

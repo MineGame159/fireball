@@ -1,6 +1,8 @@
 package types
 
-import "fireball/core"
+import (
+	"fireball/core"
+)
 
 type EnumType struct {
 	range_ core.Range

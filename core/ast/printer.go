@@ -72,7 +72,7 @@ func (p *printer) VisitFunc(decl *Func) {
 	p.print(str.String())
 
 	for _, stmt := range decl.Body {
-		p.acceptStmt(stmt)
+		p.AcceptStmt(stmt)
 	}
 }
 
@@ -82,38 +82,38 @@ func (p *printer) VisitBlock(stmt *Block) {
 	p.print("{}")
 
 	for _, s := range stmt.Stmts {
-		p.acceptStmt(s)
+		p.AcceptStmt(s)
 	}
 }
 
 func (p *printer) VisitExpression(stmt *Expression) {
 	p.print("expr")
-	p.acceptExpr(stmt.Expr)
+	p.AcceptExpr(stmt.Expr)
 }
 
 func (p *printer) VisitVariable(stmt *Variable) {
 	p.print("%s %s", stmt.Type.String(), stmt.Name.Lexeme)
-	p.acceptExpr(stmt.Initializer)
+	p.AcceptExpr(stmt.Initializer)
 }
 
 func (p *printer) VisitIf(stmt *If) {
 	p.print("if")
-	p.acceptExpr(stmt.Condition)
+	p.AcceptExpr(stmt.Condition)
 
-	p.acceptStmt(stmt.Then)
-	p.acceptStmt(stmt.Else)
+	p.AcceptStmt(stmt.Then)
+	p.AcceptStmt(stmt.Else)
 }
 
 func (p *printer) VisitFor(stmt *For) {
 	p.print("for")
 
-	p.acceptExpr(stmt.Condition)
-	p.acceptStmt(stmt.Body)
+	p.AcceptExpr(stmt.Condition)
+	p.AcceptStmt(stmt.Body)
 }
 
 func (p *printer) VisitReturn(stmt *Return) {
 	p.print("return")
-	p.acceptExpr(stmt.Expr)
+	p.AcceptExpr(stmt.Expr)
 }
 
 func (p *printer) VisitBreak(stmt *Break) {
@@ -128,7 +128,7 @@ func (p *printer) VisitContinue(stmt *Continue) {
 
 func (p *printer) VisitGroup(expr *Group) {
 	p.print("()")
-	p.acceptExpr(expr.Expr)
+	p.AcceptExpr(expr.Expr)
 }
 
 func (p *printer) VisitLiteral(expr *Literal) {
@@ -141,7 +141,7 @@ func (p *printer) VisitInitializer(expr *Initializer) {
 
 	for _, field := range expr.Fields {
 		p.print("%s:", field.Name)
-		p.acceptExpr(field.Value)
+		p.AcceptExpr(field.Value)
 	}
 
 	p.depth--
@@ -149,19 +149,19 @@ func (p *printer) VisitInitializer(expr *Initializer) {
 
 func (p *printer) VisitUnary(expr *Unary) {
 	p.print(expr.Op.Lexeme)
-	p.acceptExpr(expr.Right)
+	p.AcceptExpr(expr.Right)
 }
 
 func (p *printer) VisitBinary(expr *Binary) {
 	p.print(expr.Op.Lexeme)
-	p.acceptExpr(expr.Left)
-	p.acceptExpr(expr.Right)
+	p.AcceptExpr(expr.Left)
+	p.AcceptExpr(expr.Right)
 }
 
 func (p *printer) VisitLogical(expr *Logical) {
 	p.print(expr.Op.Lexeme)
-	p.acceptExpr(expr.Left)
-	p.acceptExpr(expr.Right)
+	p.AcceptExpr(expr.Left)
+	p.AcceptExpr(expr.Right)
 }
 
 func (p *printer) VisitIdentifier(expr *Identifier) {
@@ -170,39 +170,39 @@ func (p *printer) VisitIdentifier(expr *Identifier) {
 
 func (p *printer) VisitAssignment(expr *Assignment) {
 	p.print(expr.Op.Lexeme)
-	p.acceptExpr(expr.Assignee)
-	p.acceptExpr(expr.Value)
+	p.AcceptExpr(expr.Assignee)
+	p.AcceptExpr(expr.Value)
 }
 
 func (p *printer) VisitCast(expr *Cast) {
 	p.print("as %s", expr.Type())
-	p.acceptExpr(expr.Expr)
+	p.AcceptExpr(expr.Expr)
 }
 
 func (p *printer) VisitCall(expr *Call) {
 	p.print("call")
-	p.acceptExpr(expr.Callee)
+	p.AcceptExpr(expr.Callee)
 
 	for _, arg := range expr.Args {
-		p.acceptExpr(arg)
+		p.AcceptExpr(arg)
 	}
 }
 
 func (p *printer) VisitIndex(expr *Index) {
 	p.print("[]")
 
-	p.acceptExpr(expr.Value)
-	p.acceptExpr(expr.Index)
+	p.AcceptExpr(expr.Value)
+	p.AcceptExpr(expr.Index)
 }
 
 func (p *printer) VisitMember(expr *Member) {
 	p.print(".%s", expr.Name)
-	p.acceptExpr(expr.Value)
+	p.AcceptExpr(expr.Value)
 }
 
-// Utils
+// ast.Acceptor
 
-func (p *printer) acceptDecl(decl Decl) {
+func (p *printer) AcceptDecl(decl Decl) {
 	if decl != nil {
 		p.depth++
 		decl.Accept(p)
@@ -210,7 +210,7 @@ func (p *printer) acceptDecl(decl Decl) {
 	}
 }
 
-func (p *printer) acceptStmt(stmt Stmt) {
+func (p *printer) AcceptStmt(stmt Stmt) {
 	if stmt != nil {
 		p.depth++
 		stmt.Accept(p)
@@ -218,13 +218,15 @@ func (p *printer) acceptStmt(stmt Stmt) {
 	}
 }
 
-func (p *printer) acceptExpr(expr Expr) {
+func (p *printer) AcceptExpr(expr Expr) {
 	if expr != nil {
 		p.depth++
 		expr.Accept(p)
 		p.depth--
 	}
 }
+
+// Utils
 
 func (p *printer) print(format string, args ...any) {
 	for i := 0; i < p.depth; i++ {

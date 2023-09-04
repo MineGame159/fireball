@@ -1,10 +1,10 @@
 package codegen
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"fireball/core/utils"
 	"fmt"
 	"io"
 	"log"
@@ -19,17 +19,15 @@ type constant struct {
 	length int
 }
 
-type typeValuePair struct {
-	type_ types.Type
-	val   value
-}
-
 type typeDbgPair struct {
 	type_ types.Type
 	name  string
 }
 
 type codegen struct {
+	path     string
+	resolver utils.Resolver
+
 	debug    debug
 	dbgTypes []typeDbgPair
 
@@ -37,10 +35,9 @@ type codegen struct {
 	blocks  values
 	locals  values
 
-	constants []constant
-	types     []typeValuePair
-	enums     core.Set[string]
-	functions []function
+	constants         []constant
+	types             []typeValuePair
+	importedFunctions []value
 
 	scopes    []scope
 	variables []variable
@@ -56,11 +53,6 @@ type codegen struct {
 	depth  int
 }
 
-type function struct {
-	name scanner.Token
-	val  value
-}
-
 type scope struct {
 	variableI     int
 	variableCount int
@@ -71,38 +63,33 @@ type variable struct {
 	val  value
 }
 
-func Emit(filename string, decls []ast.Decl, writer io.Writer) {
+func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writer) {
 	// Init codegen
 	c := &codegen{
+		path:     path,
+		resolver: resolver,
+
 		globals: values{char: "@"},
 		blocks:  values{char: "bb_"},
 		locals:  values{char: "%_"},
-
-		types: make([]typeValuePair, 0, 64),
-		enums: core.NewSet[string](),
 
 		writer: writer,
 		depth:  0,
 	}
 
 	// File metadata
-	c.writeFmt("source_filename = \"%s\"\n", filename)
+	c.writeFmt("source_filename = \"%s\"\n", path)
 	c.writeRaw("\n")
 
-	file := c.debug.pushScope(c.debug.file(filename))
+	file := c.debug.pushScope(c.debug.file(path))
 	c.debug.compileUnit(file)
 
 	// Emit types
-	for _, decl := range decls {
-		if v, ok := decl.(*ast.Struct); ok {
-			val := c.globals.constant("%struct."+v.Name.Lexeme, v.Type)
+	c.types = collectTypes(&c.globals, decls)
 
-			c.types = append(c.types, typeValuePair{
-				type_: v.Type,
-				val:   val,
-			})
-
-			c.writeRaw(val.identifier)
+	for _, pair := range c.types {
+		if v, ok := pair.type_.(*types.StructType); ok {
+			c.writeRaw(pair.val.identifier)
 			c.writeRaw(" = type { ")
 
 			for i, field := range v.Fields {
@@ -119,29 +106,37 @@ func Emit(filename string, decls []ast.Decl, writer io.Writer) {
 
 	c.writeRaw("\n")
 
-	// Find all enums and functions
-	for _, decl := range decls {
-		if e, ok := decl.(*ast.Enum); ok {
-			c.enums.Add(e.Name.Lexeme)
-		} else if f, ok := decl.(*ast.Func); ok {
-			params := make([]types.Type, len(f.Params))
-
-			for i, param := range f.Params {
-				params[i] = param.Type
-			}
-
-			c.addFunction(f.Name, &types.FunctionType{
-				Params:   params,
-				Variadic: f.Variadic,
-				Returns:  f.Returns,
-			})
-		}
-	}
-
 	// Emit
 	for _, decl := range decls {
 		c.acceptDecl(decl)
 	}
+
+	// Import functions
+	for _, f := range c.importedFunctions {
+		type_ := f.type_.(*types.FunctionType)
+
+		c.writeFmt("declare %s %s(", c.getType(type_.Returns), f.identifier)
+
+		for i, param := range type_.Params {
+			if i > 0 {
+				c.writeStr(", ")
+			}
+
+			c.writeFmt("%s", c.getType(param))
+		}
+
+		if type_.Variadic {
+			if len(type_.Params) > 0 {
+				c.writeStr(", ")
+			}
+
+			c.writeStr("...")
+		}
+
+		c.writeStr(")\n")
+	}
+
+	c.writeRaw("\n")
 
 	// Emit constants
 	for _, co := range c.constants {
@@ -253,8 +248,6 @@ func (c *constant) escape() {
 // Types
 
 func (c *codegen) getType(type_ types.Type) value {
-	// TODO: Linear search for types, very bad
-
 	// Try cache
 	for _, pair := range c.types {
 		if pair.type_.Equals(type_) {
@@ -328,27 +321,34 @@ func (c *codegen) getType(type_ types.Type) value {
 	}
 
 	// Error
-	log.Fatalln("codegen.getType() - Invalid type")
-	return value{}
+	panic("invalid type")
 }
 
 // Functions
 
-func (c *codegen) getFunction(name scanner.Token) *function {
-	for i := 0; i < len(c.functions); i++ {
-		if c.functions[i].name.Lexeme == name.Lexeme {
-			return &c.functions[i]
+func (c *codegen) getFunction(name scanner.Token) value {
+	// Get function
+	type_, filePath := c.resolver.GetFunction(name.Lexeme)
+	val := c.globals.named(name.Lexeme, type_)
+
+	// Check if function needs to be imported
+	if filePath != c.path {
+		contains := false
+
+		for _, f := range c.importedFunctions {
+			if f.identifier == val.identifier {
+				contains = true
+				break
+			}
+		}
+
+		if !contains {
+			c.importedFunctions = append(c.importedFunctions, val)
 		}
 	}
 
-	return nil
-}
-
-func (c *codegen) addFunction(name scanner.Token, type_ types.Type) {
-	c.functions = append(c.functions, function{
-		name: name,
-		val:  c.globals.named(name.Lexeme, type_),
-	})
+	// Return
+	return val
 }
 
 // Scope / Variables
@@ -394,8 +394,6 @@ func (c *codegen) peekScope() *scope {
 // Debug
 
 func (c *codegen) getDbgType(type_ types.Type) string {
-	// TODO: Linear search for types, very bad
-
 	// Try cache
 	for _, pair := range c.dbgTypes {
 		if pair.type_.Equals(type_) {

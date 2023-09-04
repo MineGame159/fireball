@@ -38,12 +38,3 @@ func shadowing() {
 
     printf(text);
 }
-
-func print(a *i32) {
-    printf("Number: %d\n", *a);
-}
-
-extern func printf(format *u8, ...) void
-
-extern func malloc(size u64) *void
-extern func free(ptr *void) void

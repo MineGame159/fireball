@@ -5,6 +5,7 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"fireball/core/utils"
 	"fmt"
 	"strconv"
 )
@@ -18,10 +19,10 @@ type parser struct {
 
 	extern bool
 
-	reporter core.Reporter
+	reporter utils.Reporter
 }
 
-func Parse(reporter core.Reporter, scanner *scanner.Scanner) []ast.Decl {
+func Parse(reporter utils.Reporter, scanner *scanner.Scanner) []ast.Decl {
 	// Initialise parser
 	p := &parser{
 		scanner:  scanner,
@@ -44,7 +45,7 @@ func Parse(reporter core.Reporter, scanner *scanner.Scanner) []ast.Decl {
 	return decls
 }
 
-func (p *parser) parseType() (types.Type, *core.Diagnostic) {
+func (p *parser) parseType() (types.Type, *utils.Diagnostic) {
 	if p.match(scanner.LeftBracket) {
 		return p.parseArrayType()
 	}
@@ -55,7 +56,7 @@ func (p *parser) parseType() (types.Type, *core.Diagnostic) {
 	return p.parseIdentifierType()
 }
 
-func (p *parser) parseArrayType() (types.Type, *core.Diagnostic) {
+func (p *parser) parseArrayType() (types.Type, *utils.Diagnostic) {
 	start := p.current
 
 	// Count
@@ -88,7 +89,7 @@ func (p *parser) parseArrayType() (types.Type, *core.Diagnostic) {
 	return types.Array(uint32(count), base, core.TokensToRange(start, p.current)), nil
 }
 
-func (p *parser) parsePointerType() (types.Type, *core.Diagnostic) {
+func (p *parser) parsePointerType() (types.Type, *utils.Diagnostic) {
 	start := p.current
 
 	// Pointee
@@ -101,7 +102,7 @@ func (p *parser) parsePointerType() (types.Type, *core.Diagnostic) {
 	return types.Pointer(pointee, core.TokensToRange(start, p.current)), nil
 }
 
-func (p *parser) parseIdentifierType() (types.Type, *core.Diagnostic) {
+func (p *parser) parseIdentifierType() (types.Type, *utils.Diagnostic) {
 	// Name
 	ident, err := p.consume(scanner.Identifier, "Expected type name.")
 	if err != nil {
@@ -151,7 +152,7 @@ func (p *parser) parseIdentifierType() (types.Type, *core.Diagnostic) {
 	return types.Primitive(kind, range_), nil
 }
 
-func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *core.Diagnostic) {
+func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *utils.Diagnostic) {
 	if p.check(kind) {
 		return p.advance(), nil
 	}
@@ -167,17 +168,17 @@ func (p *parser) consume2(kind scanner.TokenKind) scanner.Token {
 	return scanner.Token{Kind: scanner.Error}
 }
 
-func (p *parser) error(token scanner.Token, format string, args ...any) *core.Diagnostic {
-	return &core.Diagnostic{
-		Kind:    core.ErrorKind,
+func (p *parser) error(token scanner.Token, format string, args ...any) *utils.Diagnostic {
+	return &utils.Diagnostic{
+		Kind:    utils.ErrorKind,
 		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	}
 }
 
 func (p *parser) error2(token scanner.Token, format string, args ...any) {
-	p.reporter.Report(core.Diagnostic{
-		Kind:    core.ErrorKind,
+	p.reporter.Report(utils.Diagnostic{
+		Kind:    utils.ErrorKind,
 		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	})

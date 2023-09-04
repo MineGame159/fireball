@@ -1,13 +1,13 @@
 package parser
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"fireball/core/utils"
 )
 
-func (p *parser) statement() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) statement() (ast.Stmt, *utils.Diagnostic) {
 	if p.match(scanner.LeftBrace) {
 		return p.block()
 	}
@@ -33,7 +33,7 @@ func (p *parser) statement() (ast.Stmt, *core.Diagnostic) {
 	return p.expressionStmt()
 }
 
-func (p *parser) block() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) block() (ast.Stmt, *utils.Diagnostic) {
 	token := p.current
 
 	// Statements
@@ -65,7 +65,7 @@ func (p *parser) block() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) expressionStmt() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) expressionStmt() (ast.Stmt, *utils.Diagnostic) {
 	token := p.next
 
 	// Expression
@@ -98,7 +98,7 @@ func (p *parser) expressionStmt() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) variable() (ast.Stmt, *utils.Diagnostic) {
 	start := p.current
 
 	// Name
@@ -152,7 +152,7 @@ func (p *parser) variable() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) if_() (ast.Stmt, *utils.Diagnostic) {
 	token := p.current
 
 	// Left paren
@@ -203,7 +203,7 @@ func (p *parser) if_() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) for_() (ast.Stmt, *utils.Diagnostic) {
 	token := p.current
 
 	var condition ast.Expr
@@ -243,7 +243,7 @@ func (p *parser) for_() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) return_() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) return_() (ast.Stmt, *utils.Diagnostic) {
 	token := p.current
 
 	// Value
@@ -274,7 +274,7 @@ func (p *parser) return_() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) break_() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) break_() (ast.Stmt, *utils.Diagnostic) {
 	token := p.current
 
 	// Semicolon
@@ -291,7 +291,7 @@ func (p *parser) break_() (ast.Stmt, *core.Diagnostic) {
 	return stmt, nil
 }
 
-func (p *parser) continue_() (ast.Stmt, *core.Diagnostic) {
+func (p *parser) continue_() (ast.Stmt, *utils.Diagnostic) {
 	token := p.current
 
 	// Semicolon

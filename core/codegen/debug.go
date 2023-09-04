@@ -68,8 +68,8 @@ func (d *debug) compileUnit(file string) string {
 	return name
 }
 
-func (d *debug) file(filename string) string {
-	name := d.node("!DIFile(filename: \"%s\", directory: \"%s\")", filename, filepath.Dir(filename))
+func (d *debug) file(path string) string {
+	name := d.node("!DIFile(filename: \"%s\", directory: \"%s\")", filepath.Base(path), filepath.Dir(path))
 
 	d.fileName = name
 	return name

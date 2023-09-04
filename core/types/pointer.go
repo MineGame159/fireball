@@ -1,6 +1,8 @@
 package types
 
-import "fireball/core"
+import (
+	"fireball/core"
+)
 
 type PointerType struct {
 	range_  core.Range

@@ -6,14 +6,15 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"fireball/core/utils"
 	"fmt"
 	"slices"
 )
 
 type highlighter struct {
-	enums core.Set[string]
+	enums utils.Set[string]
 
-	functions core.Set[string]
+	functions utils.Set[string]
 	params    []ast.Param
 
 	tokens []semantic
@@ -21,8 +22,8 @@ type highlighter struct {
 
 func highlight(decls []ast.Decl) []uint32 {
 	h := &highlighter{
-		enums:     core.NewSet[string](),
-		functions: core.NewSet[string](),
+		enums:     utils.NewSet[string](),
+		functions: utils.NewSet[string](),
 		tokens:    make([]semantic, 0, 256),
 	}
 

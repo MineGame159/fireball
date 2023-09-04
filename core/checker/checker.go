@@ -5,24 +5,20 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
+	"fireball/core/utils"
 	"fmt"
-	"math"
 )
 
 type checker struct {
 	scopes    []scope
 	variables []variable
 
-	types   map[string]types.Type
-	structs map[string]*types.StructType
-	enums   map[string]*types.EnumType
-
-	functions core.Set[string]
-	function  *ast.Func
+	function *ast.Func
 
 	loopDepth int
 
-	reporter core.Reporter
+	reporter utils.Reporter
+	resolver utils.Resolver
 	decls    []ast.Decl
 }
 
@@ -39,117 +35,16 @@ type variable struct {
 	used  bool
 }
 
-func Check(reporter core.Reporter, decls []ast.Decl) {
+func Check(reporter utils.Reporter, resolver utils.Resolver, decls []ast.Decl) {
 	c := &checker{
-		types:   make(map[string]types.Type),
-		structs: make(map[string]*types.StructType),
-		enums:   make(map[string]*types.EnumType),
-
-		functions: core.NewSet[string](),
-		reporter:  reporter,
-		decls:     decls,
-	}
-
-	// Collect types
-	for _, decl := range decls {
-		if s, ok := decl.(*ast.Struct); ok {
-			// Create struct type
-			fields := make([]types.Field, len(s.Fields))
-
-			for i, field := range s.Fields {
-				fields[i] = types.Field{
-					Name: field.Name.Lexeme,
-					Type: field.Type,
-				}
-			}
-
-			type_ := types.Struct(s.Name.Lexeme, fields, core.Range{})
-			s.Type = type_
-
-			// Save in map and check name collision
-			if _, ok := c.types[s.Name.Lexeme]; ok {
-				c.errorToken(s.Name, "Type with the name '%s' already exists.", s.Name)
-			}
-
-			c.types[s.Name.Lexeme] = type_
-			c.structs[s.Name.Lexeme] = type_
-		} else if s, ok := decl.(*ast.Enum); ok {
-			// Select smallest possible enum type
-			if s.Type == nil {
-				minValue := math.MaxInt
-				maxValue := math.MinInt
-
-				for _, case_ := range s.Cases {
-					minValue = min(minValue, case_.Value)
-					maxValue = max(maxValue, case_.Value)
-				}
-
-				var kind types.PrimitiveKind
-
-				if minValue >= 0 {
-					// Unsigned
-					if maxValue <= math.MaxUint8 {
-						kind = types.U8
-					} else if maxValue <= math.MaxUint16 {
-						kind = types.U16
-					} else if maxValue <= math.MaxUint32 {
-						kind = types.U32
-					} else {
-						kind = types.U64
-					}
-				} else {
-					// Signed
-					if minValue >= math.MinInt8 && maxValue <= math.MaxInt8 {
-						kind = types.I8
-					} else if minValue >= math.MinInt16 && maxValue <= math.MaxInt16 {
-						kind = types.I16
-					} else if minValue >= math.MinInt32 && maxValue <= math.MaxInt32 {
-						kind = types.I32
-					} else {
-						kind = types.I64
-					}
-				}
-
-				s.Type = types.Primitive(kind, core.Range{})
-			}
-
-			// Create type
-			cases := make([]types.EnumCase, len(s.Cases))
-
-			for i, case_ := range s.Cases {
-				cases[i] = types.EnumCase{
-					Name:  case_.Name.Lexeme,
-					Value: case_.Value,
-				}
-			}
-
-			type_ := types.Enum(s.Name.Lexeme, s.Type, cases, core.Range{})
-
-			// Save in map and check name collision
-			if _, ok := c.types[s.Name.Lexeme]; ok {
-				c.errorToken(s.Name, "Type with the name '%s' already exists.", s.Name)
-			}
-
-			c.types[s.Name.Lexeme] = type_
-			c.enums[s.Name.Lexeme] = type_
-		}
+		reporter: reporter,
+		resolver: resolver,
+		decls:    decls,
 	}
 
 	for _, decl := range decls {
 		c.AcceptDecl(decl)
 	}
-}
-
-func (c *checker) getFunction(name scanner.Token) *ast.Func {
-	for _, decl := range c.decls {
-		if function, ok := decl.(*ast.Func); ok {
-			if function.Name.Lexeme == name.Lexeme {
-				return function
-			}
-		}
-	}
-
-	return nil
 }
 
 // Scope / Variables
@@ -216,10 +111,8 @@ func (c *checker) peekScope() *scope {
 
 func (c *checker) VisitType(type_ *types.Type) {
 	if v, ok := (*type_).(*types.UnresolvedType); ok {
-		if t, ok := c.structs[v.Identifier.Lexeme]; ok {
-			*type_ = types.Struct(t.Name, t.Fields, v.Range())
-		} else if t, ok := c.enums[v.Identifier.Lexeme]; ok {
-			*type_ = types.Enum(t.Name, t.Type, t.Cases, v.Range())
+		if t := c.resolver.GetType(v.Identifier.Lexeme); t != nil {
+			*type_ = t.Copy()
 		} else {
 			c.errorRange(v.Range(), "Unknown type '%s'.", v)
 			*type_ = types.Primitive(types.Void, v.Range())
@@ -251,32 +144,32 @@ func (c *checker) AcceptExpr(expr ast.Expr) {
 // Diagnostics
 
 func (c *checker) errorRange(range_ core.Range, format string, args ...any) {
-	c.reporter.Report(core.Diagnostic{
-		Kind:    core.ErrorKind,
+	c.reporter.Report(utils.Diagnostic{
+		Kind:    utils.ErrorKind,
 		Range:   range_,
 		Message: fmt.Sprintf(format, args...),
 	})
 }
 
 func (c *checker) errorToken(token scanner.Token, format string, args ...any) {
-	c.reporter.Report(core.Diagnostic{
-		Kind:    core.ErrorKind,
+	c.reporter.Report(utils.Diagnostic{
+		Kind:    utils.ErrorKind,
 		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	})
 }
 
 func (c *checker) warningRange(range_ core.Range, format string, args ...any) {
-	c.reporter.Report(core.Diagnostic{
-		Kind:    core.WarningKind,
+	c.reporter.Report(utils.Diagnostic{
+		Kind:    utils.WarningKind,
 		Range:   range_,
 		Message: fmt.Sprintf(format, args...),
 	})
 }
 
 func (c *checker) warningToken(token scanner.Token, format string, args ...any) {
-	c.reporter.Report(core.Diagnostic{
-		Kind:    core.WarningKind,
+	c.reporter.Report(utils.Diagnostic{
+		Kind:    utils.WarningKind,
 		Range:   core.TokenToRange(token),
 		Message: fmt.Sprintf(format, args...),
 	})

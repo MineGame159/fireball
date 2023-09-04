@@ -1,16 +1,16 @@
 package checker
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/types"
+	"fireball/core/utils"
 )
 
 func (c *checker) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(c)
 
 	// Check fields
-	fields := core.NewSet[string]()
+	fields := utils.NewSet[string]()
 
 	for _, field := range decl.Fields {
 		// Check name collision
@@ -67,11 +67,6 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	// Pop scope
 	c.popScope()
 	c.function = nil
-
-	// Check name collision
-	if !c.functions.Add(decl.Name.Lexeme) {
-		c.errorToken(decl.Name, "Function with the name '%s' already exists.", decl.Name)
-	}
 
 	// Check parameter void type
 	for _, param := range decl.Params {

@@ -1,4 +1,4 @@
-package core
+package utils
 
 type Set[T comparable] struct {
 	data map[T]struct{}

@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"fireball/cmd/build"
-	"fireball/core"
-	"fireball/core/checker"
 	"fireball/core/codegen"
-	"fireball/core/parser"
-	"fireball/core/scanner"
+	"fireball/core/utils"
+	"fireball/core/workspace"
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -19,36 +17,42 @@ import (
 
 func GetBuildCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "build file",
-		Short: "Build a single source file into an executable",
-		Args:  cobra.ExactArgs(1),
+		Use:   "build",
+		Short: "Build project.",
 		Run:   buildCmd,
 	}
 }
 
 func buildCmd(_ *cobra.Command, args []string) {
-	buildExecutable(args[0])
+	buildProject()
 }
 
-func buildExecutable(input string) string {
+func buildProject() string {
 	start := time.Now()
 
-	// Read file
-	b, err := os.ReadFile(input)
+	// Create project
+	project, err := workspace.NewProject(".")
 	if err != nil {
-		log.Fatalln("Invalid file")
+		log.Fatalln(err.Error())
 	}
 
-	text := string(b)
+	// Load files
+	err = project.LoadFiles()
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
 
-	// Parse and check
-	reporter := &consoleReporter{
+	// Report errors
+	reporter := consoleReporter{
 		error:   color.New(color.FgRed),
 		warning: color.New(color.FgYellow),
 	}
 
-	decls := parser.Parse(reporter, scanner.NewScanner(text))
-	checker.Check(reporter, decls)
+	for _, file := range project.Files {
+		for _, diagnostic := range file.FlushDiagnostics() {
+			reporter.Report(file, diagnostic)
+		}
+	}
 
 	if reporter.errorCount > 0 {
 		fmt.Println()
@@ -60,44 +64,54 @@ func buildExecutable(input string) string {
 			fmt.Printf(", with %d errors\n", reporter.errorCount)
 		}
 
-		fmt.Println()
 		os.Exit(1)
 	}
 
-	// Get output paths
-	filename := getFilename(input)
-	output := "build/" + filename
-
-	// Emit LLVM IR file
+	// Emit LLVM IR
 	_ = os.Mkdir("build", 0750)
-	irFile, _ := os.Create(output + ".ll")
 
-	codegen.Emit(input, decls, irFile)
+	irPaths := make([]string, 0, len(project.Files))
 
-	// Compile to object file
-	c := build.Compiler{
-		OptimizationLevel: 0,
+	for _, file := range project.Files {
+		path := strings.ReplaceAll(file.Path, "/", "-")
+		path = filepath.Join(project.Path, "build", path[:len(path)-3]+".ll")
+
+		irFile, _ := os.Create(path)
+		codegen.Emit(file.Path, project, file.Decls, irFile)
+		_ = irFile.Close()
+
+		irPaths = append(irPaths, path)
 	}
 
-	if err := c.Compile(irFile.Name(), output+".o"); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(2)
+	// Compile LLVM IR files to object files
+	c := build.Compiler{OptimizationLevel: 0}
+
+	for _, irPath := range irPaths {
+		path := irPath[:len(irPath)-3] + ".o"
+		err := c.Compile(irPath, path)
+
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
 	}
 
-	// Link to executable
-	l := build.Linker{
-		Crt: true,
-	}
+	// Link all object files to final executable
+	l := build.Linker{Crt: true}
 
 	l.AddLibrary("c")
-	l.AddInput(output + ".o")
 
-	if err := l.Link(output); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(3)
+	for _, irPath := range irPaths {
+		l.AddInput(irPath[:len(irPath)-3] + ".o")
 	}
 
-	// Return
+	output := filepath.Join(project.Path, "build", project.Config.Name)
+	err = l.Link(output)
+
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	// Print info
 	took := time.Now().Sub(start)
 
 	if reporter.hadDiagnostic {
@@ -108,18 +122,8 @@ func buildExecutable(input string) string {
 	fmt.Printf(", took %s\n", took)
 	fmt.Println()
 
+	// Return
 	return output
-}
-
-func getFilename(path string) string {
-	filename := filepath.Base(path)
-
-	i := strings.IndexByte(filename, '.')
-	if i != -1 {
-		filename = filename[:i]
-	}
-
-	return filename
 }
 
 type consoleReporter struct {
@@ -130,15 +134,22 @@ type consoleReporter struct {
 	errorCount    int
 }
 
-func (c *consoleReporter) Report(diag core.Diagnostic) {
-	if diag.Kind == core.ErrorKind {
+func (c *consoleReporter) Report(file *workspace.File, diag utils.Diagnostic) {
+	path, err := filepath.Rel(file.Project.Config.Src, file.Path)
+	if err != nil {
+		path = file.Path
+	}
+
+	msg := fmt.Sprintf("[%s:%d:%d] %s", path, diag.Range.Start.Line, diag.Range.Start.Column+1, diag.Message)
+
+	if diag.Kind == utils.ErrorKind {
 		_, _ = c.error.Fprint(os.Stderr, "ERROR   ")
-		_, _ = fmt.Fprintln(os.Stderr, diag.String())
+		_, _ = fmt.Fprintln(os.Stderr, msg)
 
 		c.errorCount++
 	} else {
 		_, _ = c.warning.Print("WARNING ")
-		fmt.Println(diag.String())
+		fmt.Println(msg)
 	}
 
 	c.hadDiagnostic = true

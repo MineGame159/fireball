@@ -193,13 +193,13 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 	switch expr.Kind {
 	case ast.FunctionKind:
-		if f := c.getFunction(expr.Identifier); f != nil {
-			c.exprValue = f.val
+		if v := c.getFunction(expr.Identifier); v.identifier != "" {
+			c.exprValue = v
 			return
 		}
 
 	case ast.EnumKind:
-		if _, ok := expr.Type().(*types.EnumType); ok && c.enums.Contains(expr.Identifier.Lexeme) {
+		if expr.Kind == ast.EnumKind {
 			c.exprValue = value{identifier: "$enum$"}
 			return
 		}

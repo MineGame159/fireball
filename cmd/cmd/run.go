@@ -9,16 +9,15 @@ import (
 
 func GetRunCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "run file",
-		Short: "Runs a single source file",
-		Args:  cobra.ExactArgs(1),
+		Use:   "run",
+		Short: "Run project.",
 		Run:   runCmd,
 	}
 }
 
 func runCmd(_ *cobra.Command, args []string) {
 	// Build
-	output := buildExecutable(args[0])
+	output := buildProject()
 
 	// Run
 	cmd := exec.Command(output)

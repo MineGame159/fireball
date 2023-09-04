@@ -1,0 +1,4 @@
+extern func printf(format *u8, ...) void
+
+extern func malloc(size u64) *void
+extern func free(ptr *void) void
