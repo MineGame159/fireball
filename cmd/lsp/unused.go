@@ -152,11 +152,6 @@ func (h *handler) SignatureHelp(ctx context.Context, params *protocol.SignatureH
 }
 
 //goland:noinspection GoUnusedParameter
-func (h *handler) Symbols(ctx context.Context, params *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {
-	return nil, errors.New("not implemented")
-}
-
-//goland:noinspection GoUnusedParameter
 func (h *handler) TypeDefinition(ctx context.Context, params *protocol.TypeDefinitionParams) (result []protocol.Location, err error) {
 	return nil, errors.New("not implemented")
 }

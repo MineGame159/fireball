@@ -3,8 +3,6 @@ package lsp
 import (
 	"context"
 	"fireball/core"
-	"fireball/core/ast"
-	"fireball/core/types"
 	"fireball/core/utils"
 	"fireball/core/workspace"
 	"github.com/MineGame159/protocol"
@@ -111,8 +109,9 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 			DocumentSymbolProvider: &protocol.DocumentSymbolOptions{
 				Label: "Fireball",
 			},
-			HoverProvider:     true,
-			InlayHintProvider: true,
+			HoverProvider:           true,
+			InlayHintProvider:       true,
+			WorkspaceSymbolProvider: true,
 
 			Workspace: &protocol.ServerCapabilitiesWorkspace{
 				FileOperations: &protocol.ServerCapabilitiesWorkspaceFileOperations{
@@ -331,51 +330,11 @@ func (h *handler) DocumentSymbol(_ context.Context, params *protocol.DocumentSym
 
 	file.EnsureParsed()
 
-	// GetLeaf symbols
-	symbols := make([]interface{}, 0, 8)
+	// Get symbols
+	symbols := documentSymbolConsumer{symbols: make([]any, 0, 16)}
+	getSymbols(&symbols, file)
 
-	for _, decl := range file.Decls {
-		if v, ok := decl.(*ast.Struct); ok {
-			// Struct
-			symbols = append(symbols, &protocol.DocumentSymbol{
-				Name:           v.Name.Lexeme,
-				Kind:           protocol.SymbolKindStruct,
-				Range:          convertRange(v.Range()),
-				SelectionRange: convertRange(core.TokenToRange(v.Name)),
-			})
-		} else if v, ok := decl.(*ast.Func); ok {
-			// Function
-			signature := strings.Builder{}
-			signature.WriteRune('(')
-
-			for i, param := range v.Params {
-				if i > 0 {
-					signature.WriteString(", ")
-				}
-
-				signature.WriteString(param.Name.Lexeme)
-				signature.WriteRune(' ')
-				signature.WriteString(param.Type.String())
-			}
-
-			signature.WriteRune(')')
-
-			if !types.IsPrimitive(v.Returns, types.Void) {
-				signature.WriteRune(' ')
-				signature.WriteString(v.Returns.String())
-			}
-
-			symbols = append(symbols, &protocol.DocumentSymbol{
-				Name:           v.Name.Lexeme,
-				Detail:         signature.String(),
-				Kind:           protocol.SymbolKindFunction,
-				Range:          convertRange(v.Range()),
-				SelectionRange: convertRange(core.TokenToRange(v.Name)),
-			})
-		}
-	}
-
-	return symbols, nil
+	return symbols.symbols, nil
 }
 
 func (h *handler) InlayHint(_ context.Context, params *protocol.InlayHintParams) (result []protocol.InlayHint, err error) {
@@ -422,6 +381,20 @@ func (h *handler) Hover(_ context.Context, params *protocol.HoverParams) (result
 
 	// Get hover
 	return getHover(file.Decls, pos), nil
+}
+
+func (h *handler) Symbols(ctx context.Context, params *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {
+	defer stop(start(h, "Symbols"))
+
+	symbols := workspaceSymbolConsumer{symbols: make([]protocol.SymbolInformation, 0, 64)}
+
+	for _, project := range h.projects {
+		for _, file := range project.Files {
+			getSymbols(&symbols, file)
+		}
+	}
+
+	return symbols.symbols, nil
 }
 
 // Utils
