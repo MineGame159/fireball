@@ -128,14 +128,14 @@ func (p *Project) LoadFiles() error {
 	return nil
 }
 
-func (p *Project) GetType(name string) types.Type {
+func (p *Project) GetType(name string) (types.Type, string) {
 	for _, file := range p.Files {
 		if v, ok := file.Types[name]; ok {
-			return v
+			return v, file.Path
 		}
 	}
 
-	return nil
+	return nil, ""
 }
 
 func (p *Project) GetFunction(name string) (*types.FunctionType, string) {

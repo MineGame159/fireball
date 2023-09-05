@@ -60,7 +60,7 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 	// Check struct
 	var type_ *types.StructType
 
-	if t := c.resolver.GetType(expr.Name.Lexeme); t != nil {
+	if t, _ := c.resolver.GetType(expr.Name.Lexeme); t != nil {
 		if s, ok := t.(*types.StructType); ok {
 			type_ = s
 		}
@@ -262,7 +262,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Enum
-	if t := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
+	if t, _ := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
 		if e, ok := t.(*types.EnumType); ok {
 			expr.SetType(e.Copy())
 			expr.Kind = ast.EnumKind

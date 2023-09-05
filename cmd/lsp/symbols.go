@@ -24,91 +24,96 @@ type symbol struct {
 }
 
 type symbolConsumer interface {
-	add(symbol symbol, children []symbol)
+	add(symbol symbol, childrenCount int) int
+	addChild(parent int, child symbol)
+
+	supportsDetail() bool
 }
 
 func getSymbols(symbols symbolConsumer, file *workspace.File) {
 	for _, decl := range file.Decls {
 		if v, ok := decl.(*ast.Struct); ok {
 			// Struct
-			children := make([]symbol, len(v.Fields))
-
-			for i, field := range v.Fields {
-				range_ := core.TokenToRange(field.Name)
-
-				children[i] = symbol{
-					file:           file,
-					kind:           protocol.SymbolKindField,
-					name:           field.Name.Lexeme,
-					detail:         field.Type.String(),
-					range_:         range_,
-					selectionRange: range_,
-				}
-			}
-
-			symbols.add(symbol{
+			parent := symbols.add(symbol{
 				kind:           protocol.SymbolKindStruct,
 				name:           v.Name.Lexeme,
 				detail:         "",
 				range_:         v.Range(),
 				selectionRange: core.TokenToRange(v.Name),
 				file:           file,
-			}, children)
-		} else if v, ok := decl.(*ast.Enum); ok {
-			// Enum
-			children := make([]symbol, len(v.Cases))
+			}, len(v.Fields))
 
-			for i, case_ := range v.Cases {
-				range_ := core.TokenToRange(case_.Name)
+			for _, field := range v.Fields {
+				range_ := core.TokenToRange(field.Name)
 
-				children[i] = symbol{
+				symbols.addChild(parent, symbol{
 					file:           file,
-					kind:           protocol.SymbolKindEnumMember,
-					name:           case_.Name.Lexeme,
-					detail:         strconv.Itoa(case_.Value),
+					kind:           protocol.SymbolKindField,
+					name:           field.Name.Lexeme,
+					detail:         field.Type.String(),
 					range_:         range_,
 					selectionRange: range_,
-				}
+				})
 			}
-
-			symbols.add(symbol{
+		} else if v, ok := decl.(*ast.Enum); ok {
+			// Enum
+			parent := symbols.add(symbol{
 				kind:           protocol.SymbolKindEnum,
 				name:           v.Name.Lexeme,
 				detail:         "",
 				range_:         v.Range(),
 				selectionRange: core.TokenToRange(v.Name),
 				file:           file,
-			}, children)
+			}, len(v.Cases))
+
+			for _, case_ := range v.Cases {
+				range_ := core.TokenToRange(case_.Name)
+
+				symbols.addChild(parent, symbol{
+					file:           file,
+					kind:           protocol.SymbolKindEnumMember,
+					name:           case_.Name.Lexeme,
+					detail:         strconv.Itoa(case_.Value),
+					range_:         range_,
+					selectionRange: range_,
+				})
+			}
 		} else if v, ok := decl.(*ast.Func); ok {
 			// Function
-			signature := strings.Builder{}
-			signature.WriteRune('(')
+			detail := ""
 
-			for i, param := range v.Params {
-				if i > 0 {
-					signature.WriteString(", ")
+			if symbols.supportsDetail() {
+				signature := strings.Builder{}
+				signature.WriteRune('(')
+
+				for i, param := range v.Params {
+					if i > 0 {
+						signature.WriteString(", ")
+					}
+
+					signature.WriteString(param.Name.Lexeme)
+					signature.WriteRune(' ')
+					signature.WriteString(param.Type.String())
 				}
 
-				signature.WriteString(param.Name.Lexeme)
-				signature.WriteRune(' ')
-				signature.WriteString(param.Type.String())
-			}
+				signature.WriteRune(')')
 
-			signature.WriteRune(')')
+				if !types.IsPrimitive(v.Returns, types.Void) {
+					signature.WriteRune(' ')
+					signature.WriteString(v.Returns.String())
+				}
 
-			if !types.IsPrimitive(v.Returns, types.Void) {
-				signature.WriteRune(' ')
-				signature.WriteString(v.Returns.String())
+				detail = signature.String()
 			}
 
 			symbols.add(symbol{
 				file:           file,
 				kind:           protocol.SymbolKindFunction,
 				name:           v.Name.Lexeme,
-				detail:         signature.String(),
+				detail:         detail,
 				range_:         v.Range(),
 				selectionRange: core.TokenToRange(v.Name),
-			}, nil)
+			}, 0)
 		}
 	}
 }
@@ -119,27 +124,36 @@ type documentSymbolConsumer struct {
 	symbols []any
 }
 
-func (d *documentSymbolConsumer) add(symbol symbol, children []symbol) {
-	lspSymbol := d.convert(symbol)
-
-	if children != nil {
-		lspSymbol.Children = make([]protocol.DocumentSymbol, len(children))
-
-		for i, child := range children {
-			lspSymbol.Children[i] = d.convert(child)
-		}
-	}
-
-	d.symbols = append(d.symbols, lspSymbol)
+func (d *documentSymbolConsumer) add(symbol symbol, childrenCount int) int {
+	d.symbols = append(d.symbols, d.convert(symbol, childrenCount))
+	return len(d.symbols) - 1
 }
 
-func (d *documentSymbolConsumer) convert(symbol symbol) protocol.DocumentSymbol {
+func (d *documentSymbolConsumer) addChild(parent int, child symbol) {
+	symbol := d.symbols[parent].(protocol.DocumentSymbol)
+	symbol.Children = append(symbol.Children, d.convert(child, 0))
+
+	d.symbols[parent] = symbol
+}
+
+func (d *documentSymbolConsumer) supportsDetail() bool {
+	return true
+}
+
+func (d *documentSymbolConsumer) convert(symbol symbol, childrenCount int) protocol.DocumentSymbol {
+	var children []protocol.DocumentSymbol
+
+	if childrenCount > 0 {
+		children = make([]protocol.DocumentSymbol, 0, childrenCount)
+	}
+
 	return protocol.DocumentSymbol{
 		Name:           symbol.name,
 		Detail:         symbol.detail,
 		Kind:           symbol.kind,
 		Range:          convertRange(symbol.range_),
 		SelectionRange: convertRange(symbol.selectionRange),
+		Children:       children,
 	}
 }
 
@@ -149,15 +163,26 @@ type workspaceSymbolConsumer struct {
 	symbols []protocol.SymbolInformation
 }
 
-func (d *workspaceSymbolConsumer) add(symbol symbol, children []symbol) {
-	d.symbols = append(d.symbols, d.convert(symbol, ""))
-
-	for _, child := range children {
-		d.symbols = append(d.symbols, d.convert(child, symbol.name))
-	}
+func (w *workspaceSymbolConsumer) add(symbol symbol, _ int) int {
+	w.symbols = append(w.symbols, w.convert(symbol, -1))
+	return len(w.symbols) - 1
 }
 
-func (d *workspaceSymbolConsumer) convert(symbol symbol, parent string) protocol.SymbolInformation {
+func (w *workspaceSymbolConsumer) addChild(parent int, child symbol) {
+	w.symbols = append(w.symbols, w.convert(child, parent))
+}
+
+func (w *workspaceSymbolConsumer) supportsDetail() bool {
+	return false
+}
+
+func (w *workspaceSymbolConsumer) convert(symbol symbol, parent int) protocol.SymbolInformation {
+	containerName := ""
+
+	if parent >= 0 {
+		containerName = w.symbols[parent].Name
+	}
+
 	return protocol.SymbolInformation{
 		Name:       symbol.name,
 		Kind:       symbol.kind,
@@ -167,6 +192,6 @@ func (d *workspaceSymbolConsumer) convert(symbol symbol, parent string) protocol
 			URI:   uri.New(filepath.Join(symbol.file.Project.Path, symbol.file.Path)),
 			Range: convertRange(symbol.range_),
 		},
-		ContainerName: parent,
+		ContainerName: containerName,
 	}
 }

@@ -112,6 +112,7 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 			HoverProvider:           true,
 			InlayHintProvider:       true,
 			WorkspaceSymbolProvider: true,
+			DefinitionProvider:      true,
 
 			Workspace: &protocol.ServerCapabilitiesWorkspace{
 				FileOperations: &protocol.ServerCapabilitiesWorkspaceFileOperations{
@@ -383,7 +384,7 @@ func (h *handler) Hover(_ context.Context, params *protocol.HoverParams) (result
 	return getHover(file.Decls, pos), nil
 }
 
-func (h *handler) Symbols(ctx context.Context, params *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {
+func (h *handler) Symbols(_ context.Context, _ *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {
 	defer stop(start(h, "Symbols"))
 
 	symbols := workspaceSymbolConsumer{symbols: make([]protocol.SymbolInformation, 0, 64)}
@@ -395,6 +396,27 @@ func (h *handler) Symbols(ctx context.Context, params *protocol.WorkspaceSymbolP
 	}
 
 	return symbols.symbols, nil
+}
+
+func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParams) (result []protocol.Location, err error) {
+	defer stop(start(h, "Definition"))
+
+	// Get document
+	file := h.getFile(params.TextDocument.URI)
+	if file == nil {
+		return nil, nil
+	}
+
+	file.EnsureChecked()
+
+	// Get position
+	pos := core.Pos{
+		Line:   int(params.Position.Line + 1),
+		Column: int(params.Position.Character),
+	}
+
+	// Get declaration
+	return getDefinition(file, pos), nil
 }
 
 // Utils
@@ -464,6 +486,14 @@ func (h *handler) publishDiagnostics(ctx context.Context, project *workspace.Pro
 	return nil
 }
 
+func (h *handler) getFile(uri_ uri.URI) *workspace.File {
+	if file, ok := h.documents[uri_]; ok {
+		return file
+	}
+
+	return nil
+}
+
 func getDocument(file *workspace.File) *document {
 	// Check data field on file
 	if doc, ok := file.Data.(*document); ok {
@@ -475,14 +505,6 @@ func getDocument(file *workspace.File) *document {
 
 	file.Data = doc
 	return doc
-}
-
-func (h *handler) getFile(uri_ uri.URI) *workspace.File {
-	if file, ok := h.documents[uri_]; ok {
-		return file
-	}
-
-	return nil
 }
 
 // Conversions

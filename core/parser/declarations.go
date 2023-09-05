@@ -18,14 +18,14 @@ func (p *parser) declaration() ast.Decl {
 		return p.enum()
 	}
 	if p.match(scanner.Func) {
-		return p.function()
+		return p.function(p.current)
 	}
 
 	if p.match(scanner.Extern) {
 		p.extern = true
 
 		if p.match(scanner.Func) {
-			return p.function()
+			return p.function(p.previous)
 		}
 	}
 
@@ -224,9 +224,7 @@ func (p *parser) enum() ast.Decl {
 	return decl
 }
 
-func (p *parser) function() ast.Decl {
-	start := p.current
-
+func (p *parser) function(start scanner.Token) ast.Decl {
 	// Name
 	name := p.consume2(scanner.Identifier)
 

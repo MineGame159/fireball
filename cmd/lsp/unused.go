@@ -57,11 +57,6 @@ func (h *handler) Declaration(ctx context.Context, params *protocol.DeclarationP
 }
 
 //goland:noinspection GoUnusedParameter
-func (h *handler) Definition(ctx context.Context, params *protocol.DefinitionParams) (result []protocol.Location, err error) {
-	return nil, errors.New("not implemented")
-}
-
-//goland:noinspection GoUnusedParameter
 func (h *handler) DidChangeConfiguration(ctx context.Context, params *protocol.DidChangeConfigurationParams) (err error) {
 	return errors.New("not implemented")
 }
