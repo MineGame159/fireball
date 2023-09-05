@@ -1,9 +1,7 @@
 package ast
 
-import (
-	"fireball/core"
-	"log"
-)
+import "log"
+import "fireball/core"
 import "fireball/core/types"
 import "fireball/core/scanner"
 
@@ -101,6 +99,10 @@ func (s *Struct) Leaf() bool {
 	return true
 }
 
+func (s *Struct) String() string {
+	return s.Token().Lexeme
+}
+
 func (s *Struct) SetChildrenParent() {
 }
 
@@ -182,6 +184,10 @@ func (e *Enum) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (e *Enum) Leaf() bool {
 	return true
+}
+
+func (e *Enum) String() string {
+	return e.Token().Lexeme
 }
 
 func (e *Enum) SetChildrenParent() {

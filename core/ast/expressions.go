@@ -1,9 +1,7 @@
 package ast
 
-import (
-	"fireball/core"
-	"log"
-)
+import "log"
+import "fireball/core"
 import "fireball/core/types"
 import "fireball/core/scanner"
 
@@ -108,6 +106,10 @@ func (g *Group) Leaf() bool {
 	return false
 }
 
+func (g *Group) String() string {
+	return g.Token().Lexeme
+}
+
 func (g *Group) Type() types.Type {
 	return g.type_
 }
@@ -191,6 +193,10 @@ func (l *Literal) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (l *Literal) Leaf() bool {
 	return true
+}
+
+func (l *Literal) String() string {
+	return l.Token().Lexeme
 }
 
 func (l *Literal) Type() types.Type {
@@ -279,6 +285,10 @@ func (i *Initializer) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (i *Initializer) Leaf() bool {
 	return false
+}
+
+func (i *Initializer) String() string {
+	return i.Token().Lexeme
 }
 
 func (i *Initializer) Type() types.Type {
@@ -379,6 +389,10 @@ func (u *Unary) Leaf() bool {
 	return false
 }
 
+func (u *Unary) String() string {
+	return u.Token().Lexeme
+}
+
 func (u *Unary) Type() types.Type {
 	return u.type_
 }
@@ -470,6 +484,10 @@ func (b *Binary) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (b *Binary) Leaf() bool {
 	return false
+}
+
+func (b *Binary) String() string {
+	return b.Token().Lexeme
 }
 
 func (b *Binary) Type() types.Type {
@@ -568,6 +586,10 @@ func (l *Logical) Leaf() bool {
 	return false
 }
 
+func (l *Logical) String() string {
+	return l.Token().Lexeme
+}
+
 func (l *Logical) Type() types.Type {
 	return l.type_
 }
@@ -655,6 +677,10 @@ func (i *Identifier) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (i *Identifier) Leaf() bool {
 	return true
+}
+
+func (i *Identifier) String() string {
+	return i.Token().Lexeme
 }
 
 func (i *Identifier) Type() types.Type {
@@ -758,6 +784,10 @@ func (a *Assignment) Leaf() bool {
 	return false
 }
 
+func (a *Assignment) String() string {
+	return a.Token().Lexeme
+}
+
 func (a *Assignment) Type() types.Type {
 	return a.type_
 }
@@ -848,6 +878,10 @@ func (c *Cast) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (c *Cast) Leaf() bool {
 	return false
+}
+
+func (c *Cast) String() string {
+	return c.Token().Lexeme
 }
 
 func (c *Cast) Type() types.Type {
@@ -943,6 +977,10 @@ func (c *Call) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (c *Call) Leaf() bool {
 	return false
+}
+
+func (c *Call) String() string {
+	return c.Token().Lexeme
 }
 
 func (c *Call) Type() types.Type {
@@ -1043,6 +1081,10 @@ func (i *Index) Leaf() bool {
 	return false
 }
 
+func (i *Index) String() string {
+	return i.Token().Lexeme
+}
+
 func (i *Index) Type() types.Type {
 	return i.type_
 }
@@ -1133,6 +1175,10 @@ func (m *Member) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (m *Member) Leaf() bool {
 	return false
+}
+
+func (m *Member) String() string {
+	return m.Token().Lexeme
 }
 
 func (m *Member) Type() types.Type {

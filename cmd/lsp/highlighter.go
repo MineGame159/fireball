@@ -198,12 +198,12 @@ func (h *highlighter) VisitType(type_ types.Type) {
 	if type_.Range().Valid() {
 		if _, ok := type_.(*types.PrimitiveType); ok {
 			h.addRange(type_.Range(), typeKind)
-		} else if _, ok := type_.(*types.StructType); ok {
+		} else if _, ok := type_.(*ast.Struct); ok {
 			h.addRange(type_.Range(), classKind)
-		} else if _, ok := type_.(*types.EnumType); ok {
+		} else if _, ok := type_.(*ast.Enum); ok {
 			h.addRange(type_.Range(), enumKind)
 		} else {
-			type_.AcceptChildren(h)
+			type_.AcceptTypes(h)
 		}
 	}
 }

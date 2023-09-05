@@ -3,13 +3,11 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/types"
 	"fireball/core/workspace"
 	"github.com/MineGame159/protocol"
 	"go.lsp.dev/uri"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 type symbol struct {
@@ -32,18 +30,18 @@ type symbolConsumer interface {
 
 func getSymbols(symbols symbolConsumer, file *workspace.File) {
 	for _, decl := range file.Decls {
-		if v, ok := decl.(*ast.Struct); ok {
+		if struct_, ok := decl.(*ast.Struct); ok {
 			// Struct
 			parent := symbols.add(symbol{
 				kind:           protocol.SymbolKindStruct,
-				name:           v.Name.Lexeme,
+				name:           struct_.Name.Lexeme,
 				detail:         "",
-				range_:         v.Range(),
-				selectionRange: core.TokenToRange(v.Name),
+				range_:         struct_.Range(),
+				selectionRange: core.TokenToRange(struct_.Name),
 				file:           file,
-			}, len(v.Fields))
+			}, len(struct_.Fields))
 
-			for _, field := range v.Fields {
+			for _, field := range struct_.Fields {
 				range_ := core.TokenToRange(field.Name)
 
 				symbols.addChild(parent, symbol{
@@ -55,18 +53,18 @@ func getSymbols(symbols symbolConsumer, file *workspace.File) {
 					selectionRange: range_,
 				})
 			}
-		} else if v, ok := decl.(*ast.Enum); ok {
+		} else if enum, ok := decl.(*ast.Enum); ok {
 			// Enum
 			parent := symbols.add(symbol{
 				kind:           protocol.SymbolKindEnum,
-				name:           v.Name.Lexeme,
+				name:           enum.Name.Lexeme,
 				detail:         "",
-				range_:         v.Range(),
-				selectionRange: core.TokenToRange(v.Name),
+				range_:         enum.Range(),
+				selectionRange: core.TokenToRange(enum.Name),
 				file:           file,
-			}, len(v.Cases))
+			}, len(enum.Cases))
 
-			for _, case_ := range v.Cases {
+			for _, case_ := range enum.Cases {
 				range_ := core.TokenToRange(case_.Name)
 
 				symbols.addChild(parent, symbol{
@@ -78,41 +76,21 @@ func getSymbols(symbols symbolConsumer, file *workspace.File) {
 					selectionRange: range_,
 				})
 			}
-		} else if v, ok := decl.(*ast.Func); ok {
+		} else if function, ok := decl.(*ast.Func); ok {
 			// Function
 			detail := ""
 
 			if symbols.supportsDetail() {
-				signature := strings.Builder{}
-				signature.WriteRune('(')
-
-				for i, param := range v.Params {
-					if i > 0 {
-						signature.WriteString(", ")
-					}
-
-					signature.WriteString(param.Name.Lexeme)
-					signature.WriteRune(' ')
-					signature.WriteString(param.Type.String())
-				}
-
-				signature.WriteRune(')')
-
-				if !types.IsPrimitive(v.Returns, types.Void) {
-					signature.WriteRune(' ')
-					signature.WriteString(v.Returns.String())
-				}
-
-				detail = signature.String()
+				detail = function.Signature(true)
 			}
 
 			symbols.add(symbol{
 				file:           file,
 				kind:           protocol.SymbolKindFunction,
-				name:           v.Name.Lexeme,
+				name:           function.Name.Lexeme,
 				detail:         detail,
-				range_:         v.Range(),
-				selectionRange: core.TokenToRange(v.Name),
+				range_:         function.Range(),
+				selectionRange: core.TokenToRange(function.Name),
 			}, 0)
 		}
 	}

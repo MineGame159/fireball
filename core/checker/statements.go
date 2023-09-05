@@ -25,7 +25,7 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 			c.errorToken(stmt.Name, "Variable with no initializer needs to have an explicit type.")
 			stmt.Type = types.Primitive(types.Void, core.Range{})
 		} else {
-			stmt.Type = stmt.Initializer.Type().Copy()
+			stmt.Type = stmt.Initializer.Type().WithoutRange()
 		}
 	} else {
 		if stmt.Initializer != nil && !stmt.Initializer.Type().CanAssignTo(stmt.Type) {
@@ -75,7 +75,7 @@ func (c *checker) VisitReturn(stmt *ast.Return) {
 	var range_ core.Range
 
 	if stmt.Expr != nil {
-		type_ = stmt.Expr.Type().Copy()
+		type_ = stmt.Expr.Type().WithoutRange()
 		range_ = stmt.Expr.Range()
 	} else {
 		type_ = types.Primitive(types.Void, core.Range{})

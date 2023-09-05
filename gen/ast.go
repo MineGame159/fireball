@@ -12,8 +12,9 @@ type item struct {
 	fields []field
 	cases  []string
 
-	token string
-	ast   bool
+	token    string
+	ast      bool
+	noString bool
 }
 
 type field struct {
@@ -70,8 +71,9 @@ var decls = []item{
 			{name: "Returns", type_: "Type"},
 			{name: "Body", type_: "[]Stmt"},
 		},
-		token: "Name",
-		ast:   true,
+		token:    "Name",
+		ast:      true,
+		noString: true,
 	},
 	{
 		name: "Param",
@@ -485,6 +487,14 @@ func generate(w *writer, kind string, items []item) {
 				w.write("return %t", leaf)
 				w.write("}")
 				w.write("")
+
+				// String
+				if !item.noString {
+					w.write("%s String() string {", method)
+					w.write("return %c.Token().Lexeme", short)
+					w.write("}")
+					w.write("")
+				}
 
 				// Expr
 				if kind == "Expr" {

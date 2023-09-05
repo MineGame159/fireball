@@ -28,10 +28,10 @@ func (a *ArrayType) Size() int {
 	return int(a.Count) * a.Base.Size()
 }
 
-func (a *ArrayType) Copy() Type {
+func (a *ArrayType) WithoutRange() Type {
 	return &ArrayType{
 		Count: a.Count,
-		Base:  a.Base.Copy(),
+		Base:  a.Base.WithoutRange(),
 	}
 }
 
@@ -51,11 +51,11 @@ func (a *ArrayType) CanAssignTo(other Type) bool {
 	return false
 }
 
-func (a *ArrayType) AcceptChildren(visitor Visitor) {
+func (a *ArrayType) AcceptTypes(visitor Visitor) {
 	visitor.VisitType(a.Base)
 }
 
-func (a *ArrayType) AcceptChildrenPtr(visitor PtrVisitor) {
+func (a *ArrayType) AcceptTypesPtr(visitor PtrVisitor) {
 	visitor.VisitType(&a.Base)
 }
 

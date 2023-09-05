@@ -47,7 +47,7 @@ func (p *PrimitiveType) Size() int {
 	}
 }
 
-func (p *PrimitiveType) Copy() Type {
+func (p *PrimitiveType) WithoutRange() Type {
 	return &PrimitiveType{
 		Kind: p.Kind,
 	}
@@ -61,9 +61,9 @@ func (p *PrimitiveType) CanAssignTo(other Type) bool {
 	return IsPrimitive(other, p.Kind)
 }
 
-func (p *PrimitiveType) AcceptChildren(visitor Visitor) {}
+func (p *PrimitiveType) AcceptTypes(visitor Visitor) {}
 
-func (p *PrimitiveType) AcceptChildrenPtr(visitor PtrVisitor) {}
+func (p *PrimitiveType) AcceptTypesPtr(visitor PtrVisitor) {}
 
 func (p *PrimitiveType) String() string {
 	switch p.Kind {

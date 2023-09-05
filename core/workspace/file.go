@@ -21,7 +21,7 @@ type File struct {
 	Decls []ast.Decl
 
 	Types     map[string]types.Type
-	Functions map[string]*types.FunctionType
+	Functions map[string]*ast.Func
 
 	Data any
 
@@ -65,36 +65,27 @@ func (f *File) EnsureChecked() {
 
 func (f *File) CollectTypesAndFunctions() {
 	typeMap := make(map[string]types.Type)
-	functionMap := make(map[string]*types.FunctionType)
+	functionMap := make(map[string]*ast.Func)
 
 	for _, decl := range f.Decls {
-		if v, ok := decl.(*ast.Struct); ok {
+		if struct_, ok := decl.(*ast.Struct); ok {
 			// Struct
-			fields := make([]types.Field, len(v.Fields))
-
-			for i, field := range v.Fields {
-				fields[i] = types.Field{
-					Name: field.Name.Lexeme,
-					Type: field.Type,
-				}
-			}
-
-			if _, ok := typeMap[v.Name.Lexeme]; ok {
+			if _, ok := typeMap[struct_.Name.Lexeme]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
-					Range:   core.TokenToRange(v.Name),
-					Message: fmt.Sprintf("Type with the name '%s' aleady exists.", v.Name),
+					Range:   core.TokenToRange(struct_.Name),
+					Message: fmt.Sprintf("Type with the name '%s' aleady exists.", struct_.Name),
 				})
 			} else {
-				typeMap[v.Name.Lexeme] = types.Struct(v.Name.Lexeme, fields, v.Range())
+				typeMap[struct_.Name.Lexeme] = struct_
 			}
-		} else if v, ok := decl.(*ast.Enum); ok {
+		} else if enum, ok := decl.(*ast.Enum); ok {
 			// Enum
-			if v.Type == nil {
+			if enum.Type == nil {
 				minValue := math.MaxInt
 				maxValue := math.MinInt
 
-				for _, case_ := range v.Cases {
+				for _, case_ := range enum.Cases {
 					minValue = min(minValue, case_.Value)
 					maxValue = max(maxValue, case_.Value)
 				}
@@ -125,43 +116,28 @@ func (f *File) CollectTypesAndFunctions() {
 					}
 				}
 
-				v.Type = types.Primitive(kind, core.Range{})
+				enum.Type = types.Primitive(kind, core.Range{})
 			}
 
-			cases := make([]types.EnumCase, len(v.Cases))
-
-			for i, case_ := range v.Cases {
-				cases[i] = types.EnumCase{
-					Name:  case_.Name.Lexeme,
-					Value: case_.Value,
-				}
-			}
-
-			if _, ok := typeMap[v.Name.Lexeme]; ok {
+			if _, ok := typeMap[enum.Name.Lexeme]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
-					Range:   core.TokenToRange(v.Name),
-					Message: fmt.Sprintf("Type with the name '%s' aleady exists.", v.Name),
+					Range:   core.TokenToRange(enum.Name),
+					Message: fmt.Sprintf("Type with the name '%s' aleady exists.", enum.Name),
 				})
 			} else {
-				typeMap[v.Name.Lexeme] = types.Enum(v.Name.Lexeme, v.Type, cases, v.Range())
+				typeMap[enum.Name.Lexeme] = enum
 			}
-		} else if v, ok := decl.(*ast.Func); ok {
+		} else if function, ok := decl.(*ast.Func); ok {
 			// Function
-			params := make([]types.Type, len(v.Params))
-
-			for i, param := range v.Params {
-				params[i] = param.Type
-			}
-
-			if _, ok := functionMap[v.Name.Lexeme]; ok {
+			if _, ok := functionMap[function.Name.Lexeme]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
-					Range:   core.TokenToRange(v.Name),
-					Message: fmt.Sprintf("Function with the name '%s' already exists.", v.Name),
+					Range:   core.TokenToRange(function.Name),
+					Message: fmt.Sprintf("Function with the name '%s' already exists.", function.Name),
 				})
 			} else {
-				functionMap[v.Name.Lexeme] = types.Function(params, v.Variadic, v.Returns, v.Range())
+				functionMap[function.Name.Lexeme] = function
 			}
 		}
 	}

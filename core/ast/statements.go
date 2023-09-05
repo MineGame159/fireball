@@ -1,9 +1,7 @@
 package ast
 
-import (
-	"fireball/core"
-	"log"
-)
+import "log"
+import "fireball/core"
 import "fireball/core/types"
 import "fireball/core/scanner"
 
@@ -98,6 +96,10 @@ func (b *Block) Leaf() bool {
 	return false
 }
 
+func (b *Block) String() string {
+	return b.Token().Lexeme
+}
+
 func (b *Block) SetChildrenParent() {
 	for i_ := range b.Stmts {
 		if b.Stmts[i_] != nil {
@@ -174,6 +176,10 @@ func (e *Expression) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (e *Expression) Leaf() bool {
 	return false
+}
+
+func (e *Expression) String() string {
+	return e.Token().Lexeme
 }
 
 func (e *Expression) SetChildrenParent() {
@@ -258,6 +264,10 @@ func (v *Variable) Leaf() bool {
 	return false
 }
 
+func (v *Variable) String() string {
+	return v.Token().Lexeme
+}
+
 func (v *Variable) SetChildrenParent() {
 	if v.Initializer != nil {
 		v.Initializer.SetParent(v)
@@ -340,6 +350,10 @@ func (i *If) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (i *If) Leaf() bool {
 	return false
+}
+
+func (i *If) String() string {
+	return i.Token().Lexeme
 }
 
 func (i *If) SetChildrenParent() {
@@ -428,6 +442,10 @@ func (f *For) Leaf() bool {
 	return false
 }
 
+func (f *For) String() string {
+	return f.Token().Lexeme
+}
+
 func (f *For) SetChildrenParent() {
 	if f.Condition != nil {
 		f.Condition.SetParent(f)
@@ -507,6 +525,10 @@ func (r *Return) Leaf() bool {
 	return false
 }
 
+func (r *Return) String() string {
+	return r.Token().Lexeme
+}
+
 func (r *Return) SetChildrenParent() {
 	if r.Expr != nil {
 		r.Expr.SetParent(r)
@@ -579,6 +601,10 @@ func (b *Break) Leaf() bool {
 	return true
 }
 
+func (b *Break) String() string {
+	return b.Token().Lexeme
+}
+
 func (b *Break) SetChildrenParent() {
 }
 
@@ -646,6 +672,10 @@ func (c *Continue) AcceptTypesPtr(visitor types.PtrVisitor) {
 
 func (c *Continue) Leaf() bool {
 	return true
+}
+
+func (c *Continue) String() string {
+	return c.Token().Lexeme
 }
 
 func (c *Continue) SetChildrenParent() {

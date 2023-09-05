@@ -2,21 +2,21 @@ package types
 
 import (
 	"fireball/core"
-	"fmt"
 )
 
 type Type interface {
 	Range() core.Range
 	Size() int
-	Copy() Type
+
+	WithoutRange() Type
 
 	Equals(other Type) bool
 	CanAssignTo(other Type) bool
 
-	AcceptChildren(visitor Visitor)
-	AcceptChildrenPtr(visitor PtrVisitor)
+	AcceptTypes(visitor Visitor)
+	AcceptTypesPtr(visitor PtrVisitor)
 
-	fmt.Stringer
+	String() string
 }
 
 type Visitor interface {

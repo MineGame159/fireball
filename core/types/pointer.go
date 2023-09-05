@@ -24,9 +24,9 @@ func (p *PointerType) Size() int {
 	return 4
 }
 
-func (p *PointerType) Copy() Type {
+func (p *PointerType) WithoutRange() Type {
 	return &PointerType{
-		Pointee: p.Pointee.Copy(),
+		Pointee: p.Pointee.WithoutRange(),
 	}
 }
 
@@ -46,11 +46,11 @@ func (p *PointerType) CanAssignTo(other Type) bool {
 	return false
 }
 
-func (p *PointerType) AcceptChildren(visitor Visitor) {
+func (p *PointerType) AcceptTypes(visitor Visitor) {
 	visitor.VisitType(p.Pointee)
 }
 
-func (p *PointerType) AcceptChildrenPtr(visitor PtrVisitor) {
+func (p *PointerType) AcceptTypesPtr(visitor PtrVisitor) {
 	visitor.VisitType(&p.Pointee)
 }
 

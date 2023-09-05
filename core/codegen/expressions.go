@@ -62,7 +62,7 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 
 func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 	// TODO: Use LLVM's structure literal syntax if possible, aka if all fields are assigned
-	struct_, _ := expr.Type().(*types.StructType)
+	struct_, _ := expr.Type().(*ast.Struct)
 	type_ := c.getType(expr.Type())
 
 	// Allocate struct
@@ -244,7 +244,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 		}
 	}
 
-	if from, ok := expr.Expr.Type().(*types.EnumType); ok {
+	if from, ok := expr.Expr.Type().(*ast.Enum); ok {
 		if to, ok := expr.Type().(*types.PrimitiveType); ok {
 			// enum to integer
 			c.castPrimitiveToPrimitive(val, loc, from, to, from.Type.(*types.PrimitiveType).Kind, to.Kind)
@@ -253,7 +253,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	}
 
 	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
-		if to, ok := expr.Type().(*types.EnumType); ok {
+		if to, ok := expr.Type().(*ast.Enum); ok {
 			// integer to enum
 			c.castPrimitiveToPrimitive(val, loc, from, to, from.Kind, to.Type.(*types.PrimitiveType).Kind)
 			return
@@ -321,9 +321,9 @@ func (c *codegen) castPrimitiveToPrimitive(val value, loc string, from, to types
 }
 
 func (c *codegen) VisitCall(expr *ast.Call) {
-	var f *types.FunctionType
+	var f *ast.Func
 
-	if v, ok := expr.Callee.Type().(*types.FunctionType); ok {
+	if v, ok := expr.Callee.Type().(*ast.Func); ok {
 		f = v
 	}
 
@@ -392,18 +392,18 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 	if value.identifier == "$enum$" {
 		// Enum
-		case_ := expr.Value.Type().(*types.EnumType).GetCase(expr.Name.Lexeme)
+		case_ := expr.Value.Type().(*ast.Enum).GetCase(expr.Name.Lexeme)
 		c.exprValue = c.locals.constant(strconv.Itoa(case_.Value), expr.Type())
 	} else {
 		// Member
 		val := c.toPtrOrLoad(value, expr.Value.Type())
 
-		var s *types.StructType
+		var s *ast.Struct
 
-		if v, ok := expr.Value.Type().(*types.StructType); ok {
+		if v, ok := expr.Value.Type().(*ast.Struct); ok {
 			s = v
 		} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
-			if v, ok := v.Pointee.(*types.StructType); ok {
+			if v, ok := v.Pointee.(*ast.Struct); ok {
 				s = v
 
 				res := c.locals.unnamed(val.type_)

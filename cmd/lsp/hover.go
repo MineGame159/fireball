@@ -3,7 +3,6 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/types"
 	"github.com/MineGame159/protocol"
 	"strconv"
 )
@@ -20,7 +19,7 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 					range_ := core.TokenToRange(field.Name)
 
 					if range_.Contains(pos) {
-						_, f := i.Type().(*types.StructType).GetField(field.Name.Lexeme)
+						_, f := i.Type().(*ast.Struct).GetField(field.Name.Lexeme)
 
 						return &protocol.Hover{
 							Contents: protocol.MarkupContent{
@@ -34,7 +33,7 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 			} else if m, ok := node.(*ast.Member); ok {
 				// ast.Member that is an enum
 				if i, ok := m.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
-					if e, ok := m.Type().(*types.EnumType); ok {
+					if e, ok := m.Type().(*ast.Enum); ok {
 						case_ := e.GetCase(m.Name.Lexeme)
 
 						if case_ != nil {

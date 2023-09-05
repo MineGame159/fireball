@@ -39,8 +39,8 @@ func (t *typeCollector) addType(type_ types.Type) {
 	}
 
 	// Struct
-	if v, ok := type_.(*types.StructType); ok {
-		val := t.globals.constant("%struct."+v.Name, v)
+	if v, ok := type_.(*ast.Struct); ok {
+		val := t.globals.constant("%struct."+v.Name.Lexeme, v)
 
 		t.types = append(t.types, typeValuePair{
 			type_: type_,
@@ -51,7 +51,7 @@ func (t *typeCollector) addType(type_ types.Type) {
 
 func (t *typeCollector) VisitType(type_ types.Type) {
 	t.addType(type_)
-	type_.AcceptChildren(t)
+	type_.AcceptTypes(t)
 }
 
 // ast.Acceptor

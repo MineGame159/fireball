@@ -58,10 +58,10 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 	expr.AcceptChildren(c)
 
 	// Check struct
-	var type_ *types.StructType
+	var type_ *ast.Struct
 
 	if t, _ := c.resolver.GetType(expr.Name.Lexeme); t != nil {
-		if s, ok := t.(*types.StructType); ok {
+		if s, ok := t.(*ast.Struct); ok {
 			type_ = s
 		}
 	}
@@ -140,11 +140,11 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			c.errorRange(expr.Right.Range(), "Cannot take address of this expression.")
 		}
 
-		expr.SetType(types.Pointer(expr.Right.Type().Copy(), core.Range{}))
+		expr.SetType(types.Pointer(expr.Right.Type().WithoutRange(), core.Range{}))
 
 	case scanner.Star:
 		if p, ok := expr.Right.Type().(*types.PointerType); ok {
-			expr.SetType(p.Pointee.Copy())
+			expr.SetType(p.Pointee.WithoutRange())
 		} else {
 			c.errorRange(expr.Right.Range(), "Can only dereference pointer types, not '%s'.", expr.Right.Type())
 			expr.SetType(types.Primitive(types.Void, core.Range{}))
@@ -163,7 +163,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
 			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
 				if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left.Equals(right) {
-					expr.SetType(expr.Left.Type().Copy())
+					expr.SetType(expr.Left.Type().WithoutRange())
 					return
 				}
 			}
@@ -215,7 +215,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := expr.Left.Type().(*types.PrimitiveType); ok {
 			if right, ok := expr.Right.Type().(*types.PrimitiveType); ok {
 				if left.Equals(right) && types.IsInteger(left.Kind) {
-					expr.SetType(expr.Left.Type().Copy())
+					expr.SetType(expr.Left.Type().WithoutRange())
 					return
 				}
 			}
@@ -251,7 +251,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	// Function
 	if parent, ok := expr.Parent().(*ast.Call); ok && parent.Callee == expr {
 		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
-			expr.SetType(f.Copy())
+			expr.SetType(f.WithoutRange())
 		} else {
 			c.errorToken(expr.Identifier, "Function with the name '%s' does not exist.", expr.Identifier)
 			expr.SetType(types.Primitive(types.Void, core.Range{}))
@@ -263,8 +263,8 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 
 	// Enum
 	if t, _ := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
-		if e, ok := t.(*types.EnumType); ok {
-			expr.SetType(e.Copy())
+		if e, ok := t.(*ast.Enum); ok {
+			expr.SetType(e.WithoutRange())
 			expr.Kind = ast.EnumKind
 
 			return
@@ -275,7 +275,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	if variable := c.getVariable(expr.Identifier); variable != nil {
 		variable.used = true
 
-		expr.SetType(variable.type_.Copy())
+		expr.SetType(variable.type_.WithoutRange())
 
 		if variable.param {
 			expr.Kind = ast.ParameterKind
@@ -347,12 +347,12 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	if types.IsPrimitive(expr.Expr.Type(), types.Void) || types.IsPrimitive(expr.Type(), types.Void) {
 		// void
 		c.errorRange(expr.Range(), "Cannot cast to or from type 'void'.")
-	} else if _, ok := expr.Expr.Type().(*types.EnumType); ok {
+	} else if _, ok := expr.Expr.Type().(*ast.Enum); ok {
 		// enum to non integer
 		if to, ok := expr.Type().(*types.PrimitiveType); !ok || !types.IsInteger(to.Kind) {
 			c.errorRange(expr.Range(), "Can only cast enums to integers, not '%s'.", to)
 		}
-	} else if _, ok := expr.Type().(*types.EnumType); ok {
+	} else if _, ok := expr.Type().(*ast.Enum); ok {
 		// non integer to enum
 		if from, ok := expr.Expr.Type().(*types.PrimitiveType); !ok || !types.IsInteger(from.Kind) {
 			c.errorRange(expr.Range(), "Can only cast to enums from integers, not '%s'.", from)
@@ -363,7 +363,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 func (c *checker) VisitCall(expr *ast.Call) {
 	expr.AcceptChildren(c)
 
-	if v, ok := expr.Callee.Type().(*types.FunctionType); ok {
+	if v, ok := expr.Callee.Type().(*ast.Func); ok {
 		toCheck := min(len(v.Params), len(expr.Args))
 
 		if v.Variadic {
@@ -380,12 +380,12 @@ func (c *checker) VisitCall(expr *ast.Call) {
 			arg := expr.Args[i]
 			param := v.Params[i]
 
-			if !arg.Type().CanAssignTo(param) {
-				c.errorRange(arg.Range(), "Argument with type '%s' cannot be assigned to a parameter wth type '%s'.", arg.Type(), param)
+			if !arg.Type().CanAssignTo(param.Type) {
+				c.errorRange(arg.Range(), "Argument with type '%s' cannot be assigned to a parameter with type '%s'.", arg.Type(), param.Type)
 			}
 		}
 
-		expr.SetType(v.Returns.Copy())
+		expr.SetType(v.Returns.WithoutRange())
 	} else {
 		expr.SetType(types.Primitive(types.Void, core.Range{}))
 		c.errorRange(expr.Callee.Range(), "Can't call type '%s'.", expr.Callee.Type())
@@ -397,9 +397,9 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 
 	// Check value type
 	if v, ok := expr.Value.Type().(*types.ArrayType); ok {
-		expr.SetType(v.Base.Copy())
+		expr.SetType(v.Base.WithoutRange())
 	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
-		expr.SetType(v.Pointee.Copy())
+		expr.SetType(v.Pointee.WithoutRange())
 	} else {
 		c.errorRange(expr.Value.Range(), "Can only index into array and pointer types, not '%s'.", expr.Value.Type())
 		expr.SetType(types.Pointer(types.Primitive(types.Void, core.Range{}), core.Range{}))
@@ -420,24 +420,24 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 	if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 		// Enum
-		if v, ok := expr.Value.Type().(*types.EnumType); ok {
+		if v, ok := expr.Value.Type().(*ast.Enum); ok {
 			if case_ := v.GetCase(expr.Name.Lexeme); case_ == nil {
 				c.errorToken(expr.Name, "Enum '%s' does not contain case '%s'.", v, expr.Name)
 			}
 
-			expr.SetType(v.Copy())
+			expr.SetType(v.WithoutRange())
 		}
 
 		return
 	}
 
 	// Struct
-	var s *types.StructType
+	var s *ast.Struct
 
-	if v, ok := expr.Value.Type().(*types.StructType); ok {
+	if v, ok := expr.Value.Type().(*ast.Struct); ok {
 		s = v
 	} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
-		if v, ok := v.Pointee.(*types.StructType); ok {
+		if v, ok := v.Pointee.(*ast.Struct); ok {
 			s = v
 		}
 	}
@@ -446,7 +446,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		_, field := s.GetField(expr.Name.Lexeme)
 
 		if field != nil {
-			expr.SetType(field.Type.Copy())
+			expr.SetType(field.Type.WithoutRange())
 		} else {
 			c.errorToken(expr.Name, "Struct '%s' does not contain member '%s'.", s, expr.Name)
 			expr.SetType(types.Primitive(types.Void, core.Range{}))

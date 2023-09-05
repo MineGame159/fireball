@@ -25,7 +25,7 @@ func (u *UnresolvedType) Size() int {
 	return 0
 }
 
-func (u *UnresolvedType) Copy() Type {
+func (u *UnresolvedType) WithoutRange() Type {
 	return &UnresolvedType{
 		Identifier: u.Identifier,
 	}
@@ -39,9 +39,9 @@ func (u *UnresolvedType) CanAssignTo(other Type) bool {
 	return false
 }
 
-func (u *UnresolvedType) AcceptChildren(visitor Visitor) {}
+func (u *UnresolvedType) AcceptTypes(visitor Visitor) {}
 
-func (u *UnresolvedType) AcceptChildrenPtr(visitor PtrVisitor) {}
+func (u *UnresolvedType) AcceptTypesPtr(visitor PtrVisitor) {}
 
 func (u *UnresolvedType) String() string {
 	return u.Identifier.Lexeme

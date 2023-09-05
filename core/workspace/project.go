@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"errors"
+	"fireball/core/ast"
 	"fireball/core/checker"
 	"fireball/core/parser"
 	"fireball/core/scanner"
@@ -138,7 +139,7 @@ func (p *Project) GetType(name string) (types.Type, string) {
 	return nil, ""
 }
 
-func (p *Project) GetFunction(name string) (*types.FunctionType, string) {
+func (p *Project) GetFunction(name string) (*ast.Func, string) {
 	for _, file := range p.Files {
 		if v, ok := file.Functions[name]; ok {
 			return v, file.Path

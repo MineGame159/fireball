@@ -88,7 +88,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 	c.types = collectTypes(&c.globals, decls)
 
 	for _, pair := range c.types {
-		if v, ok := pair.type_.(*types.StructType); ok {
+		if v, ok := pair.type_.(*ast.Struct); ok {
 			c.writeRaw(pair.val.identifier)
 			c.writeRaw(" = type { ")
 
@@ -113,7 +113,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 
 	// Import functions
 	for _, f := range c.importedFunctions {
-		type_ := f.type_.(*types.FunctionType)
+		type_ := f.type_.(*ast.Func)
 
 		c.writeFmt("declare %s %s(", c.getType(type_.Returns), f.identifier)
 
@@ -122,7 +122,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 				c.writeStr(", ")
 			}
 
-			c.writeFmt("%s", c.getType(param))
+			c.writeFmt("%s", c.getType(param.Type))
 		}
 
 		if type_.Variadic {
@@ -256,7 +256,7 @@ func (c *codegen) getType(type_ types.Type) value {
 	}
 
 	// Enum
-	if v, ok := type_.(*types.EnumType); ok {
+	if v, ok := type_.(*ast.Enum); ok {
 		return c.getType(v.Type)
 	}
 
@@ -402,13 +402,13 @@ func (c *codegen) getDbgType(type_ types.Type) string {
 	}
 
 	// Struct
-	if v, ok := type_.(*types.StructType); ok {
+	if v, ok := type_.(*ast.Struct); ok {
 		members := make([]string, len(v.Fields))
 		offset := 0
 
 		for i, field := range v.Fields {
 			size := field.Type.Size() * 8
-			members[i] = c.debug.derivedType(MemberDTag, field.Name, c.getDbgType(field.Type), size, offset)
+			members[i] = c.debug.derivedType(MemberDTag, field.Name.Lexeme, c.getDbgType(field.Type), size, offset)
 			offset += size
 		}
 
@@ -422,8 +422,8 @@ func (c *codegen) getDbgType(type_ types.Type) string {
 	}
 
 	// Enum
-	if v, ok := type_.(*types.EnumType); ok {
-		name := c.debug.derivedType(TypedefDTag, v.Name, c.getDbgType(v.Type), v.Size()*8, 0)
+	if v, ok := type_.(*ast.Enum); ok {
+		name := c.debug.derivedType(TypedefDTag, v.Name.Lexeme, c.getDbgType(v.Type), v.Size()*8, 0)
 		c.dbgTypes = append(c.dbgTypes, typeDbgPair{
 			type_: type_,
 			name:  name,

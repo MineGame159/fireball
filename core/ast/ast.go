@@ -8,11 +8,7 @@ import (
 
 type Node interface {
 	Token() scanner.Token
-
 	Range() core.Range
-	SetRangeToken(start, end scanner.Token)
-	SetRangePos(start, end core.Pos)
-	SetRangeNode(start, end Node)
 
 	Parent() Node
 	SetParent(parent Node)
@@ -23,6 +19,7 @@ type Node interface {
 	AcceptTypesPtr(visitor types.PtrVisitor)
 
 	Leaf() bool
+	String() string
 }
 
 type Acceptor interface {
