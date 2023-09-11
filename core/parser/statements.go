@@ -4,10 +4,9 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/types"
-	"fireball/core/utils"
 )
 
-func (p *parser) statement() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) statement() ast.Stmt {
 	if p.match(scanner.LeftBrace) {
 		return p.block()
 	}
@@ -33,25 +32,27 @@ func (p *parser) statement() (ast.Stmt, *utils.Diagnostic) {
 	return p.expressionStmt()
 }
 
-func (p *parser) block() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) block() ast.Stmt {
 	token := p.current
 
 	// Statements
 	stmts := make([]ast.Stmt, 0, 4)
 
-	for !p.check(scanner.RightBrace) {
-		stmt, err := p.statement()
-		if err != nil {
-			return nil, err
+	for p.canLoop(scanner.RightBrace) {
+		stmt := p.statement()
+
+		if stmt == nil {
+			if !p.syncToStmt() {
+				break
+			}
+			continue
 		}
 
 		stmts = append(stmts, stmt)
 	}
 
 	// Right brace
-	if _, err := p.consume(scanner.RightBrace, "Expected '}'."); err != nil {
-		return nil, err
-	}
+	_ = p.consume(scanner.RightBrace, "Expected '}'.")
 
 	// Return
 	stmt := &ast.Block{
@@ -62,29 +63,28 @@ func (p *parser) block() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(token, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) expressionStmt() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) expressionStmt() ast.Stmt {
 	token := p.next
 
 	// Expression
-	expr, err := p.expression()
-	if err != nil {
-		return nil, err
+	expr := p.expression()
+	if expr == nil {
+		return nil
 	}
 
 	_, isAssignment := expr.(*ast.Assignment)
 	_, isCall := expr.(*ast.Call)
 
 	if !isAssignment && !isCall {
-		return nil, p.error(token, "Invalid statement.")
+		p.error(token, "Invalid statement.")
+		return nil
 	}
 
 	// Semicolon
-	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
-		return nil, err
-	}
+	_ = p.consume(scanner.Semicolon, "Expected ';'.")
 
 	// Return
 	stmt := &ast.Expression{
@@ -95,25 +95,25 @@ func (p *parser) expressionStmt() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(token, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) variable() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) variable() ast.Stmt {
 	start := p.current
 
 	// Name
-	name, err := p.consume(scanner.Identifier, "expected variable name")
-	if err != nil {
-		return nil, err
+	name := p.consume(scanner.Identifier, "expected variable name")
+	if name.IsError() {
+		return nil
 	}
 
 	// Type
 	var type_ types.Type
 
 	if !p.check(scanner.Equal) {
-		type__, err := p.parseType()
-		if err != nil {
-			return nil, err
+		type__ := p.parseType()
+		if type_ == nil {
+			return nil
 		}
 
 		type_ = type__
@@ -123,20 +123,18 @@ func (p *parser) variable() (ast.Stmt, *utils.Diagnostic) {
 	var initializer ast.Expr
 
 	if !p.check(scanner.Semicolon) {
-		if _, err := p.consume(scanner.Equal, "Expected '='."); err != nil {
-			return nil, err
+		if token := p.consume(scanner.Equal, "Expected '='."); token.IsError() {
+			return nil
 		}
 
-		initializer, err = p.expression()
-		if err != nil {
-			return nil, err
+		initializer = p.expression()
+		if initializer == nil {
+			return nil
 		}
 	}
 
 	// Semicolon
-	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
-		return nil, err
-	}
+	_ = p.consume(scanner.Semicolon, "Expected ';'.")
 
 	// Return
 	stmt := &ast.Variable{
@@ -149,41 +147,41 @@ func (p *parser) variable() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(start, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) if_() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) if_() ast.Stmt {
 	token := p.current
 
 	// Left paren
-	if _, err := p.consume(scanner.LeftParen, "Expected '(' before condition."); err != nil {
-		return nil, err
+	if token := p.consume(scanner.LeftParen, "Expected '(' before condition."); token.IsError() {
+		return nil
 	}
 
 	// Condition
-	condition, err := p.expression()
-	if err != nil {
-		return nil, err
+	condition := p.expression()
+	if condition == nil {
+		return nil
 	}
 
 	// Right paren
-	if _, err := p.consume(scanner.RightParen, "Expected ')' before condition."); err != nil {
-		return nil, err
+	if token := p.consume(scanner.RightParen, "Expected ')' before condition."); token.IsError() {
+		return nil
 	}
 
 	// Then
-	then, err := p.statement()
-	if err != nil {
-		return nil, err
+	then := p.statement()
+	if then == nil {
+		return nil
 	}
 
 	// Else
 	var else_ ast.Stmt
 
 	if p.match(scanner.Else) {
-		else__, err := p.statement()
-		if err != nil {
-			return nil, err
+		else__ := p.statement()
+		if else__ == nil {
+			return nil
 		}
 
 		else_ = else__
@@ -200,10 +198,10 @@ func (p *parser) if_() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(token, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) for_() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) for_() ast.Stmt {
 	token := p.current
 
 	var condition ast.Expr
@@ -211,23 +209,23 @@ func (p *parser) for_() (ast.Stmt, *utils.Diagnostic) {
 	// Left paren
 	if p.match(scanner.LeftParen) {
 		// Condition
-		expr, err := p.expression()
-		if err != nil {
-			return nil, err
+		expr := p.expression()
+		if expr == nil {
+			return nil
 		}
 
 		condition = expr
 
 		// Right paren
-		if _, err := p.consume(scanner.RightParen, "Expected ')' before condition."); err != nil {
-			return nil, err
+		if token := p.consume(scanner.RightParen, "Expected ')' before condition."); token.IsError() {
+			return nil
 		}
 	}
 
 	// Body
-	body, err := p.statement()
-	if err != nil {
-		return nil, err
+	body := p.statement()
+	if body == nil {
+		return nil
 	}
 
 	// Return
@@ -240,27 +238,26 @@ func (p *parser) for_() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(token, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) return_() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) return_() ast.Stmt {
 	token := p.current
 
 	// Value
 	var expr ast.Expr
 
 	if !p.check(scanner.Semicolon) {
-		expr_, err := p.expression()
-		if err != nil {
-			return nil, err
+		expr_ := p.expression()
+		if expr_ == nil {
+			return nil
 		}
 
 		expr = expr_
 	}
 
-	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
-		return nil, err
-	}
+	// Semicolon
+	_ = p.consume(scanner.Semicolon, "Expected ';'.")
 
 	// Return
 	stmt := &ast.Return{
@@ -271,16 +268,14 @@ func (p *parser) return_() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(token, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) break_() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) break_() ast.Stmt {
 	token := p.current
 
 	// Semicolon
-	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
-		return nil, err
-	}
+	_ = p.consume(scanner.Semicolon, "Expected ';'.")
 
 	// Return
 	stmt := &ast.Break{
@@ -288,16 +283,14 @@ func (p *parser) break_() (ast.Stmt, *utils.Diagnostic) {
 	}
 
 	stmt.SetRangeToken(token, p.current)
-	return stmt, nil
+	return stmt
 }
 
-func (p *parser) continue_() (ast.Stmt, *utils.Diagnostic) {
+func (p *parser) continue_() ast.Stmt {
 	token := p.current
 
 	// Semicolon
-	if _, err := p.consume(scanner.Semicolon, "Expected ';'."); err != nil {
-		return nil, err
-	}
+	_ = p.consume(scanner.Semicolon, "Expected ';'.")
 
 	// Return
 	stmt := &ast.Continue{
@@ -307,5 +300,5 @@ func (p *parser) continue_() (ast.Stmt, *utils.Diagnostic) {
 	stmt.SetRangeToken(token, p.current)
 	stmt.SetChildrenParent()
 
-	return stmt, nil
+	return stmt
 }

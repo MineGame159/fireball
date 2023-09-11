@@ -195,7 +195,7 @@ func (h *highlighter) VisitType(type_ types.Type) {
 		fmt.Println()
 	}
 
-	if type_.Range().Valid() {
+	if _, ok := type_.(ast.Decl); !ok && type_.Range().Valid() {
 		if _, ok := type_.(*types.PrimitiveType); ok {
 			h.addRange(type_.Range(), typeKind)
 		} else if _, ok := type_.(*ast.Struct); ok {

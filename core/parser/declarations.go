@@ -30,7 +30,7 @@ func (p *parser) declaration() ast.Decl {
 	}
 
 	// Error
-	p.error2(p.next, "Expected declaration, got '%s'.", p.next)
+	p.error(p.next, "Expected declaration, got '%s'.", p.next)
 	p.syncToDecl()
 
 	return nil
@@ -40,49 +40,41 @@ func (p *parser) struct_() ast.Decl {
 	start := p.current
 
 	// Name
-	name := p.consume2(scanner.Identifier)
+	name := p.consume(scanner.Identifier, "Expected struct name.")
 
 	if name.IsError() {
-		p.error2(p.next, "Expected struct name.")
-		if !p.syncToDecl() {
-			return nil
-		}
+		p.syncToDecl()
 		return nil
 	}
 
 	// Left brace
-	if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
-		p.error2(p.next, "Expected '{' after struct name.")
-		if !p.syncToDecl() {
-			return nil
-		}
+	if brace := p.consume(scanner.LeftBrace, "Expected '{' after struct name."); brace.IsError() {
+		p.syncToDecl()
 		return nil
 	}
 
 	// Fields
 	fields := make([]ast.Field, 0, 4)
 
-	for !p.check(scanner.RightBrace) {
+	for p.canLoopAdvanced(scanner.Identifier, scanner.RightBrace) {
 		// Name
-		name := p.consume2(scanner.Identifier)
+		name := p.consume(scanner.Identifier, "Expected field name.")
 
 		if name.IsError() {
-			p.error2(p.next, "Expected field name.")
-			if !p.syncToDecl() {
+			if !p.syncBeforeFieldOrDecl() {
 				return nil
 			}
-			return nil
+			continue
 		}
 
 		// Type
-		type_, err := p.parseType()
+		type_ := p.parseType()
 
-		if err != nil {
-			p.reporter.Report(*err)
-			if !p.syncToDecl() {
+		if type_ == nil {
+			if !p.syncBeforeFieldOrDecl() {
 				return nil
 			}
-			return nil
+			continue
 		}
 
 		// Add
@@ -90,15 +82,23 @@ func (p *parser) struct_() ast.Decl {
 			Name: name,
 			Type: type_,
 		})
+
+		// Comma
+		if token := p.consume(scanner.Comma, "Expected ',' after field type."); token.IsError() {
+			if p.check(scanner.RightBrace) {
+				break
+			}
+			if !p.syncBeforeFieldOrDecl() {
+				return nil
+			}
+
+			continue
+		}
 	}
 
 	// Right brace
-	if brace := p.consume2(scanner.RightBrace); brace.IsError() {
-		p.error2(p.next, "Expected '}' after struct fields.")
-		if !p.syncToDecl() {
-			return nil
-		}
-		return nil
+	if brace := p.consume(scanner.RightBrace, "Expected '}' after struct fields."); brace.IsError() {
+		p.syncToDecl()
 	}
 
 	// Return
@@ -117,10 +117,9 @@ func (p *parser) enum() ast.Decl {
 	start := p.current
 
 	// Name
-	name := p.consume2(scanner.Identifier)
+	name := p.consume(scanner.Identifier, "Expected enum name.")
 
 	if name.IsError() {
-		p.error2(p.next, "Expected enum name.")
 		p.syncToDecl()
 		return nil
 	}
@@ -129,18 +128,18 @@ func (p *parser) enum() ast.Decl {
 	var type_ types.Type
 
 	if !p.check(scanner.LeftBrace) {
-		type__, err := p.parseType()
+		type__ := p.parseType()
 
-		if err != nil {
-			p.reporter.Report(*err)
+		if type__ == nil {
+			p.syncToDecl()
+			return nil
 		}
 
 		type_ = type__
 	}
 
 	// Left brace
-	if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
-		p.error2(p.next, "Expected '{' before enum cases.")
+	if brace := p.consume(scanner.LeftBrace, "Expected '{' before enum cases."); brace.IsError() {
 		p.syncToDecl()
 		return nil
 	}
@@ -149,44 +148,37 @@ func (p *parser) enum() ast.Decl {
 	cases := make([]ast.EnumCase, 0, 8)
 	lastValue := -1
 
-	for !p.check(scanner.RightBrace) {
-		// Comma
-		if len(cases) > 0 {
-			if comma := p.consume2(scanner.Comma); comma.IsError() {
-				p.error2(p.next, "Expected ',' before next enum case.")
-				p.syncToDecl()
-				return nil
-			}
-		}
-
+	for p.canLoopAdvanced(scanner.Identifier, scanner.RightBrace) {
 		// Name
-		name := p.consume2(scanner.Identifier)
+		name := p.consume(scanner.Identifier, "Expected enum case name.")
 
 		if name.IsError() {
-			p.error2(p.next, "Expected enum case name.")
-			p.syncToDecl()
-			return nil
+			if !p.syncBeforeFieldOrDecl() {
+				return nil
+			}
+			continue
 		}
 
 		// Value
 		value := lastValue + 1
 		inferValue := true
+		validValue := true
 
 		if p.match(scanner.Equal) {
-			literal := p.consume2(scanner.Number)
+			literal := p.consume(scanner.Number, "Enum case values can only be integers.")
 
 			if literal.IsError() {
-				p.error2(p.next, "Enum case values can only be integers.")
-				p.syncToDecl()
-				return nil
+				if !p.syncBeforeFieldOrDecl() {
+					return nil
+				}
+				continue
 			}
 
 			number, err := strconv.Atoi(literal.Lexeme)
 
 			if err != nil {
-				p.error2(literal, "Invalid integer.")
-				p.syncToDecl()
-				return nil
+				p.error(literal, "Invalid integer.")
+				validValue = false
 			}
 
 			value = number
@@ -196,18 +188,30 @@ func (p *parser) enum() ast.Decl {
 		lastValue = value
 
 		// Add
-		cases = append(cases, ast.EnumCase{
-			Name:       name,
-			Value:      value,
-			InferValue: inferValue,
-		})
+		if validValue {
+			cases = append(cases, ast.EnumCase{
+				Name:       name,
+				Value:      value,
+				InferValue: inferValue,
+			})
+		}
+
+		// Comma
+		if comma := p.consume(scanner.Comma, "Expected ',' before next enum case."); comma.IsError() {
+			if p.check(scanner.RightBrace) {
+				break
+			}
+			if !p.syncBeforeFieldOrDecl() {
+				return nil
+			}
+
+			continue
+		}
 	}
 
 	// Right brace
-	if brace := p.consume2(scanner.RightBrace); brace.IsError() {
-		p.error2(p.next, "Expected '}' after enum cases.")
+	if brace := p.consume(scanner.RightBrace, "Expected '}' after enum cases."); brace.IsError() {
 		p.syncToDecl()
-		return nil
 	}
 
 	// Return
@@ -226,17 +230,15 @@ func (p *parser) enum() ast.Decl {
 
 func (p *parser) function(start scanner.Token) ast.Decl {
 	// Name
-	name := p.consume2(scanner.Identifier)
+	name := p.consume(scanner.Identifier, "Expected function name.")
 
 	if name.IsError() {
-		p.error2(p.next, "Expected function name.")
 		p.syncToDecl()
 		return nil
 	}
 
 	// Parameters
-	if paren := p.consume2(scanner.LeftParen); paren.IsError() {
-		p.error2(p.next, "Expected '(' after function name.")
+	if paren := p.consume(scanner.LeftParen, "Expected '(' after function name."); paren.IsError() {
 		p.syncToDecl()
 		return nil
 	}
@@ -244,17 +246,15 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	params := make([]ast.Param, 0, 4)
 	variadic := false
 
-	for !p.check(scanner.RightParen) && !p.check(scanner.Dot) {
-		name := p.consume2(scanner.Identifier)
+	for p.canLoop(scanner.RightParen, scanner.Dot) {
+		name := p.consume(scanner.Identifier, "Expected parameter name.")
 		if name.IsError() {
-			p.error2(p.next, "Expected parameter name.")
 			p.syncToDecl()
 			return nil
 		}
 
-		type_, err := p.parseType()
-		if err != nil {
-			p.reporter.Report(*err)
+		type_ := p.parseType()
+		if type_ == nil {
 			p.syncToDecl()
 			return nil
 		}
@@ -267,22 +267,17 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 		})
 	}
 
-	if dot := p.consume2(scanner.Dot); !dot.IsError() {
-		if dot := p.consume2(scanner.Dot); !dot.IsError() {
-			if dot := p.consume2(scanner.Dot); !dot.IsError() {
-				variadic = true
+	if p.match(scanner.Dot) && p.match(scanner.Dot) && p.match(scanner.Dot) {
+		variadic = true
 
-				if !p.extern {
-					p.error2(dot, "Only extern functions can be variadic.")
-					p.syncToDecl()
-					return nil
-				}
-			}
+		if !p.extern {
+			p.error(p.current, "Only extern functions can be variadic.")
+			p.syncToDecl()
+			return nil
 		}
 	}
 
-	if paren := p.consume2(scanner.RightParen); paren.IsError() {
-		p.error2(p.next, "Expected ')' after function parameters.")
+	if paren := p.consume(scanner.RightParen, "Expected ')' after function parameters."); paren.IsError() {
 		p.syncToDecl()
 		return nil
 	}
@@ -291,9 +286,8 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	var returns types.Type
 
 	if !p.check(scanner.LeftBrace) {
-		type_, err := p.parseType()
-		if err != nil {
-			p.reporter.Report(*err)
+		type_ := p.parseType()
+		if type_ == nil {
 			p.syncToDecl()
 			return nil
 		}
@@ -309,30 +303,26 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	if !p.extern {
 		body = make([]ast.Stmt, 0, 8)
 
-		if brace := p.consume2(scanner.LeftBrace); brace.IsError() {
-			p.error2(p.next, "Expected '{' before function body.")
+		if brace := p.consume(scanner.LeftBrace, "Expected '{' before function body."); brace.IsError() {
 			p.syncToDecl()
 			return nil
 		}
 
-		for !p.check(scanner.RightBrace) {
-			stmt, err := p.statement()
+		for p.canLoop(scanner.RightBrace) {
+			stmt := p.statement()
 
-			if err != nil {
-				p.reporter.Report(*err)
-
+			if stmt == nil {
 				if !p.syncToStmt() {
-					return nil
+					break
 				}
-			} else {
-				body = append(body, stmt)
+				continue
 			}
+
+			body = append(body, stmt)
 		}
 
-		if brace := p.consume2(scanner.RightBrace); brace.IsError() {
-			p.error2(p.next, "Expected '}' after function body.")
+		if brace := p.consume(scanner.RightBrace, "Expected '}' after function body."); brace.IsError() {
 			p.syncToDecl()
-			return nil
 		}
 	}
 
@@ -352,38 +342,22 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	return decl
 }
 
-func (p *parser) syncToDecl() bool {
-	// Advance until we hit a token that stars a declaration or EOF
-	for {
-		// Handle EOF
-		if p.isAtEnd() {
-			return false
-		}
+// Helpers
 
-		// Check token
+func (p *parser) syncBeforeFieldOrDecl() bool {
+	for !p.isAtEnd() {
 		switch p.next.Kind {
-		case scanner.Extern, scanner.Func:
+		case scanner.Struct, scanner.Enum, scanner.Extern, scanner.Func:
+			return false
+
+		case scanner.Comma:
+			p.advance()
 			return true
 
 		default:
 			p.advance()
 		}
 	}
-}
 
-func (p *parser) syncToStmt() bool {
-	// Advance until we hit a semicolon or EOF
-	for !p.check(scanner.Semicolon) {
-		// Handle EOF
-		if p.isAtEnd() {
-			return false
-		}
-		// Advance
-		p.advance()
-	}
-
-	// Skip semicolon
-	p.advance()
-
-	return true
+	return false
 }

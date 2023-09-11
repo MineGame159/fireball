@@ -21,12 +21,14 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 					if range_.Contains(pos) {
 						_, f := i.Type().(*ast.Struct).GetField(field.Name.Lexeme)
 
-						return &protocol.Hover{
-							Contents: protocol.MarkupContent{
-								Kind:  protocol.PlainText,
-								Value: f.Type.String(),
-							},
-							Range: convertRangePtr(range_),
+						if f != nil {
+							return &protocol.Hover{
+								Contents: protocol.MarkupContent{
+									Kind:  protocol.PlainText,
+									Value: f.Type.String(),
+								},
+								Range: convertRangePtr(range_),
+							}
 						}
 					}
 				}

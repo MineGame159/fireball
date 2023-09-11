@@ -45,7 +45,9 @@ func Parse(reporter utils.Reporter, scanner *scanner.Scanner) []ast.Decl {
 	return decls
 }
 
-func (p *parser) parseType() (types.Type, *utils.Diagnostic) {
+// Types
+
+func (p *parser) parseType() types.Type {
 	if p.match(scanner.LeftBracket) {
 		return p.parseArrayType()
 	}
@@ -56,57 +58,60 @@ func (p *parser) parseType() (types.Type, *utils.Diagnostic) {
 	return p.parseIdentifierType()
 }
 
-func (p *parser) parseArrayType() (types.Type, *utils.Diagnostic) {
+func (p *parser) parseArrayType() types.Type {
 	start := p.current
 
 	// Count
-	token, err := p.consume(scanner.Number, "Expected array size.")
-	if err != nil {
-		return nil, err
+	token := p.consume(scanner.Number, "Expected array size.")
+	if token.IsError() {
+		return nil
 	}
 
 	count, err_ := strconv.Atoi(token.Lexeme)
 
 	if err_ != nil {
-		return nil, p.error(token, "Invalid array size.")
+		p.error(token, "Invalid array size.")
+		return nil
 	}
+
 	if count < 0 {
-		return nil, p.error(token, "Invalid array size.")
+		p.error(token, "Invalid array size.")
+		return nil
 	}
 
 	// Right bracket
-	if _, err := p.consume(scanner.RightBracket, "Expected ']' after array size."); err != nil {
-		return nil, err
+	if token := p.consume(scanner.RightBracket, "Expected ']' after array size."); token.IsError() {
+		return nil
 	}
 
 	// Base
-	base, err := p.parseType()
-	if err != nil {
-		return nil, err
+	base := p.parseType()
+	if base == nil {
+		return nil
 	}
 
 	// Return
-	return types.Array(uint32(count), base, core.TokensToRange(start, p.current)), nil
+	return types.Array(uint32(count), base, core.TokensToRange(start, p.current))
 }
 
-func (p *parser) parsePointerType() (types.Type, *utils.Diagnostic) {
+func (p *parser) parsePointerType() types.Type {
 	start := p.current
 
 	// Pointee
-	pointee, err := p.parseType()
-	if err != nil {
-		return nil, err
+	pointee := p.parseType()
+	if pointee == nil {
+		return nil
 	}
 
 	// return
-	return types.Pointer(pointee, core.TokensToRange(start, p.current)), nil
+	return types.Pointer(pointee, core.TokensToRange(start, p.current))
 }
 
-func (p *parser) parseIdentifierType() (types.Type, *utils.Diagnostic) {
+func (p *parser) parseIdentifierType() types.Type {
 	// Name
-	ident, err := p.consume(scanner.Identifier, "Expected type name.")
-	if err != nil {
-		return nil, err
+	ident := p.consume(scanner.Identifier, "Expected type name.")
+	if ident.IsError() {
+		return nil
 	}
 
 	range_ := core.TokenToRange(ident)
@@ -145,43 +150,22 @@ func (p *parser) parseIdentifierType() (types.Type, *utils.Diagnostic) {
 
 	default:
 		// Unresolved
-		return types.Unresolved(ident, range_), nil
+		return types.Unresolved(ident, range_)
 	}
 
 	// Primitive
-	return types.Primitive(kind, range_), nil
+	return types.Primitive(kind, range_)
 }
 
-func (p *parser) consume(kind scanner.TokenKind, msg string) (scanner.Token, *utils.Diagnostic) {
-	if p.check(kind) {
-		return p.advance(), nil
-	}
+// Helpers
 
-	return scanner.Token{}, p.error(p.next, msg)
-}
-
-func (p *parser) consume2(kind scanner.TokenKind) scanner.Token {
+func (p *parser) consume(kind scanner.TokenKind, msg string) scanner.Token {
 	if p.check(kind) {
 		return p.advance()
 	}
 
+	p.error(p.next, msg)
 	return scanner.Token{Kind: scanner.Error}
-}
-
-func (p *parser) error(token scanner.Token, format string, args ...any) *utils.Diagnostic {
-	return &utils.Diagnostic{
-		Kind:    utils.ErrorKind,
-		Range:   core.TokenToRange(token),
-		Message: fmt.Sprintf(format, args...),
-	}
-}
-
-func (p *parser) error2(token scanner.Token, format string, args ...any) {
-	p.reporter.Report(utils.Diagnostic{
-		Kind:    utils.ErrorKind,
-		Range:   core.TokenToRange(token),
-		Message: fmt.Sprintf(format, args...),
-	})
 }
 
 func (p *parser) match(kinds ...scanner.TokenKind) bool {
@@ -212,6 +196,76 @@ func (p *parser) advance() scanner.Token {
 	return p.current
 }
 
+func (p *parser) canLoop(notNext ...scanner.TokenKind) bool {
+	if p.isAtEnd() {
+		return false
+	}
+
+	for _, kind := range notNext {
+		if p.next.Kind == kind {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (p *parser) canLoopAdvanced(next, notNext scanner.TokenKind) bool {
+	if p.isAtEnd() {
+		return false
+	}
+
+	if p.next.Kind != next {
+		return false
+	}
+
+	return p.next.Kind != notNext
+}
+
 func (p *parser) isAtEnd() bool {
 	return p.next.Kind == scanner.Eof
+}
+
+// Error handling
+
+func (p *parser) syncToDecl() {
+	p.syncTo(scanner.Struct, scanner.Enum, scanner.Extern, scanner.Func)
+}
+
+func (p *parser) syncToStmt() bool {
+	for !p.isAtEnd() {
+		switch p.next.Kind {
+		case scanner.Semicolon:
+			p.advance()
+			return true
+
+		case scanner.Struct, scanner.Enum, scanner.Extern, scanner.Func, scanner.RightBrace:
+			return false
+
+		default:
+			p.advance()
+		}
+	}
+
+	return false
+}
+
+func (p *parser) syncTo(kinds ...scanner.TokenKind) {
+	for !p.isAtEnd() {
+		for _, kind := range kinds {
+			if p.next.Kind == kind {
+				return
+			}
+		}
+
+		p.advance()
+	}
+}
+
+func (p *parser) error(token scanner.Token, format string, args ...any) {
+	p.reporter.Report(utils.Diagnostic{
+		Kind:    utils.ErrorKind,
+		Range:   core.TokenToRange(token),
+		Message: fmt.Sprintf(format, args...),
+	})
 }

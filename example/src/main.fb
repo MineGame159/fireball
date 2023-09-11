@@ -1,11 +1,11 @@
 struct Vec2 {
-    x i32
-    y i32
+    x i32,
+    y i32,
 }
 
 enum Animal {
     Dog = 9,
-    Cat
+    Cat,
 }
 
 func main() i32 {

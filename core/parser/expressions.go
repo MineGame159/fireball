@@ -4,18 +4,17 @@ import (
 	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
-	"fireball/core/utils"
 )
 
-func (p *parser) expression() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) expression() ast.Expr {
 	return p.assignment()
 }
 
-func (p *parser) assignment() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) assignment() ast.Expr {
 	// Cascade
-	expr, err := p.logicalOr()
-	if err != nil {
-		return nil, err
+	expr := p.logicalOr()
+	if expr == nil {
+		return nil
 	}
 
 	// = += -= *= /= %=
@@ -23,9 +22,9 @@ func (p *parser) assignment() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		value, err := p.assignment()
-		if err != nil {
-			return nil, err
+		value := p.assignment()
+		if value == nil {
+			return nil
 		}
 
 		// Return
@@ -38,18 +37,18 @@ func (p *parser) assignment() (ast.Expr, *utils.Diagnostic) {
 		expr.SetRangeNode(expr.Assignee, expr.Value)
 		expr.SetChildrenParent()
 
-		return expr, nil
+		return expr
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) logicalOr() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) logicalOr() ast.Expr {
 	// Cascade
-	expr, err := p.logicalAnd()
-	if err != nil {
-		return nil, err
+	expr := p.logicalAnd()
+	if expr == nil {
+		return nil
 	}
 
 	// ||
@@ -57,9 +56,9 @@ func (p *parser) logicalOr() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.logicalAnd()
-		if err != nil {
-			return nil, err
+		right := p.logicalAnd()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -76,14 +75,14 @@ func (p *parser) logicalOr() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) logicalAnd() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) logicalAnd() ast.Expr {
 	// Cascade
-	expr, err := p.bitwiseOr()
-	if err != nil {
-		return nil, err
+	expr := p.bitwiseOr()
+	if expr == nil {
+		return nil
 	}
 
 	// &&
@@ -91,9 +90,9 @@ func (p *parser) logicalAnd() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.bitwiseOr()
-		if err != nil {
-			return nil, err
+		right := p.bitwiseOr()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -110,14 +109,14 @@ func (p *parser) logicalAnd() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) bitwiseOr() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) bitwiseOr() ast.Expr {
 	// Cascade
-	expr, err := p.bitwiseAnd()
-	if err != nil {
-		return nil, err
+	expr := p.bitwiseAnd()
+	if expr == nil {
+		return nil
 	}
 
 	// |
@@ -125,9 +124,9 @@ func (p *parser) bitwiseOr() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.bitwiseAnd()
-		if err != nil {
-			return nil, err
+		right := p.bitwiseAnd()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -144,14 +143,14 @@ func (p *parser) bitwiseOr() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) bitwiseAnd() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) bitwiseAnd() ast.Expr {
 	// Cascade
-	expr, err := p.equality()
-	if err != nil {
-		return nil, err
+	expr := p.equality()
+	if expr == nil {
+		return nil
 	}
 
 	// &
@@ -159,9 +158,9 @@ func (p *parser) bitwiseAnd() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.equality()
-		if err != nil {
-			return nil, err
+		right := p.equality()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -178,14 +177,14 @@ func (p *parser) bitwiseAnd() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) equality() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) equality() ast.Expr {
 	// Cascade
-	expr, err := p.comparison()
-	if err != nil {
-		return nil, err
+	expr := p.comparison()
+	if expr == nil {
+		return nil
 	}
 
 	// == !=
@@ -193,9 +192,9 @@ func (p *parser) equality() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.comparison()
-		if err != nil {
-			return nil, err
+		right := p.comparison()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -212,14 +211,14 @@ func (p *parser) equality() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) comparison() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) comparison() ast.Expr {
 	// Cascade
-	expr, err := p.shift()
-	if err != nil {
-		return nil, err
+	expr := p.shift()
+	if expr == nil {
+		return nil
 	}
 
 	// < <= > >=
@@ -227,9 +226,9 @@ func (p *parser) comparison() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.shift()
-		if err != nil {
-			return nil, err
+		right := p.shift()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -246,14 +245,14 @@ func (p *parser) comparison() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) shift() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) shift() ast.Expr {
 	// Cascade
-	expr, err := p.term()
-	if err != nil {
-		return nil, err
+	expr := p.term()
+	if expr == nil {
+		return nil
 	}
 
 	// << >>
@@ -261,9 +260,9 @@ func (p *parser) shift() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.term()
-		if err != nil {
-			return nil, err
+		right := p.term()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -280,14 +279,14 @@ func (p *parser) shift() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) term() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) term() ast.Expr {
 	// Cascade
-	expr, err := p.factor()
-	if err != nil {
-		return nil, err
+	expr := p.factor()
+	if expr == nil {
+		return nil
 	}
 
 	// + -
@@ -295,9 +294,9 @@ func (p *parser) term() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.factor()
-		if err != nil {
-			return nil, err
+		right := p.factor()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -314,14 +313,14 @@ func (p *parser) term() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) factor() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) factor() ast.Expr {
 	// Cascade
-	expr, err := p.unary()
-	if err != nil {
-		return nil, err
+	expr := p.unary()
+	if expr == nil {
+		return nil
 	}
 
 	// * / %
@@ -329,9 +328,9 @@ func (p *parser) factor() (ast.Expr, *utils.Diagnostic) {
 		op := p.current
 
 		// Cascade
-		right, err := p.unary()
-		if err != nil {
-			return nil, err
+		right := p.unary()
+		if right == nil {
+			return nil
 		}
 
 		// Set
@@ -348,18 +347,18 @@ func (p *parser) factor() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) unary() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) unary() ast.Expr {
 	// ! - & *
 	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand, scanner.Star) {
 		op := p.current
 
 		// Cascade
-		right, err := p.unary()
-		if err != nil {
-			return nil, err
+		right := p.unary()
+		if right == nil {
+			return nil
 		}
 
 		// Return
@@ -371,44 +370,44 @@ func (p *parser) unary() (ast.Expr, *utils.Diagnostic) {
 		expr.SetRangeToken(op, p.current)
 		expr.SetChildrenParent()
 
-		return expr, nil
+		return expr
 	}
 
 	// Return cascade
 	return p.call()
 }
 
-func (p *parser) call() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) call() ast.Expr {
 	// Cascade
-	expr, err := p.primary()
-	if err != nil {
-		return nil, err
+	expr := p.primary()
+	if expr == nil {
+		return nil
 	}
 
 	for {
 		if p.match(scanner.LeftParen) {
 			// (
-			expr, err = p.finishCall(expr)
-			if err != nil {
-				return nil, err
+			expr = p.finishCall(expr)
+			if expr == nil {
+				return nil
 			}
 		} else if p.match(scanner.LeftBracket) {
 			// {
-			expr, err = p.finishIndex(expr)
-			if err != nil {
-				return nil, err
+			expr = p.finishIndex(expr)
+			if expr == nil {
+				return nil
 			}
 		} else if p.match(scanner.Dot) {
 			// .
-			expr, err = p.finishMember(expr)
-			if err != nil {
-				return nil, err
+			expr = p.finishMember(expr)
+			if expr == nil {
+				return nil
 			}
 		} else if p.match(scanner.As) {
 			// as
-			expr, err = p.finishCast(expr)
-			if err != nil {
-				return nil, err
+			expr = p.finishCast(expr)
+			if expr == nil {
+				return nil
 			}
 		} else {
 			break
@@ -416,17 +415,17 @@ func (p *parser) call() (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Return
-	return expr, nil
+	return expr
 }
 
-func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *utils.Diagnostic) {
+func (p *parser) finishCall(callee ast.Expr) ast.Expr {
 	// Arguments
 	args := make([]ast.Expr, 0, 4)
 
-	for !p.check(scanner.RightParen) {
-		expr, err := p.expression()
-		if err != nil {
-			return nil, err
+	for p.canLoop(scanner.RightParen) {
+		expr := p.expression()
+		if expr == nil {
+			return nil
 		}
 
 		p.match(scanner.Comma)
@@ -434,8 +433,8 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *utils.Diagnostic) {
 		args = append(args, expr)
 	}
 
-	if _, err := p.consume(scanner.RightParen, "Expected ')' after call arguments."); err != nil {
-		return nil, err
+	if token := p.consume(scanner.RightParen, "Expected ')' after call arguments."); token.IsError() {
+		return nil
 	}
 
 	// Return
@@ -448,21 +447,21 @@ func (p *parser) finishCall(callee ast.Expr) (ast.Expr, *utils.Diagnostic) {
 	expr.SetRangePos(callee.Range().Start, core.TokenToPos(p.current, true))
 	expr.SetChildrenParent()
 
-	return expr, nil
+	return expr
 }
 
-func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *utils.Diagnostic) {
+func (p *parser) finishIndex(value ast.Expr) ast.Expr {
 	token := p.current
 
 	// Index expression
-	index, err := p.expression()
-	if err != nil {
-		return nil, err
+	index := p.expression()
+	if index == nil {
+		return nil
 	}
 
 	// Right bracket
-	if _, err := p.consume(scanner.RightBracket, "Expected ']' after index expression."); err != nil {
-		return nil, err
+	if token := p.consume(scanner.RightBracket, "Expected ']' after index expression."); token.IsError() {
+		return nil
 	}
 
 	// Return
@@ -475,14 +474,14 @@ func (p *parser) finishIndex(value ast.Expr) (ast.Expr, *utils.Diagnostic) {
 	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	expr.SetChildrenParent()
 
-	return expr, nil
+	return expr
 }
 
-func (p *parser) finishMember(value ast.Expr) (ast.Expr, *utils.Diagnostic) {
+func (p *parser) finishMember(value ast.Expr) ast.Expr {
 	// Name
-	name, err := p.consume(scanner.Identifier, "Expected member name.")
-	if err != nil {
-		return nil, err
+	name := p.consume(scanner.Identifier, "Expected member name.")
+	if name.IsError() {
+		return nil
 	}
 
 	// Return
@@ -494,16 +493,16 @@ func (p *parser) finishMember(value ast.Expr) (ast.Expr, *utils.Diagnostic) {
 	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	expr.SetChildrenParent()
 
-	return expr, nil
+	return expr
 }
 
-func (p *parser) finishCast(value ast.Expr) (ast.Expr, *utils.Diagnostic) {
+func (p *parser) finishCast(value ast.Expr) ast.Expr {
 	token := p.current
 
 	// Type
-	type_, err := p.parseType()
-	if err != nil {
-		return nil, err
+	type_ := p.parseType()
+	if type_ == nil {
+		return nil
 	}
 
 	// Return
@@ -516,10 +515,10 @@ func (p *parser) finishCast(value ast.Expr) (ast.Expr, *utils.Diagnostic) {
 	expr.SetChildrenParent()
 	expr.SetType(type_)
 
-	return expr, nil
+	return expr
 }
 
-func (p *parser) primary() (ast.Expr, *utils.Diagnostic) {
+func (p *parser) primary() ast.Expr {
 	// nil true false 0.0 'c' "str"
 	if p.match(scanner.Nil, scanner.True, scanner.False, scanner.Number, scanner.Character, scanner.String) {
 		expr := &ast.Literal{
@@ -529,7 +528,7 @@ func (p *parser) primary() (ast.Expr, *utils.Diagnostic) {
 		expr.SetRangeToken(p.current, p.current)
 		expr.SetChildrenParent()
 
-		return expr, nil
+		return expr
 	}
 
 	// abc
@@ -549,7 +548,7 @@ func (p *parser) primary() (ast.Expr, *utils.Diagnostic) {
 		expr.SetRangeToken(token, token)
 		expr.SetChildrenParent()
 
-		return expr, nil
+		return expr
 	}
 
 	// (
@@ -557,14 +556,14 @@ func (p *parser) primary() (ast.Expr, *utils.Diagnostic) {
 		token := p.current
 
 		// Expression
-		expr, err := p.expression()
-		if err != nil {
-			return nil, err
+		expr := p.expression()
+		if expr == nil {
+			return nil
 		}
 
 		// Right paren
-		if _, err := p.consume(scanner.RightParen, "Expected ')' after expression."); err != nil {
-			return nil, err
+		if token := p.consume(scanner.RightParen, "Expected ')' after expression."); token.IsError() {
+			return nil
 		}
 
 		// Return
@@ -576,40 +575,41 @@ func (p *parser) primary() (ast.Expr, *utils.Diagnostic) {
 		group.SetRangeToken(token, p.current)
 		group.SetChildrenParent()
 
-		return group, nil
+		return group
 	}
 
 	// Error
-	return nil, p.error(p.next, "Expected expression.")
+	p.error(p.next, "Expected expression.")
+	return nil
 }
 
-func (p *parser) initializer(name scanner.Token) (ast.Expr, *utils.Diagnostic) {
+func (p *parser) initializer(name scanner.Token) ast.Expr {
 	// Fields
 	fields := make([]ast.InitField, 0, 4)
 
 	for !p.check(scanner.RightBrace) {
 		// Comma
 		if len(fields) > 0 {
-			if _, err := p.consume(scanner.Comma, "Expected ',' between fields."); err != nil {
-				return nil, err
+			if token := p.consume(scanner.Comma, "Expected ',' between fields."); token.IsError() {
+				return nil
 			}
 		}
 
 		// Name
-		name, err := p.consume(scanner.Identifier, "Expected field name.")
-		if err != nil {
-			return nil, err
+		name := p.consume(scanner.Identifier, "Expected field name.")
+		if name.IsError() {
+			return nil
 		}
 
 		// Colon
-		if _, err := p.consume(scanner.Colon, "Expected ':' after field name."); err != nil {
-			return nil, err
+		if token := p.consume(scanner.Colon, "Expected ':' after field name."); token.IsError() {
+			return nil
 		}
 
 		// Value
-		value, err := p.expression()
-		if err != nil {
-			return nil, err
+		value := p.expression()
+		if value == nil {
+			return nil
 		}
 
 		// Add
@@ -620,8 +620,8 @@ func (p *parser) initializer(name scanner.Token) (ast.Expr, *utils.Diagnostic) {
 	}
 
 	// Right brace
-	if _, err := p.consume(scanner.RightBrace, "Expected '}' after initializer fields."); err != nil {
-		return nil, err
+	if token := p.consume(scanner.RightBrace, "Expected '}' after initializer fields."); token.IsError() {
+		return nil
 	}
 
 	// Return
@@ -633,5 +633,5 @@ func (p *parser) initializer(name scanner.Token) (ast.Expr, *utils.Diagnostic) {
 	expr.SetRangeToken(name, p.current)
 	expr.SetChildrenParent()
 
-	return expr, nil
+	return expr
 }
