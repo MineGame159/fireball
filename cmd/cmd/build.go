@@ -83,6 +83,23 @@ func buildProject() string {
 		irPaths = append(irPaths, path)
 	}
 
+	entrypointPath := filepath.Join(project.Path, "build", "__entrypoint.ll")
+	irPaths = append(irPaths, entrypointPath)
+
+	err = os.WriteFile(entrypointPath, []byte(`
+define i32 @main() {
+entry:
+	%0 = call i32 @fb$main()
+	ret i32 %0
+}
+
+declare i32 @fb$main()
+`), 0750)
+
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
 	// Compile LLVM IR files to object files
 	c := build.Compiler{OptimizationLevel: 0}
 

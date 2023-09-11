@@ -326,10 +326,20 @@ func (c *codegen) getType(type_ types.Type) value {
 
 // Functions
 
+func mangleName(name string) string {
+	return "fb$" + name
+}
+
 func (c *codegen) getFunction(name scanner.Token) value {
 	// Get function
 	type_, filePath := c.resolver.GetFunction(name.Lexeme)
-	val := c.globals.named(name.Lexeme, type_)
+
+	mangledName := name.Lexeme
+	if !type_.Extern {
+		mangledName = mangleName(name.Lexeme)
+	}
+
+	val := c.globals.named(mangledName, type_)
 
 	// Check if function needs to be imported
 	if filePath != c.path {

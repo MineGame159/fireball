@@ -35,7 +35,12 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	}
 
 	// Signature
-	c.writeFmt("%s %s @%s(", ternary(decl.Extern, "declare", "define"), c.getType(decl.Returns), decl.Name)
+	name := decl.Name.Lexeme
+	if !decl.Extern {
+		name = mangleName(name)
+	}
+
+	c.writeFmt("%s %s @%s(", ternary(decl.Extern, "declare", "define"), c.getType(decl.Returns), name)
 
 	for i, param := range decl.Params {
 		if i > 0 {
