@@ -12,14 +12,14 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 		// Get node under cursor
 		node := ast.GetLeaf(decl, pos)
 
-		if expr, ok := node.(ast.Expr); ok {
+		if expr, ok := node.(ast.Expr); ok && expr.Result().Kind != ast.InvalidResultKind {
 			if i, ok := node.(*ast.Initializer); ok {
 				// ast.Initializer
 				for _, field := range i.Fields {
 					range_ := core.TokenToRange(field.Name)
 
 					if range_.Contains(pos) {
-						_, f := i.Type().(*ast.Struct).GetField(field.Name.Lexeme)
+						_, f := i.Result().Type.(*ast.Struct).GetField(field.Name.Lexeme)
 
 						if f != nil {
 							return &protocol.Hover{
@@ -35,7 +35,7 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 			} else if m, ok := node.(*ast.Member); ok {
 				// ast.Member that is an enum
 				if i, ok := m.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
-					if e, ok := m.Type().(*ast.Enum); ok {
+					if e, ok := m.Result().Type.(*ast.Enum); ok {
 						case_ := e.GetCase(m.Name.Lexeme)
 
 						if case_ != nil {
@@ -52,7 +52,7 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 			}
 
 			// ast.Expr
-			text := expr.Type().String()
+			text := expr.Result().Type.String()
 
 			// Ignore literal expressions
 			if _, ok := expr.(*ast.Literal); ok {

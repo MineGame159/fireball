@@ -57,29 +57,29 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	}
 
 	// Emit
-	c.exprValue = c.locals.constant(raw, expr.Type())
+	c.exprValue = c.locals.constant(raw, expr.Result().Type)
 }
 
 func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 	// TODO: Use LLVM's structure literal syntax if possible, aka if all fields are assigned
-	struct_, _ := expr.Type().(*ast.Struct)
-	type_ := c.getType(expr.Type())
+	struct_, _ := expr.Result().Type.(*ast.Struct)
+	type_ := c.getType(expr.Result().Type)
 
 	// Allocate struct
-	res := c.locals.unnamed(expr.Type())
+	res := c.locals.unnamed(expr.Result().Type)
 	c.writeFmt("%s = alloca %s\n", res, type_)
 
 	// Assign fields
 	for _, field := range expr.Fields {
 		i, _ := struct_.GetField(field.Name.Lexeme)
 
-		value := c.load(c.acceptExpr(field.Value), field.Value.Type())
+		value := c.load(c.acceptExpr(field.Value), field.Value.Result().Type)
 
-		ptr := c.locals.unnamed(expr.Type())
+		ptr := c.locals.unnamed(expr.Result().Type)
 		loc := c.debug.location(field.Name)
 
 		c.writeFmt("%s = getelementptr inbounds %s, ptr %s, i32 0, i32 %d\n", ptr, type_, res, i)
-		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(field.Value.Type()), value, ptr, loc)
+		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(field.Value.Result().Type), value, ptr, loc)
 	}
 
 	// Return
@@ -93,21 +93,21 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 	switch expr.Op.Kind {
 	case scanner.Bang:
-		res := c.locals.unnamed(expr.Right.Type())
-		c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", res, c.load(val, expr.Right.Type()), loc)
+		res := c.locals.unnamed(expr.Right.Result().Type)
+		c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", res, c.load(val, expr.Right.Result().Type), loc)
 		c.exprValue = res
 
 	case scanner.Minus:
-		if v, ok := expr.Right.Type().(*types.PrimitiveType); ok {
-			res := c.locals.unnamed(expr.Right.Type())
-			val := c.load(val, expr.Right.Type())
+		if v, ok := expr.Right.Result().Type.(*types.PrimitiveType); ok {
+			res := c.locals.unnamed(expr.Right.Result().Type)
+			val := c.load(val, expr.Right.Result().Type)
 
 			if types.IsFloating(v.Kind) {
 				// floating
-				c.writeFmt("%s = fneg %s %s, !dbg %s\n", res, c.getType(expr.Right.Type()), val, loc)
+				c.writeFmt("%s = fneg %s %s, !dbg %s\n", res, c.getType(expr.Right.Result().Type), val, loc)
 			} else {
 				// signed
-				c.writeFmt("%s = sub nsw %s 0, %s, !dbg %s\n", res, c.getType(expr.Right.Type()), val, loc)
+				c.writeFmt("%s = sub nsw %s 0, %s, !dbg %s\n", res, c.getType(expr.Right.Result().Type), val, loc)
 			}
 
 			c.exprValue = res
@@ -122,8 +122,8 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		}
 
 	case scanner.Star:
-		res := c.locals.unnamed(expr.Type())
-		c.writeFmt("%s = load %s, ptr %s, !dbg %s\n", res, c.getType(expr.Type()), c.load(val, expr.Right.Type()), loc)
+		res := c.locals.unnamed(expr.Result().Type)
+		c.writeFmt("%s = load %s, ptr %s, !dbg %s\n", res, c.getType(expr.Result().Type), c.load(val, expr.Right.Result().Type), loc)
 		c.exprValue = res
 
 	default:
@@ -135,14 +135,14 @@ func (c *codegen) VisitBinary(expr *ast.Binary) {
 	left := c.acceptExpr(expr.Left)
 	right := c.acceptExpr(expr.Right)
 
-	c.exprValue = c.binary(expr.Op, left, expr.Left.Type(), right, expr.Right.Type())
+	c.exprValue = c.binary(expr.Op, left, expr.Left.Result().Type, right, expr.Right.Result().Type)
 }
 
 func (c *codegen) VisitLogical(expr *ast.Logical) {
 	loc := c.debug.location(expr.Token())
 
-	left := c.load(c.acceptExpr(expr.Left), expr.Left.Type())
-	right := c.load(c.acceptExpr(expr.Right), expr.Right.Type())
+	left := c.load(c.acceptExpr(expr.Left), expr.Left.Result().Type)
+	right := c.load(c.acceptExpr(expr.Right), expr.Right.Result().Type)
 
 	switch expr.Op.Kind {
 	case scanner.Or:
@@ -160,7 +160,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 		// End
 		c.writeBlock(end)
 
-		res := c.locals.unnamed(expr.Type())
+		res := c.locals.unnamed(expr.Result().Type)
 		c.writeFmt("%s = phi i1 [ true, %%%s ], [ %s, %%%s ], !dbg %s\n", res, startBlock, right, false_, loc)
 
 		c.exprValue = res
@@ -180,7 +180,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 		// End
 		c.writeBlock(end)
 
-		res := c.locals.unnamed(expr.Type())
+		res := c.locals.unnamed(expr.Result().Type)
 		c.writeFmt("%s = phi i1 [ false, %%%s ], [ %s, %%%s ], !dbg %s\n", res, startBlock, right, true_, loc)
 
 		c.exprValue = res
@@ -219,15 +219,15 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	assignee := c.acceptExpr(expr.Assignee)
 
 	// Value
-	val := c.load(c.acceptExpr(expr.Value), expr.Value.Type())
+	val := c.load(c.acceptExpr(expr.Value), expr.Value.Result().Type)
 
 	if expr.Op.Kind != scanner.Equal {
-		val = c.binary(expr.Op, c.load(assignee, expr.Assignee.Type()), expr.Assignee.Type(), val, expr.Value.Type())
+		val = c.binary(expr.Op, c.load(assignee, expr.Assignee.Result().Type), expr.Assignee.Result().Type, val, expr.Value.Result().Type)
 	}
 
 	// Store
 	loc := c.debug.location(expr.Token())
-	c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(expr.Value.Type()), val, assignee, loc)
+	c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(expr.Value.Result().Type), val, assignee, loc)
 
 	c.exprValue = assignee
 }
@@ -236,32 +236,32 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	loc := c.debug.location(expr.Token())
 	val := c.acceptExpr(expr.Expr)
 
-	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
-		if to, ok := expr.Type().(*types.PrimitiveType); ok {
+	if from, ok := expr.Expr.Result().Type.(*types.PrimitiveType); ok {
+		if to, ok := expr.Result().Type.(*types.PrimitiveType); ok {
 			// primitive to primitive
 			c.castPrimitiveToPrimitive(val, loc, from, to, from.Kind, to.Kind)
 			return
 		}
 	}
 
-	if from, ok := expr.Expr.Type().(*ast.Enum); ok {
-		if to, ok := expr.Type().(*types.PrimitiveType); ok {
+	if from, ok := expr.Expr.Result().Type.(*ast.Enum); ok {
+		if to, ok := expr.Result().Type.(*types.PrimitiveType); ok {
 			// enum to integer
 			c.castPrimitiveToPrimitive(val, loc, from, to, from.Type.(*types.PrimitiveType).Kind, to.Kind)
 			return
 		}
 	}
 
-	if from, ok := expr.Expr.Type().(*types.PrimitiveType); ok {
-		if to, ok := expr.Type().(*ast.Enum); ok {
+	if from, ok := expr.Expr.Result().Type.(*types.PrimitiveType); ok {
+		if to, ok := expr.Result().Type.(*ast.Enum); ok {
 			// integer to enum
 			c.castPrimitiveToPrimitive(val, loc, from, to, from.Kind, to.Type.(*types.PrimitiveType).Kind)
 			return
 		}
 	}
 
-	if _, ok := expr.Expr.Type().(*types.PointerType); ok {
-		if _, ok := expr.Type().(*types.PointerType); ok {
+	if _, ok := expr.Expr.Result().Type.(*types.PointerType); ok {
+		if _, ok := expr.Result().Type.(*types.PointerType); ok {
 			// pointer to pointer
 			c.exprValue = val
 			return
@@ -323,19 +323,19 @@ func (c *codegen) castPrimitiveToPrimitive(val value, loc string, from, to types
 func (c *codegen) VisitCall(expr *ast.Call) {
 	var f *ast.Func
 
-	if v, ok := expr.Callee.Type().(*ast.Func); ok {
+	if v, ok := expr.Callee.Result().Type.(*ast.Func); ok {
 		f = v
 	}
 
 	args := make([]value, len(expr.Args))
 
 	for i, arg := range expr.Args {
-		args[i] = c.load(c.acceptExpr(arg), arg.Type())
+		args[i] = c.load(c.acceptExpr(arg), arg.Result().Type)
 	}
 
 	builder := strings.Builder{}
 
-	type_ := c.getType(expr.Type())
+	type_ := c.getType(expr.Result().Type)
 	callee := c.acceptExpr(expr.Callee)
 
 	if types.IsPrimitive(f.Returns, types.Void) {
@@ -346,7 +346,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 			type_:      types.Primitive(types.Void, core.Range{}),
 		}
 	} else {
-		val := c.locals.unnamed(expr.Type())
+		val := c.locals.unnamed(expr.Result().Type)
 		builder.WriteString(fmt.Sprintf("%s = call %s %s(", val, type_, callee))
 		c.exprValue = val
 	}
@@ -356,7 +356,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 			builder.WriteString(", ")
 		}
 
-		builder.WriteString(fmt.Sprintf("%s %s", c.getType(expr.Args[i].Type()), arg))
+		builder.WriteString(fmt.Sprintf("%s %s", c.getType(expr.Args[i].Result().Type), arg))
 	}
 
 	builder.WriteString("), !dbg ")
@@ -366,23 +366,23 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 }
 
 func (c *codegen) VisitIndex(expr *ast.Index) {
-	val := c.toPtrOrLoad(c.acceptExpr(expr.Value), expr.Value.Type())
-	index := c.load(c.acceptExpr(expr.Index), expr.Index.Type())
+	val := c.toPtrOrLoad(c.acceptExpr(expr.Value), expr.Value.Result().Type)
+	index := c.load(c.acceptExpr(expr.Index), expr.Index.Result().Type)
 
-	if _, ok := expr.Value.Type().(*types.PointerType); ok {
+	if _, ok := expr.Value.Result().Type.(*types.PointerType); ok {
 		res := c.locals.unnamed(val.type_)
 		c.writeFmt("%s = load ptr, ptr %s\n", res, val)
 
 		val = res
 	}
 
-	type_ := c.getType(expr.Type())
+	type_ := c.getType(expr.Result().Type)
 
-	res := c.locals.unnamed(expr.Type())
+	res := c.locals.unnamed(expr.Result().Type)
 	res.needsLoading = true
 
 	loc := c.debug.location(expr.Token())
-	c.writeFmt("%s = getelementptr inbounds %s, %s %s, %s %s, !debg %s\n", res, type_, c.getType(val.type_), val, c.getType(expr.Index.Type()), index, loc)
+	c.writeFmt("%s = getelementptr inbounds %s, %s %s, %s %s, !debg %s\n", res, type_, c.getType(val.type_), val, c.getType(expr.Index.Result().Type), index, loc)
 
 	c.exprValue = res
 }
@@ -392,17 +392,17 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 	if value.identifier == "$enum$" {
 		// Enum
-		case_ := expr.Value.Type().(*ast.Enum).GetCase(expr.Name.Lexeme)
-		c.exprValue = c.locals.constant(strconv.Itoa(case_.Value), expr.Type())
+		case_ := expr.Value.Result().Type.(*ast.Enum).GetCase(expr.Name.Lexeme)
+		c.exprValue = c.locals.constant(strconv.Itoa(case_.Value), expr.Result().Type)
 	} else {
 		// Member
-		val := c.toPtrOrLoad(value, expr.Value.Type())
+		val := c.toPtrOrLoad(value, expr.Value.Result().Type)
 
 		var s *ast.Struct
 
-		if v, ok := expr.Value.Type().(*ast.Struct); ok {
+		if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
 			s = v
-		} else if v, ok := expr.Value.Type().(*types.PointerType); ok {
+		} else if v, ok := expr.Value.Result().Type.(*types.PointerType); ok {
 			if v, ok := v.Pointee.(*ast.Struct); ok {
 				s = v
 
@@ -419,7 +419,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 		i, _ := s.GetField(expr.Name.Lexeme)
 
-		res := c.locals.unnamed(expr.Type())
+		res := c.locals.unnamed(expr.Result().Type)
 		res.needsLoading = true
 
 		loc := c.debug.location(expr.Token())

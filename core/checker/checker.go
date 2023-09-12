@@ -17,6 +17,8 @@ type checker struct {
 
 	loopDepth int
 
+	typeExpr ast.Expr
+
 	reporter utils.Reporter
 	resolver utils.Resolver
 	decls    []ast.Decl
@@ -116,6 +118,10 @@ func (c *checker) VisitType(type_ *types.Type) {
 		} else {
 			c.errorRange(v.Range(), "Unknown type '%s'.", v)
 			*type_ = types.Primitive(types.Void, v.Range())
+
+			if c.typeExpr != nil {
+				c.typeExpr.Result().SetInvalid()
+			}
 		}
 	}
 
@@ -138,7 +144,13 @@ func (c *checker) AcceptStmt(stmt ast.Stmt) {
 
 func (c *checker) AcceptExpr(expr ast.Expr) {
 	expr.Accept(c)
+
+	prevTypeExpr := c.typeExpr
+	c.typeExpr = expr
+
 	expr.AcceptTypesPtr(c)
+
+	c.typeExpr = prevTypeExpr
 }
 
 // Diagnostics

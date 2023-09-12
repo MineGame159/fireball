@@ -175,7 +175,7 @@ func (p *printer) VisitAssignment(expr *Assignment) {
 }
 
 func (p *printer) VisitCast(expr *Cast) {
-	p.print("as %s", expr.Type())
+	p.print("as %s", expr.Result().Type)
 	p.AcceptExpr(expr.Expr)
 }
 

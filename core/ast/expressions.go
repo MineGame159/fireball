@@ -27,8 +27,7 @@ type Expr interface {
 
 	Accept(visitor ExprVisitor)
 
-	Type() types.Type
-	SetType(type_ types.Type)
+	Result() *ExprResult
 }
 
 // Group
@@ -36,7 +35,7 @@ type Expr interface {
 type Group struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Token_ scanner.Token
 	Expr   Expr
@@ -93,13 +92,13 @@ func (g *Group) AcceptChildren(visitor Acceptor) {
 }
 
 func (g *Group) AcceptTypes(visitor types.Visitor) {
-	if g.type_ != nil {
-		visitor.VisitType(g.type_)
+	if g.result.Type != nil {
+		visitor.VisitType(g.result.Type)
 	}
 }
 
 func (g *Group) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&g.type_)
+	visitor.VisitType(&g.result.Type)
 }
 
 func (g *Group) Leaf() bool {
@@ -110,12 +109,8 @@ func (g *Group) String() string {
 	return g.Token().Lexeme
 }
 
-func (g *Group) Type() types.Type {
-	return g.type_
-}
-
-func (g *Group) SetType(type_ types.Type) {
-	g.type_ = type_
+func (g *Group) Result() *ExprResult {
+	return &g.result
 }
 
 func (g *Group) SetChildrenParent() {
@@ -129,7 +124,7 @@ func (g *Group) SetChildrenParent() {
 type Literal struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Value scanner.Token
 }
@@ -182,13 +177,13 @@ func (l *Literal) AcceptChildren(visitor Acceptor) {
 }
 
 func (l *Literal) AcceptTypes(visitor types.Visitor) {
-	if l.type_ != nil {
-		visitor.VisitType(l.type_)
+	if l.result.Type != nil {
+		visitor.VisitType(l.result.Type)
 	}
 }
 
 func (l *Literal) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&l.type_)
+	visitor.VisitType(&l.result.Type)
 }
 
 func (l *Literal) Leaf() bool {
@@ -199,12 +194,8 @@ func (l *Literal) String() string {
 	return l.Token().Lexeme
 }
 
-func (l *Literal) Type() types.Type {
-	return l.type_
-}
-
-func (l *Literal) SetType(type_ types.Type) {
-	l.type_ = type_
+func (l *Literal) Result() *ExprResult {
+	return &l.result
 }
 
 func (l *Literal) SetChildrenParent() {
@@ -215,7 +206,7 @@ func (l *Literal) SetChildrenParent() {
 type Initializer struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Name   scanner.Token
 	Fields []InitField
@@ -274,13 +265,13 @@ func (i *Initializer) AcceptChildren(visitor Acceptor) {
 }
 
 func (i *Initializer) AcceptTypes(visitor types.Visitor) {
-	if i.type_ != nil {
-		visitor.VisitType(i.type_)
+	if i.result.Type != nil {
+		visitor.VisitType(i.result.Type)
 	}
 }
 
 func (i *Initializer) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&i.type_)
+	visitor.VisitType(&i.result.Type)
 }
 
 func (i *Initializer) Leaf() bool {
@@ -291,12 +282,8 @@ func (i *Initializer) String() string {
 	return i.Token().Lexeme
 }
 
-func (i *Initializer) Type() types.Type {
-	return i.type_
-}
-
-func (i *Initializer) SetType(type_ types.Type) {
-	i.type_ = type_
+func (i *Initializer) Result() *ExprResult {
+	return &i.result
 }
 
 func (i *Initializer) SetChildrenParent() {
@@ -319,7 +306,7 @@ type InitField struct {
 type Unary struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Op    scanner.Token
 	Right Expr
@@ -376,13 +363,13 @@ func (u *Unary) AcceptChildren(visitor Acceptor) {
 }
 
 func (u *Unary) AcceptTypes(visitor types.Visitor) {
-	if u.type_ != nil {
-		visitor.VisitType(u.type_)
+	if u.result.Type != nil {
+		visitor.VisitType(u.result.Type)
 	}
 }
 
 func (u *Unary) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&u.type_)
+	visitor.VisitType(&u.result.Type)
 }
 
 func (u *Unary) Leaf() bool {
@@ -393,12 +380,8 @@ func (u *Unary) String() string {
 	return u.Token().Lexeme
 }
 
-func (u *Unary) Type() types.Type {
-	return u.type_
-}
-
-func (u *Unary) SetType(type_ types.Type) {
-	u.type_ = type_
+func (u *Unary) Result() *ExprResult {
+	return &u.result
 }
 
 func (u *Unary) SetChildrenParent() {
@@ -412,7 +395,7 @@ func (u *Unary) SetChildrenParent() {
 type Binary struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Left  Expr
 	Op    scanner.Token
@@ -473,13 +456,13 @@ func (b *Binary) AcceptChildren(visitor Acceptor) {
 }
 
 func (b *Binary) AcceptTypes(visitor types.Visitor) {
-	if b.type_ != nil {
-		visitor.VisitType(b.type_)
+	if b.result.Type != nil {
+		visitor.VisitType(b.result.Type)
 	}
 }
 
 func (b *Binary) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&b.type_)
+	visitor.VisitType(&b.result.Type)
 }
 
 func (b *Binary) Leaf() bool {
@@ -490,12 +473,8 @@ func (b *Binary) String() string {
 	return b.Token().Lexeme
 }
 
-func (b *Binary) Type() types.Type {
-	return b.type_
-}
-
-func (b *Binary) SetType(type_ types.Type) {
-	b.type_ = type_
+func (b *Binary) Result() *ExprResult {
+	return &b.result
 }
 
 func (b *Binary) SetChildrenParent() {
@@ -512,7 +491,7 @@ func (b *Binary) SetChildrenParent() {
 type Logical struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Left  Expr
 	Op    scanner.Token
@@ -573,13 +552,13 @@ func (l *Logical) AcceptChildren(visitor Acceptor) {
 }
 
 func (l *Logical) AcceptTypes(visitor types.Visitor) {
-	if l.type_ != nil {
-		visitor.VisitType(l.type_)
+	if l.result.Type != nil {
+		visitor.VisitType(l.result.Type)
 	}
 }
 
 func (l *Logical) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&l.type_)
+	visitor.VisitType(&l.result.Type)
 }
 
 func (l *Logical) Leaf() bool {
@@ -590,12 +569,8 @@ func (l *Logical) String() string {
 	return l.Token().Lexeme
 }
 
-func (l *Logical) Type() types.Type {
-	return l.type_
-}
-
-func (l *Logical) SetType(type_ types.Type) {
-	l.type_ = type_
+func (l *Logical) Result() *ExprResult {
+	return &l.result
 }
 
 func (l *Logical) SetChildrenParent() {
@@ -612,7 +587,7 @@ func (l *Logical) SetChildrenParent() {
 type Identifier struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Identifier scanner.Token
 	Kind       IdentifierKind
@@ -666,13 +641,13 @@ func (i *Identifier) AcceptChildren(visitor Acceptor) {
 }
 
 func (i *Identifier) AcceptTypes(visitor types.Visitor) {
-	if i.type_ != nil {
-		visitor.VisitType(i.type_)
+	if i.result.Type != nil {
+		visitor.VisitType(i.result.Type)
 	}
 }
 
 func (i *Identifier) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&i.type_)
+	visitor.VisitType(&i.result.Type)
 }
 
 func (i *Identifier) Leaf() bool {
@@ -683,12 +658,8 @@ func (i *Identifier) String() string {
 	return i.Token().Lexeme
 }
 
-func (i *Identifier) Type() types.Type {
-	return i.type_
-}
-
-func (i *Identifier) SetType(type_ types.Type) {
-	i.type_ = type_
+func (i *Identifier) Result() *ExprResult {
+	return &i.result
 }
 
 func (i *Identifier) SetChildrenParent() {
@@ -710,7 +681,7 @@ const (
 type Assignment struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Assignee Expr
 	Op       scanner.Token
@@ -771,13 +742,13 @@ func (a *Assignment) AcceptChildren(visitor Acceptor) {
 }
 
 func (a *Assignment) AcceptTypes(visitor types.Visitor) {
-	if a.type_ != nil {
-		visitor.VisitType(a.type_)
+	if a.result.Type != nil {
+		visitor.VisitType(a.result.Type)
 	}
 }
 
 func (a *Assignment) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&a.type_)
+	visitor.VisitType(&a.result.Type)
 }
 
 func (a *Assignment) Leaf() bool {
@@ -788,12 +759,8 @@ func (a *Assignment) String() string {
 	return a.Token().Lexeme
 }
 
-func (a *Assignment) Type() types.Type {
-	return a.type_
-}
-
-func (a *Assignment) SetType(type_ types.Type) {
-	a.type_ = type_
+func (a *Assignment) Result() *ExprResult {
+	return &a.result
 }
 
 func (a *Assignment) SetChildrenParent() {
@@ -810,7 +777,7 @@ func (a *Assignment) SetChildrenParent() {
 type Cast struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Token_ scanner.Token
 	Expr   Expr
@@ -867,13 +834,13 @@ func (c *Cast) AcceptChildren(visitor Acceptor) {
 }
 
 func (c *Cast) AcceptTypes(visitor types.Visitor) {
-	if c.type_ != nil {
-		visitor.VisitType(c.type_)
+	if c.result.Type != nil {
+		visitor.VisitType(c.result.Type)
 	}
 }
 
 func (c *Cast) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&c.type_)
+	visitor.VisitType(&c.result.Type)
 }
 
 func (c *Cast) Leaf() bool {
@@ -884,12 +851,8 @@ func (c *Cast) String() string {
 	return c.Token().Lexeme
 }
 
-func (c *Cast) Type() types.Type {
-	return c.type_
-}
-
-func (c *Cast) SetType(type_ types.Type) {
-	c.type_ = type_
+func (c *Cast) Result() *ExprResult {
+	return &c.result
 }
 
 func (c *Cast) SetChildrenParent() {
@@ -903,7 +866,7 @@ func (c *Cast) SetChildrenParent() {
 type Call struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Token_ scanner.Token
 	Callee Expr
@@ -966,13 +929,13 @@ func (c *Call) AcceptChildren(visitor Acceptor) {
 }
 
 func (c *Call) AcceptTypes(visitor types.Visitor) {
-	if c.type_ != nil {
-		visitor.VisitType(c.type_)
+	if c.result.Type != nil {
+		visitor.VisitType(c.result.Type)
 	}
 }
 
 func (c *Call) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&c.type_)
+	visitor.VisitType(&c.result.Type)
 }
 
 func (c *Call) Leaf() bool {
@@ -983,12 +946,8 @@ func (c *Call) String() string {
 	return c.Token().Lexeme
 }
 
-func (c *Call) Type() types.Type {
-	return c.type_
-}
-
-func (c *Call) SetType(type_ types.Type) {
-	c.type_ = type_
+func (c *Call) Result() *ExprResult {
+	return &c.result
 }
 
 func (c *Call) SetChildrenParent() {
@@ -1007,7 +966,7 @@ func (c *Call) SetChildrenParent() {
 type Index struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Token_ scanner.Token
 	Value  Expr
@@ -1068,13 +1027,13 @@ func (i *Index) AcceptChildren(visitor Acceptor) {
 }
 
 func (i *Index) AcceptTypes(visitor types.Visitor) {
-	if i.type_ != nil {
-		visitor.VisitType(i.type_)
+	if i.result.Type != nil {
+		visitor.VisitType(i.result.Type)
 	}
 }
 
 func (i *Index) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&i.type_)
+	visitor.VisitType(&i.result.Type)
 }
 
 func (i *Index) Leaf() bool {
@@ -1085,12 +1044,8 @@ func (i *Index) String() string {
 	return i.Token().Lexeme
 }
 
-func (i *Index) Type() types.Type {
-	return i.type_
-}
-
-func (i *Index) SetType(type_ types.Type) {
-	i.type_ = type_
+func (i *Index) Result() *ExprResult {
+	return &i.result
 }
 
 func (i *Index) SetChildrenParent() {
@@ -1107,7 +1062,7 @@ func (i *Index) SetChildrenParent() {
 type Member struct {
 	range_ core.Range
 	parent Node
-	type_  types.Type
+	result ExprResult
 
 	Value Expr
 	Name  scanner.Token
@@ -1164,13 +1119,13 @@ func (m *Member) AcceptChildren(visitor Acceptor) {
 }
 
 func (m *Member) AcceptTypes(visitor types.Visitor) {
-	if m.type_ != nil {
-		visitor.VisitType(m.type_)
+	if m.result.Type != nil {
+		visitor.VisitType(m.result.Type)
 	}
 }
 
 func (m *Member) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&m.type_)
+	visitor.VisitType(&m.result.Type)
 }
 
 func (m *Member) Leaf() bool {
@@ -1181,12 +1136,8 @@ func (m *Member) String() string {
 	return m.Token().Lexeme
 }
 
-func (m *Member) Type() types.Type {
-	return m.type_
-}
-
-func (m *Member) SetType(type_ types.Type) {
-	m.type_ = type_
+func (m *Member) Result() *ExprResult {
+	return &m.result
 }
 
 func (m *Member) SetChildrenParent() {

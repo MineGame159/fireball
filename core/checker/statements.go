@@ -19,18 +19,34 @@ func (c *checker) VisitExpression(stmt *ast.Expression) {
 func (c *checker) VisitVariable(stmt *ast.Variable) {
 	stmt.AcceptChildren(c)
 
-	// Check initializer type
-	if stmt.Type == nil {
-		if stmt.Initializer == nil {
-			c.errorToken(stmt.Name, "Variable with no initializer needs to have an explicit type.")
-			stmt.Type = types.Primitive(types.Void, core.Range{})
-		} else {
-			stmt.Type = stmt.Initializer.Type().WithoutRange()
-		}
+	// Check initializer value
+	valueOk := true
+
+	// TODO: Somehow make this code nicer lmao
+	if stmt.Initializer != nil && stmt.Initializer.Result().Kind == ast.InvalidResultKind {
+		valueOk = false
 	} else {
-		if stmt.Initializer != nil && !stmt.Initializer.Type().CanAssignTo(stmt.Type) {
-			c.errorRange(stmt.Initializer.Range(), "Initializer with type '%s' cannot be assigned to a variable with type '%s'.", stmt.Initializer.Type(), stmt.Type)
+		if stmt.Initializer != nil && stmt.Initializer.Result().Kind != ast.ValueResultKind {
+			c.errorRange(stmt.Initializer.Range(), "Invalid value.")
+			valueOk = false
+		} else {
+			if stmt.Type == nil {
+				if stmt.Initializer == nil {
+					c.errorToken(stmt.Name, "Variable with no initializer needs to have an explicit type.")
+					valueOk = false
+				} else {
+					stmt.Type = stmt.Initializer.Result().Type
+				}
+			} else {
+				if stmt.Initializer != nil && !stmt.Initializer.Result().Type.CanAssignTo(stmt.Type) {
+					c.errorRange(stmt.Initializer.Range(), "Initializer with type '%s' cannot be assigned to a variable with type '%s'.", stmt.Initializer.Result().Type, stmt.Type)
+				}
+			}
 		}
+	}
+
+	if !valueOk {
+		stmt.Type = types.Primitive(types.Void, core.Range{})
 	}
 
 	// Check name collision
@@ -41,7 +57,7 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 	}
 
 	// Check void type
-	if types.IsPrimitive(stmt.Type, types.Void) {
+	if valueOk && types.IsPrimitive(stmt.Type, types.Void) {
 		c.errorToken(stmt.Name, "Variable cannot be of type 'void'.")
 	}
 }
@@ -49,9 +65,13 @@ func (c *checker) VisitVariable(stmt *ast.Variable) {
 func (c *checker) VisitIf(stmt *ast.If) {
 	stmt.AcceptChildren(c)
 
-	// Check condition type
-	if !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
-		c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
+	// Check condition value
+	if stmt.Condition.Result().Kind != ast.ValueResultKind {
+		c.errorRange(stmt.Condition.Range(), "Invalid value.")
+	} else {
+		if !types.IsPrimitive(stmt.Condition.Result().Type, types.Bool) {
+			c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Result().Type)
+		}
 	}
 }
 
@@ -61,21 +81,30 @@ func (c *checker) VisitFor(stmt *ast.For) {
 	stmt.AcceptChildren(c)
 	c.loopDepth--
 
-	// Check condition type
-	if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Type(), types.Bool) {
-		c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Type())
+	// Check condition value
+	if stmt.Condition.Result().Kind != ast.ValueResultKind {
+		c.errorRange(stmt.Condition.Range(), "Invalid value.")
+	} else {
+		if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Result().Type, types.Bool) {
+			c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Result().Type)
+		}
 	}
 }
 
 func (c *checker) VisitReturn(stmt *ast.Return) {
 	stmt.AcceptChildren(c)
 
-	// Check return type
+	// Check return value
 	var type_ types.Type
 	var range_ core.Range
 
 	if stmt.Expr != nil {
-		type_ = stmt.Expr.Type().WithoutRange()
+		if stmt.Expr.Result().Kind != ast.ValueResultKind {
+			c.errorRange(stmt.Expr.Range(), "Invalid value.")
+			return
+		}
+
+		type_ = stmt.Expr.Result().Type
 		range_ = stmt.Expr.Range()
 	} else {
 		type_ = types.Primitive(types.Void, core.Range{})

@@ -32,8 +32,8 @@ func (c *codegen) VisitVariable(stmt *ast.Variable) {
 
 	// Initializer
 	if stmt.Initializer != nil {
-		init := c.load(c.acceptExpr(stmt.Initializer), stmt.Initializer.Type())
-		c.writeFmt("store %s %s, ptr %s\n", c.getType(stmt.Initializer.Type()), init, val)
+		init := c.load(c.acceptExpr(stmt.Initializer), stmt.Initializer.Result().Type)
+		c.writeFmt("store %s %s, ptr %s\n", c.getType(stmt.Initializer.Result().Type), init, val)
 	}
 
 	// Debug
@@ -61,7 +61,7 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	}
 
 	// Condition
-	condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
+	condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Result().Type)
 	loc := c.debug.location(stmt.Token())
 
 	c.writeFmt("br i1 %s, label %%%s, label %%%s, !dbg %s\n", condition, then, else_, loc)
@@ -97,7 +97,7 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 		body = c.blocks.unnamedRaw()
 		c.loopEnd = c.blocks.unnamedRaw()
 
-		condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Type())
+		condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Result().Type)
 		loc := c.debug.location(stmt.Token())
 
 		c.writeFmt("br i1 %s, label %%%s, label %%%s, !dbg %s\n", condition, body, c.loopEnd, loc)
@@ -129,8 +129,8 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		c.writeFmt("ret void, !dbg %s\n", loc)
 	} else {
 		// Other
-		val := c.load(c.acceptExpr(stmt.Expr), stmt.Expr.Type())
-		c.writeFmt("ret %s %s, !dbg %s\n", c.getType(stmt.Expr.Type()), val, loc)
+		val := c.load(c.acceptExpr(stmt.Expr), stmt.Expr.Result().Type)
+		c.writeFmt("ret %s %s, !dbg %s\n", c.getType(stmt.Expr.Result().Type), val, loc)
 	}
 }
 

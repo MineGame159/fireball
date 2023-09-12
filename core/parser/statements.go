@@ -112,7 +112,7 @@ func (p *parser) variable() ast.Stmt {
 
 	if !p.check(scanner.Equal) {
 		type__ := p.parseType()
-		if type_ == nil {
+		if type__ == nil {
 			return nil
 		}
 

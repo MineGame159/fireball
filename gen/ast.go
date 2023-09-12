@@ -345,8 +345,7 @@ func generate(w *writer, kind string, items []item) {
 
 	if kind == "Expr" {
 		w.write("")
-		w.write("Type() types.Type")
-		w.write("SetType(type_ types.Type)")
+		w.write("Result() *ExprResult")
 	}
 
 	w.write("}")
@@ -381,7 +380,7 @@ func generate(w *writer, kind string, items []item) {
 				w.write("parent Node")
 
 				if kind == "Expr" {
-					w.write("type_ types.Type")
+					w.write("result ExprResult")
 				}
 
 				w.write("")
@@ -473,13 +472,13 @@ func generate(w *writer, kind string, items []item) {
 				})
 
 				// AcceptTypes
-				genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(taget string) bool {
-					return taget == "Type"
+				genVisitor(w, kind, items, item, short, method, "AcceptTypes", false, "types.Visitor", "VisitType", func(target string) bool {
+					return target == "Type"
 				})
 
 				// AcceptTypesPtr
-				genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(taget string) bool {
-					return taget == "Type"
+				genVisitor(w, kind, items, item, short, method, "AcceptTypesPtr", true, "types.PtrVisitor", "VisitType", func(target string) bool {
+					return target == "Type"
 				})
 
 				// Leaf
@@ -498,15 +497,9 @@ func generate(w *writer, kind string, items []item) {
 
 				// Expr
 				if kind == "Expr" {
-					// Type
-					w.write("%s Type() types.Type {", method)
-					w.write("return %c.type_", short)
-					w.write("}")
-					w.write("")
-
-					// SetType
-					w.write("%s SetType(type_ types.Type) {", method)
-					w.write("%c.type_ = type_", short)
+					// Result
+					w.write("%s Result() *ExprResult {", method)
+					w.write("return &%c.result", short)
 					w.write("}")
 					w.write("")
 				}
@@ -540,7 +533,7 @@ func genVisitor(w *writer, kind string, items []item, item item, short uint8, me
 	}
 
 	if kind == "Expr" && target("Type") {
-		genVisit(w, ptr, "VisitType", fmt.Sprintf("%s%c.type_", ptrStr, short))
+		genVisit(w, ptr, "VisitType", fmt.Sprintf("%s%c.result.Type", ptrStr, short))
 	}
 
 	visitRecursive(w, items, item, string(short), target, func(path, type_ string) {
