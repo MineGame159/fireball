@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fireball/core"
 	"fireball/core/types"
 )
 
@@ -52,11 +53,17 @@ func (e *ExprResult) SetType(type_ types.Type) {
 func (e *ExprResult) SetFunction(function *Func) {
 	e.Kind = FunctionResultKind
 	e.Flags = 0
-	e.Type = function.WithoutRange()
+	e.Type = function.WithRange(core.Range{})
 	e.Function = function
 }
 
 func (e *ExprResult) SetValue(type_ types.Type, flags ExprResultFlags) {
+	e.Kind = ValueResultKind
+	e.Flags = flags
+	e.Type = type_.WithRange(core.Range{})
+}
+
+func (e *ExprResult) SetValueRaw(type_ types.Type, flags ExprResultFlags) {
 	e.Kind = ValueResultKind
 	e.Flags = flags
 	e.Type = type_

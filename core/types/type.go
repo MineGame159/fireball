@@ -8,7 +8,7 @@ type Type interface {
 	Range() core.Range
 	Size() int
 
-	WithoutRange() Type
+	WithRange(range_ core.Range) Type
 
 	Equals(other Type) bool
 	CanAssignTo(other Type) bool

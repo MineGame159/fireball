@@ -47,9 +47,10 @@ func (p *PrimitiveType) Size() int {
 	}
 }
 
-func (p *PrimitiveType) WithoutRange() Type {
+func (p *PrimitiveType) WithRange(range_ core.Range) Type {
 	return &PrimitiveType{
-		Kind: p.Kind,
+		range_: range_,
+		Kind:   p.Kind,
 	}
 }
 

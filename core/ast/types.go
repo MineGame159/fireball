@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fireball/core"
 	"fireball/core/types"
 )
 
@@ -16,8 +17,9 @@ func (s *Struct) Size() int {
 	return size
 }
 
-func (s *Struct) WithoutRange() types.Type {
+func (s *Struct) WithRange(range_ core.Range) types.Type {
 	return &Struct{
+		range_: range_,
 		parent: s.parent,
 		Name:   s.Name,
 		Fields: s.Fields,
@@ -53,8 +55,9 @@ func (e *Enum) Size() int {
 	return e.Type.Size()
 }
 
-func (e *Enum) WithoutRange() types.Type {
+func (e *Enum) WithRange(range_ core.Range) types.Type {
 	return &Enum{
+		range_:    range_,
 		parent:    e.parent,
 		Name:      e.Name,
 		Type:      e.Type,
@@ -93,8 +96,9 @@ func (f *Func) Size() int {
 	return 4
 }
 
-func (f *Func) WithoutRange() types.Type {
+func (f *Func) WithRange(range_ core.Range) types.Type {
 	return &Func{
+		range_:   range_,
 		parent:   f.parent,
 		Extern:   f.Extern,
 		Name:     f.Name,

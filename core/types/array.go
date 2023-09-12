@@ -28,10 +28,11 @@ func (a *ArrayType) Size() int {
 	return int(a.Count) * a.Base.Size()
 }
 
-func (a *ArrayType) WithoutRange() Type {
+func (a *ArrayType) WithRange(range_ core.Range) Type {
 	return &ArrayType{
-		Count: a.Count,
-		Base:  a.Base.WithoutRange(),
+		range_: range_,
+		Count:  a.Count,
+		Base:   a.Base.WithRange(core.Range{}),
 	}
 }
 

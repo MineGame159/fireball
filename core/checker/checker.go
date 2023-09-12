@@ -114,7 +114,7 @@ func (c *checker) peekScope() *scope {
 func (c *checker) VisitType(type_ *types.Type) {
 	if v, ok := (*type_).(*types.UnresolvedType); ok {
 		if t, _ := c.resolver.GetType(v.Identifier.Lexeme); t != nil {
-			*type_ = t.WithoutRange()
+			*type_ = t.WithRange(v.Range())
 		} else {
 			c.errorRange(v.Range(), "Unknown type '%s'.", v)
 			*type_ = types.Primitive(types.Void, v.Range())

@@ -513,7 +513,7 @@ func (p *parser) finishCast(value ast.Expr) ast.Expr {
 
 	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	expr.SetChildrenParent()
-	expr.Result().SetValue(type_, 0)
+	expr.Result().SetValueRaw(type_, 0)
 
 	return expr
 }

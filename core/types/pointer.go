@@ -24,9 +24,10 @@ func (p *PointerType) Size() int {
 	return 4
 }
 
-func (p *PointerType) WithoutRange() Type {
+func (p *PointerType) WithRange(range_ core.Range) Type {
 	return &PointerType{
-		Pointee: p.Pointee.WithoutRange(),
+		range_:  range_,
+		Pointee: p.Pointee.WithRange(core.Range{}),
 	}
 }
 

@@ -73,7 +73,7 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 		return
 	}
 
-	expr.Result().SetValue(type_.WithoutRange(), 0)
+	expr.Result().SetValue(type_, 0)
 
 	// Check fields
 	assignedFields := utils.NewSet[string]()
@@ -139,7 +139,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 
 		if v, ok := expr.Right.Result().Type.(*types.PrimitiveType); ok {
 			if types.IsFloating(v.Kind) || types.IsSigned(v.Kind) {
-				expr.Result().SetValue(expr.Right.Result().Type.WithoutRange(), 0)
+				expr.Result().SetValue(expr.Right.Result().Type, 0)
 				return
 			}
 		}
@@ -152,7 +152,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			c.errorRange(expr.Right.Range(), "Cannot take address of this expression.")
 		}
 
-		expr.Result().SetValue(types.Pointer(expr.Right.Result().Type.WithoutRange(), core.Range{}), 0)
+		expr.Result().SetValue(types.Pointer(expr.Right.Result().Type, core.Range{}), 0)
 
 	case scanner.Star:
 		if expr.Right.Result().Kind != ast.ValueResultKind {
@@ -163,7 +163,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		}
 
 		if p, ok := expr.Right.Result().Type.(*types.PointerType); ok {
-			expr.Result().SetValue(p.Pointee.WithoutRange(), 0)
+			expr.Result().SetValue(p.Pointee, 0)
 		} else {
 			c.errorRange(expr.Right.Range(), "Can only dereference pointer types, not '%s'.", expr.Right.Result().Type)
 			expr.Result().SetInvalid()
@@ -208,7 +208,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := leftType.(*types.PrimitiveType); ok {
 			if right, ok := rightType.(*types.PrimitiveType); ok {
 				if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left.Equals(right) {
-					expr.Result().SetValue(leftType.WithoutRange(), 0)
+					expr.Result().SetValue(leftType, 0)
 					return
 				}
 			}
@@ -264,7 +264,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := leftType.(*types.PrimitiveType); ok {
 			if right, ok := rightType.(*types.PrimitiveType); ok {
 				if left.Equals(right) && types.IsInteger(left.Kind) {
-					expr.Result().SetValue(leftType.WithoutRange(), 0)
+					expr.Result().SetValue(leftType, 0)
 					return
 				}
 			}
@@ -344,7 +344,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	// Enum
 	if t, _ := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
 		if e, ok := t.(*ast.Enum); ok {
-			expr.Result().SetType(e.WithoutRange())
+			expr.Result().SetType(e)
 			expr.Kind = ast.EnumKind
 
 			return
@@ -355,7 +355,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	if variable := c.getVariable(expr.Identifier); variable != nil {
 		variable.used = true
 
-		expr.Result().SetValue(variable.type_.WithoutRange(), ast.AssignableFlag|ast.AddressableFlag)
+		expr.Result().SetValue(variable.type_, ast.AssignableFlag|ast.AddressableFlag)
 
 		if variable.param {
 			expr.Kind = ast.ParameterKind
@@ -426,7 +426,7 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	}
 
 	// Set result
-	expr.Result().SetValue(expr.Value.Result().Type.WithoutRange(), 0)
+	expr.Result().SetValue(expr.Value.Result().Type, 0)
 }
 
 func (c *checker) VisitCast(expr *ast.Cast) {
@@ -530,7 +530,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 	}
 
 	// Set result
-	expr.Result().SetValue(function.Returns.WithoutRange(), 0)
+	expr.Result().SetValue(function.Returns, 0)
 }
 
 func (c *checker) VisitIndex(expr *ast.Index) {
@@ -585,7 +585,7 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	}
 
 	// Set result
-	expr.Result().SetValue(base.WithoutRange(), ast.AssignableFlag|ast.AddressableFlag)
+	expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag)
 }
 
 func (c *checker) VisitMember(expr *ast.Member) {
@@ -604,7 +604,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 					c.errorToken(expr.Name, "Enum '%s' does not contain case '%s'.", v, expr.Name)
 				}
 
-				expr.Result().SetValue(v.WithoutRange(), 0)
+				expr.Result().SetValue(v, 0)
 				return
 			}
 		}
@@ -645,7 +645,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			return
 		}
 
-		expr.Result().SetValue(field.Type.WithoutRange(), ast.AssignableFlag|ast.AddressableFlag)
+		expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag)
 		return
 	}
 

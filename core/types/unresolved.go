@@ -25,8 +25,9 @@ func (u *UnresolvedType) Size() int {
 	return 0
 }
 
-func (u *UnresolvedType) WithoutRange() Type {
+func (u *UnresolvedType) WithRange(range_ core.Range) Type {
 	return &UnresolvedType{
+		range_:     range_,
 		Identifier: u.Identifier,
 	}
 }
