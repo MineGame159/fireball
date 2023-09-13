@@ -7,6 +7,7 @@ import (
 	"fireball/core/types"
 	"fmt"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -23,8 +24,28 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	case scanner.Nil:
 		raw = "null"
 
-	case scanner.True, scanner.False, scanner.Number:
+	case scanner.True, scanner.False:
 		raw = expr.Value.Lexeme
+
+	case scanner.Number:
+		raw = expr.Value.Lexeme
+		last := raw[len(raw)-1]
+
+		if last == 'f' || last == 'F' {
+			v, _ := strconv.ParseFloat(raw[:len(raw)-1], 32)
+			raw = fmt.Sprintf("0x%X", math.Float64bits(v))
+		} else if strings.ContainsRune(raw, '.') {
+			v, _ := strconv.ParseFloat(raw, 64)
+			raw = fmt.Sprintf("0x%X", math.Float64bits(v))
+		}
+
+	case scanner.Hex:
+		v, _ := strconv.ParseUint(expr.Value.Lexeme[2:], 16, 64)
+		raw = strconv.FormatUint(v, 10)
+
+	case scanner.Binary:
+		v, _ := strconv.ParseUint(expr.Value.Lexeme[2:], 2, 64)
+		raw = strconv.FormatUint(v, 10)
 
 	case scanner.Character:
 		c := expr.Value.Lexeme[1 : len(expr.Value.Lexeme)-1]
@@ -456,7 +477,7 @@ func (c *codegen) binary(op scanner.Token, left value, leftType types.Type, righ
 	case scanner.Star, scanner.StarEqual:
 		inst = ternary(floating, "fmul", "mul")
 	case scanner.Slash, scanner.SlashEqual:
-		inst = ternary(floating, "fdiv", "div")
+		inst = ternary(floating, "fdiv", ternary(signed, "sdiv", "udiv"))
 	case scanner.Percentage, scanner.PercentageEqual:
 		inst = ternary(floating, "frem", ternary(signed, "srem", "urem"))
 

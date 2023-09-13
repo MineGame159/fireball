@@ -46,6 +46,9 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 }
 
 func (c *checker) VisitFunc(decl *ast.Func) {
+	// Need to resolve return type sooner
+	decl.AcceptTypesPtr(c)
+
 	// Push scope
 	c.function = decl
 	c.pushScope()

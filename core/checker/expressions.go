@@ -7,6 +7,7 @@ import (
 	"fireball/core/types"
 	"fireball/core/utils"
 	"log"
+	"strconv"
 	"strings"
 )
 
@@ -31,13 +32,54 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 		kind = types.Bool
 
 	case scanner.Number:
-		if strings.HasSuffix(expr.Value.Lexeme, "f") {
+		raw := expr.Value.Lexeme
+		last := raw[len(raw)-1]
+
+		if last == 'f' || last == 'F' {
+			_, err := strconv.ParseFloat(raw[:len(raw)-1], 32)
+			if err != nil {
+				c.errorToken(expr.Value, "Invalid float.")
+				expr.Result().SetInvalid()
+
+				return
+			}
+
 			kind = types.F32
-		} else if strings.ContainsRune(expr.Value.Lexeme, '.') {
+		} else if strings.ContainsRune(raw, '.') {
+			_, err := strconv.ParseFloat(raw, 64)
+			if err != nil {
+				c.errorToken(expr.Value, "Invalid double.")
+				expr.Result().SetInvalid()
+
+				return
+			}
+
 			kind = types.F64
 		} else {
 			kind = types.I32
 		}
+
+	case scanner.Hex:
+		_, err := strconv.ParseUint(expr.Value.Lexeme[2:], 16, 64)
+		if err != nil {
+			c.errorToken(expr.Value, "Invalid hex integer.")
+			expr.Result().SetInvalid()
+
+			return
+		}
+
+		kind = types.U32
+
+	case scanner.Binary:
+		_, err := strconv.ParseUint(expr.Value.Lexeme[2:], 2, 64)
+		if err != nil {
+			c.errorToken(expr.Value, "Invalid binary integer.")
+			expr.Result().SetInvalid()
+
+			return
+		}
+
+		kind = types.U32
 
 	case scanner.Character:
 		kind = types.U8

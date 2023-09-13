@@ -9,43 +9,12 @@ enum Animal {
 }
 
 func main() i32 {
-    var pos = Vec2 { x: 2, y: 6 };
-    print(&pos.x);
-
+    printf("%d\n", 5);
+    printf("%d\n", 0x05FF);
+    printf("%d\n", 0b1001);
     printf("\n");
-
-    var animal = 9 as Animal;
-    printf("Dog: %d\n", animal == Animal.Dog);
-    printf("Cat: %d\n", animal == Animal.Cat);
-
-    printf("\n");
-    shadowing();
-
-    printf("\n");
-    printf("4 << 2 = %d\n", 4 << 2);
+    printf("%f\n", 1.0f as f64); // Idk why but C casts it to double or else it prints 0
+    printf("%f\n", 2.0);
 
     return 0;
-}
-
-func foo() {
-    var p1 Vec2;
-    p1.x = 5;
-
-    var p2 *Vec2;
-    p2.x = 5;
-
-    var p3 **Vec2;
-    //p3.x = 5;
-}
-
-func shadowing() {
-    var text = "outer\n";
-
-    {
-        printf(text);
-        var text = "inner\n";
-        printf(text);
-    }
-
-    printf(text);
 }

@@ -33,7 +33,7 @@ func (s *Scanner) Next() Token {
 		return s.identifier()
 	}
 	if isDigit(c) || (c == '-' && isDigit(s.peek())) {
-		return s.number()
+		return s.number(c)
 	}
 
 	switch c {
@@ -168,7 +168,26 @@ func (s *Scanner) checkKeyword(start int, rest string, kind TokenKind) TokenKind
 	return Identifier
 }
 
-func (s *Scanner) number() Token {
+func (s *Scanner) number(c uint8) Token {
+	next := s.peek()
+
+	// Hex
+	if c == '0' && (next == 'x' || next == 'X') {
+		s.advance()
+		return s.hex()
+	}
+
+	// Binary
+	if c == '0' && (next == 'b' || next == 'B') {
+		s.advance()
+		return s.binary()
+	}
+
+	// Integers or floats
+	return s.integerOrFloat()
+}
+
+func (s *Scanner) integerOrFloat() Token {
 	for isDigit(s.peek()) {
 		s.advance()
 	}
@@ -181,9 +200,27 @@ func (s *Scanner) number() Token {
 		}
 	}
 
-	s.match('f')
+	if s.peek() == 'f' || s.peek() == 'F' {
+		s.advance()
+	}
 
 	return s.make(Number)
+}
+
+func (s *Scanner) hex() Token {
+	for isHex(s.peek()) {
+		s.advance()
+	}
+
+	return s.make(Hex)
+}
+
+func (s *Scanner) binary() Token {
+	for isBinary(s.peek()) {
+		s.advance()
+	}
+
+	return s.make(Binary)
 }
 
 func (s *Scanner) string() Token {
@@ -350,4 +387,12 @@ func isAlpha(c uint8) bool {
 
 func isDigit(c uint8) bool {
 	return c >= '0' && c <= '9'
+}
+
+func isHex(c uint8) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+func isBinary(c uint8) bool {
+	return c == '0' || c == '1'
 }

@@ -5,6 +5,7 @@ import (
 	"fireball/core/ast"
 	"github.com/MineGame159/protocol"
 	"strconv"
+	"strings"
 )
 
 func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
@@ -13,7 +14,34 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 		node := ast.GetLeaf(decl, pos)
 
 		if expr, ok := node.(ast.Expr); ok && expr.Result().Kind != ast.InvalidResultKind {
-			if i, ok := node.(*ast.Initializer); ok {
+			if l, ok := node.(*ast.Literal); ok {
+				// ast.Literal
+				text := ""
+
+				if strings.HasPrefix(l.Value.Lexeme, "0x") || strings.HasPrefix(l.Value.Lexeme, "0X") {
+					v, err := strconv.ParseUint(l.Value.Lexeme[2:], 16, 64)
+					if err == nil {
+						text = strconv.FormatUint(v, 10)
+					}
+				} else if strings.HasPrefix(l.Value.Lexeme, "0b") || strings.HasPrefix(l.Value.Lexeme, "0B") {
+					v, err := strconv.ParseUint(l.Value.Lexeme[2:], 2, 64)
+					if err == nil {
+						text = strconv.FormatUint(v, 10)
+					}
+				}
+
+				if text != "" {
+					return &protocol.Hover{
+						Contents: protocol.MarkupContent{
+							Kind:  protocol.PlainText,
+							Value: text,
+						},
+						Range: convertRangePtr(l.Range()),
+					}
+				}
+
+				return nil
+			} else if i, ok := node.(*ast.Initializer); ok {
 				// ast.Initializer
 				for _, field := range i.Fields {
 					range_ := core.TokenToRange(field.Name)

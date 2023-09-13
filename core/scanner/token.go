@@ -61,6 +61,8 @@ const (
 	Enum
 
 	Number
+	Hex
+	Binary
 	Character
 	String
 	Identifier

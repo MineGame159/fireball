@@ -23,7 +23,7 @@ func GetBuildCmd() *cobra.Command {
 	}
 }
 
-func buildCmd(_ *cobra.Command, args []string) {
+func buildCmd(_ *cobra.Command, _ []string) {
 	buildProject()
 }
 
@@ -116,6 +116,7 @@ declare i32 @fb$main()
 	l := build.Linker{Crt: true}
 
 	l.AddLibrary("c")
+	l.AddLibrary("m")
 
 	for _, irPath := range irPaths {
 		l.AddInput(irPath[:len(irPath)-3] + ".o")

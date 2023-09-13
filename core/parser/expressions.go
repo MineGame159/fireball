@@ -520,7 +520,7 @@ func (p *parser) finishCast(value ast.Expr) ast.Expr {
 
 func (p *parser) primary() ast.Expr {
 	// nil true false 0.0 'c' "str"
-	if p.match(scanner.Nil, scanner.True, scanner.False, scanner.Number, scanner.Character, scanner.String) {
+	if p.match(scanner.Nil, scanner.True, scanner.False, scanner.Number, scanner.Hex, scanner.Binary, scanner.Character, scanner.String) {
 		expr := &ast.Literal{
 			Value: p.current,
 		}
