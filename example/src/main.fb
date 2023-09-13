@@ -9,13 +9,14 @@ enum Animal {
 }
 
 func main() i32 {
-    var number = 5;
+    printVec(Vec2 { x: 2, y: 5 });
+    printVec(Vec2 { x: 2 });
+    printVec(Vec2 { y: 5 });
+    printVec(Vec2 {});
 
-    for (var i = 0; i < 2; i += 1) {
-        for (var j = 0; j < 3; j += 1) {
-            printf("%d %d\n", i, j);
-        }
-    }
+    return 0;
+}
 
-    return number - number;
+func printVec(vec Vec2) {
+    printf("X: %d, Y: %d\n", vec.x, vec.y);
 }

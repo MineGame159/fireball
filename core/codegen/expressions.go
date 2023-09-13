@@ -82,29 +82,23 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 }
 
 func (c *codegen) VisitInitializer(expr *ast.Initializer) {
-	// TODO: Use LLVM's structure literal syntax if possible, aka if all fields are assigned
 	struct_, _ := expr.Result().Type.(*ast.Struct)
 	type_ := c.getType(expr.Result().Type)
 
-	// Allocate struct
-	res := c.locals.unnamed(expr.Result().Type)
-	c.writeFmt("%s = alloca %s\n", res, type_)
+	res := c.locals.constant("zeroinitializer", expr.Result().Type)
 
-	// Assign fields
 	for _, field := range expr.Fields {
-		i, _ := struct_.GetField(field.Name.Lexeme)
+		loc := c.debug.location(field.Name)
+		newRes := c.locals.unnamed(expr.Result().Type)
 
 		value := c.load(c.acceptExpr(field.Value), field.Value.Result().Type)
+		i, _ := struct_.GetField(field.Name.Lexeme)
 
-		ptr := c.locals.unnamed(expr.Result().Type)
-		loc := c.debug.location(field.Name)
+		c.writeFmt("%s = insertvalue %s %s, %s %s, %d, !dbg %s\n", newRes, type_, res, c.getType(field.Value.Result().Type), value, i, loc)
 
-		c.writeFmt("%s = getelementptr inbounds %s, ptr %s, i32 0, i32 %d\n", ptr, type_, res, i)
-		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(field.Value.Result().Type), value, ptr, loc)
+		res = newRes
 	}
 
-	// Return
-	res.needsLoading = true
 	c.exprValue = res
 }
 
