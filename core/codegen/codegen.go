@@ -24,6 +24,11 @@ type typeDbgPair struct {
 	name  string
 }
 
+type importedFunc struct {
+	function *ast.Func
+	value    exprValue
+}
+
 type codegen struct {
 	path     string
 	resolver utils.Resolver
@@ -37,7 +42,7 @@ type codegen struct {
 
 	constants         []constant
 	types             []typeValuePair
-	importedFunctions []value
+	importedFunctions []importedFunc
 
 	scopes    []scope
 	variables []variable
@@ -47,7 +52,7 @@ type codegen struct {
 	loopStart string
 	loopEnd   string
 
-	exprValue value
+	exprResult exprValue
 
 	writer io.Writer
 	depth  int
@@ -59,8 +64,8 @@ type scope struct {
 }
 
 type variable struct {
-	name scanner.Token
-	val  value
+	name  scanner.Token
+	value exprValue
 }
 
 func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writer) {
@@ -89,7 +94,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 
 	for _, pair := range c.types {
 		if v, ok := pair.type_.(*ast.Struct); ok {
-			c.writeRaw(pair.val.identifier)
+			c.writeRaw(pair.identifier)
 			c.writeRaw(" = type { ")
 
 			for i, field := range v.Fields {
@@ -97,7 +102,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 					c.writeRaw(", ")
 				}
 
-				c.writeRaw(c.getType(field.Type).identifier)
+				c.writeRaw(c.getType(field.Type))
 			}
 
 			c.writeRaw(" }\n")
@@ -113,9 +118,9 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 
 	// Import functions
 	for _, f := range c.importedFunctions {
-		type_ := f.type_.(*ast.Func)
+		type_ := f.function
 
-		c.writeFmt("declare %s %s(", c.getType(type_.Returns), f.identifier)
+		c.writeFmt("declare %s %s(", c.getType(type_.Returns), f.value.identifier)
 
 		for i, param := range type_.Params {
 			if i > 0 {
@@ -154,26 +159,26 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 
 // IR
 
-func (c *codegen) load(val value, type_ types.Type) value {
-	if val.needsLoading {
-		res := c.locals.unnamed(val.type_)
-		c.writeFmt("%s = load %s, ptr %s\n", res, c.getType(type_), val)
+func (c *codegen) load(value exprValue, type_ types.Type) exprValue {
+	if value.addressable {
+		result := c.locals.unnamed()
+		c.writeFmt("%s = load %s, ptr %s\n", result, c.getType(type_), value)
 
-		return res
+		return result
 	}
 
-	return val
+	return value
 }
 
-func (c *codegen) toPtrOrLoad(val value, type_ types.Type) value {
-	if val.needsLoading {
-		return value{
-			identifier: val.identifier,
-			type_:      &types.PointerType{Pointee: val.type_},
-		}
+func (c *codegen) loadExpr(expr ast.Expr) (exprValue, string) {
+	value := c.load(c.acceptExpr(expr), expr.Result().Type)
+
+	type_ := "ptr"
+	if !value.addressable {
+		type_ = c.getType(expr.Result().Type)
 	}
 
-	return c.load(val, type_)
+	return value, type_
 }
 
 func (c *codegen) writeBlock(block string) {
@@ -247,11 +252,11 @@ func (c *constant) escape() {
 
 // Types
 
-func (c *codegen) getType(type_ types.Type) value {
+func (c *codegen) getType(type_ types.Type) string {
 	// Try cache
 	for _, pair := range c.types {
 		if pair.type_.Equals(type_) {
-			return pair.val
+			return pair.identifier
 		}
 	}
 
@@ -262,26 +267,26 @@ func (c *codegen) getType(type_ types.Type) value {
 
 	// Array
 	if v, ok := type_.(*types.ArrayType); ok {
-		val := c.globals.constant(fmt.Sprintf("[%d x %s]", v.Count, c.getType(v.Base)), type_)
+		value := c.globals.constant(fmt.Sprintf("[%d x %s]", v.Count, c.getType(v.Base)))
 
 		c.types = append(c.types, typeValuePair{
-			type_: type_,
-			val:   val,
+			type_:      type_,
+			identifier: value.identifier,
 		})
 
-		return val
+		return value.identifier
 	}
 
 	// Pointer
 	if _, ok := type_.(*types.PointerType); ok {
-		val := c.globals.constant("ptr", type_)
+		value := c.globals.constant("ptr")
 
 		c.types = append(c.types, typeValuePair{
-			type_: type_,
-			val:   val,
+			type_:      type_,
+			identifier: value.identifier,
 		})
 
-		return val
+		return value.identifier
 	}
 
 	// Primitive
@@ -310,14 +315,14 @@ func (c *codegen) getType(type_ types.Type) value {
 			name = v.String()
 		}
 
-		val := c.globals.constant(name, type_)
+		value := c.globals.constant(name)
 
 		c.types = append(c.types, typeValuePair{
-			type_: type_,
-			val:   val,
+			type_:      type_,
+			identifier: value.identifier,
 		})
 
-		return val
+		return value.identifier
 	}
 
 	// Error
@@ -330,35 +335,38 @@ func mangleName(name string) string {
 	return "fb$" + name
 }
 
-func (c *codegen) getFunction(name scanner.Token) value {
+func (c *codegen) getFunction(name scanner.Token) exprValue {
 	// Get function
-	type_, filePath := c.resolver.GetFunction(name.Lexeme)
+	function, filePath := c.resolver.GetFunction(name.Lexeme)
 
 	mangledName := name.Lexeme
-	if !type_.Extern {
+	if !function.Extern {
 		mangledName = mangleName(name.Lexeme)
 	}
 
-	val := c.globals.named(mangledName, type_)
+	value := c.globals.named(mangledName)
 
 	// Check if function needs to be imported
 	if filePath != c.path {
 		contains := false
 
 		for _, f := range c.importedFunctions {
-			if f.identifier == val.identifier {
+			if f.value.identifier == value.identifier {
 				contains = true
 				break
 			}
 		}
 
 		if !contains {
-			c.importedFunctions = append(c.importedFunctions, val)
+			c.importedFunctions = append(c.importedFunctions, importedFunc{
+				function: function,
+				value:    value,
+			})
 		}
 	}
 
 	// Return
-	return val
+	return value
 }
 
 // Scope / Variables
@@ -373,12 +381,12 @@ func (c *codegen) getVariable(name scanner.Token) *variable {
 	return nil
 }
 
-func (c *codegen) addVariable(name scanner.Token, val value) *variable {
-	val.needsLoading = true
+func (c *codegen) addVariable(name scanner.Token, value exprValue) *variable {
+	value.addressable = true
 
 	c.variables = append(c.variables, variable{
-		name: name,
-		val:  val,
+		name:  name,
+		value: value,
 	})
 
 	c.peekScope().variableCount++
@@ -549,13 +557,13 @@ func (c *codegen) acceptStmt(stmt ast.Stmt) {
 	}
 }
 
-func (c *codegen) acceptExpr(expr ast.Expr) value {
+func (c *codegen) acceptExpr(expr ast.Expr) exprValue {
 	if expr != nil {
 		expr.Accept(c)
-		return c.exprValue
+		return c.exprResult
 	}
 
-	return value{}
+	return exprValue{}
 }
 
 // Write
@@ -606,13 +614,12 @@ func ternary[T any](cond bool, true T, false T) T {
 
 // Value
 
-type value struct {
-	identifier   string
-	type_        types.Type
-	needsLoading bool
+type exprValue struct {
+	identifier  string
+	addressable bool
 }
 
-func (v value) String() string {
+func (v exprValue) String() string {
 	return v.identifier
 }
 
@@ -625,17 +632,15 @@ func (v *values) reset() {
 	v.unnamedCount = 0
 }
 
-func (v *values) named(identifier string, type_ types.Type) value {
-	return value{
+func (v *values) named(identifier string) exprValue {
+	return exprValue{
 		identifier: v.char + identifier,
-		type_:      type_,
 	}
 }
 
-func (v *values) unnamed(type_ types.Type) value {
-	return value{
+func (v *values) unnamed() exprValue {
+	return exprValue{
 		identifier: v.unnamedRaw(),
-		type_:      type_,
 	}
 }
 
@@ -644,9 +649,8 @@ func (v *values) unnamedRaw() string {
 	return v.char + strconv.Itoa(v.unnamedCount-1)
 }
 
-func (v *values) constant(constant string, type_ types.Type) value {
-	return value{
+func (v *values) constant(constant string) exprValue {
+	return exprValue{
 		identifier: constant,
-		type_:      type_,
 	}
 }

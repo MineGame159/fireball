@@ -24,25 +24,25 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 
 func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Variable
-	val := c.locals.unnamed(stmt.Type)
-	val.identifier += "." + stmt.Name.Lexeme
+	value := c.locals.unnamed()
+	value.identifier += "." + stmt.Name.Lexeme
 
-	c.addVariable(stmt.Name, val)
+	c.addVariable(stmt.Name, value)
 
 	loc := c.debug.location(stmt.Name)
-	c.writeFmt("%s = alloca %s, !dbg %s\n", val, c.getType(stmt.Type), loc)
+	c.writeFmt("%s = alloca %s, !dbg %s\n", value, c.getType(stmt.Type), loc)
 
 	// Initializer
 	if stmt.Initializer != nil {
-		init := c.load(c.acceptExpr(stmt.Initializer), stmt.Initializer.Result().Type)
-		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(stmt.Initializer.Result().Type), init, val, loc)
+		initializer, initializerType := c.loadExpr(stmt.Initializer)
+		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", initializerType, initializer, value, loc)
 	}
 
 	// Debug
-	c.variableDebug(stmt.Name, val, stmt.Type, 0, loc)
+	c.variableDebug(stmt.Name, value, stmt.Type, 0, loc)
 }
 
-func (c *codegen) variableDebug(name scanner.Token, ptr value, type_ types.Type, arg int, loc string) {
+func (c *codegen) variableDebug(name scanner.Token, ptr exprValue, type_ types.Type, arg int, loc string) {
 	dbg := c.debug.localVariable(name.Lexeme, c.getDbgType(type_), arg, name.Line)
 	c.writeFmt("call void @llvm.dbg.declare(metadata ptr %s, metadata %s, metadata !DIExpression()), !dbg %s\n", ptr, dbg, loc)
 }
@@ -62,7 +62,7 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	}
 
 	// Condition
-	condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Result().Type)
+	condition, _ := c.loadExpr(stmt.Condition)
 	loc := c.debug.location(stmt.Token())
 
 	c.writeFmt("br i1 %s, label %%%s, label %%%s, !dbg %s\n", condition, then, else_, loc)
@@ -105,7 +105,7 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 		body = c.blocks.unnamedRaw()
 		c.loopEnd = c.blocks.unnamedRaw()
 
-		condition := c.load(c.acceptExpr(stmt.Condition), stmt.Condition.Result().Type)
+		condition, _ := c.loadExpr(stmt.Condition)
 		loc := c.debug.location(stmt.Token())
 
 		c.writeFmt("br i1 %s, label %%%s, label %%%s, !dbg %s\n", condition, body, c.loopEnd, loc)
@@ -140,8 +140,8 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		c.writeFmt("ret void, !dbg %s\n", loc)
 	} else {
 		// Other
-		val := c.load(c.acceptExpr(stmt.Expr), stmt.Expr.Result().Type)
-		c.writeFmt("ret %s %s, !dbg %s\n", c.getType(stmt.Expr.Result().Type), val, loc)
+		value, valueType := c.loadExpr(stmt.Expr)
+		c.writeFmt("ret %s %s, !dbg %s\n", valueType, value, loc)
 	}
 }
 

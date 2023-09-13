@@ -5,10 +5,10 @@ import (
 	"fireball/core/types"
 )
 
-func (c *codegen) VisitStruct(decl *ast.Struct) {
+func (c *codegen) VisitStruct(_ *ast.Struct) {
 }
 
-func (c *codegen) VisitEnum(decl *ast.Enum) {
+func (c *codegen) VisitEnum(_ *ast.Enum) {
 }
 
 func (c *codegen) VisitFunc(decl *ast.Func) {
@@ -66,7 +66,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 		c.writeBlock(c.blocks.unnamedRaw())
 
 		for i, param := range decl.Params {
-			val := c.locals.named(param.Name.Lexeme+".var", param.Type)
+			val := c.locals.named(param.Name.Lexeme + ".var")
 			type_ := c.getType(param.Type)
 
 			loc := c.debug.location(param.Name)

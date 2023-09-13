@@ -6,8 +6,8 @@ import (
 )
 
 type typeValuePair struct {
-	type_ types.Type
-	val   value
+	type_      types.Type
+	identifier string
 }
 
 type typeCollector struct {
@@ -40,11 +40,11 @@ func (t *typeCollector) addType(type_ types.Type) {
 
 	// Struct
 	if v, ok := type_.(*ast.Struct); ok {
-		val := t.globals.constant("%struct."+v.Name.Lexeme, v)
+		value := t.globals.constant("%struct." + v.Name.Lexeme)
 
 		t.types = append(t.types, typeValuePair{
-			type_: type_,
-			val:   val,
+			type_:      type_,
+			identifier: value.identifier,
 		})
 	}
 }
