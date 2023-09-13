@@ -69,11 +69,12 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 			val := c.locals.named(param.Name.Lexeme+".var", param.Type)
 			type_ := c.getType(param.Type)
 
-			c.writeFmt("%s = alloca %s\n", val, type_)
-			c.writeFmt("store %s %%%s, ptr %s\n", type_, param.Name, val)
+			loc := c.debug.location(param.Name)
+			c.writeFmt("%s = alloca %s, !dbg %s\n", val, type_, loc)
+			c.writeFmt("store %s %%%s, ptr %s, !dbg %s\n", type_, param.Name, val, loc)
 
 			c.addVariable(param.Name, val)
-			c.variableDebug(param.Name, val, param.Type, i+1)
+			c.variableDebug(param.Name, val, param.Type, i+1, loc)
 		}
 
 		for _, stmt := range decl.Body {

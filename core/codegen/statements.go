@@ -28,21 +28,22 @@ func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	val.identifier += "." + stmt.Name.Lexeme
 
 	c.addVariable(stmt.Name, val)
-	c.writeFmt("%s = alloca %s\n", val, c.getType(stmt.Type))
+
+	loc := c.debug.location(stmt.Name)
+	c.writeFmt("%s = alloca %s, !dbg %s\n", val, c.getType(stmt.Type), loc)
 
 	// Initializer
 	if stmt.Initializer != nil {
 		init := c.load(c.acceptExpr(stmt.Initializer), stmt.Initializer.Result().Type)
-		c.writeFmt("store %s %s, ptr %s\n", c.getType(stmt.Initializer.Result().Type), init, val)
+		c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(stmt.Initializer.Result().Type), init, val, loc)
 	}
 
 	// Debug
-	c.variableDebug(stmt.Name, val, stmt.Type, 0)
+	c.variableDebug(stmt.Name, val, stmt.Type, 0, loc)
 }
 
-func (c *codegen) variableDebug(name scanner.Token, ptr value, type_ types.Type, arg int) {
+func (c *codegen) variableDebug(name scanner.Token, ptr value, type_ types.Type, arg int, loc string) {
 	dbg := c.debug.localVariable(name.Lexeme, c.getDbgType(type_), arg, name.Line)
-	loc := c.debug.location(name)
 	c.writeFmt("call void @llvm.dbg.declare(metadata ptr %s, metadata %s, metadata !DIExpression()), !dbg %s\n", ptr, dbg, loc)
 }
 
