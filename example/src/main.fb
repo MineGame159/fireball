@@ -9,12 +9,11 @@ enum Animal {
 }
 
 func main() i32 {
-    printf("%d\n", 5);
-    printf("%d\n", 0x05FF);
-    printf("%d\n", 0b1001);
-    printf("\n");
-    printf("%f\n", 1.0f as f64); // Idk why but C casts it to double or else it prints 0
-    printf("%f\n", 2.0);
+    for (var i = 0; i < 2; i += 1) {
+        for (var j = 0; j < 3; j += 1) {
+            printf("%d %d\n", i, j);
+        }
+    }
 
     return 0;
 }

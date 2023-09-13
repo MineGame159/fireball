@@ -83,11 +83,18 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 }
 
 func (c *codegen) VisitFor(stmt *ast.For) {
-	// GetLeaf basic block names
+	// Get basic block names
+	prevLoopStart := c.loopStart
+	prevLoopEnd := c.loopEnd
+
 	c.loopStart = c.blocks.unnamedRaw()
 	body := c.loopStart
 	c.loopEnd = ""
 
+	// Initializer
+	c.pushScope()
+
+	c.acceptStmt(stmt.Initializer)
 	c.writeFmt("br label %%%s\n", c.loopStart)
 
 	// Condition
@@ -105,20 +112,23 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 		c.loopEnd = c.blocks.unnamedRaw()
 	}
 
-	// Body
+	// Body and increment
 	if c.loopStart != body {
 		c.writeBlock(body)
 	}
 
 	c.acceptStmt(stmt.Body)
+	c.acceptExpr(stmt.Increment)
+
 	c.writeFmt("br label %%%s\n", c.loopStart)
 
 	// End
+	c.popScope()
 	c.writeBlock(c.loopEnd)
 
 	// Reset basic block names
-	c.loopStart = ""
-	c.loopEnd = ""
+	c.loopStart = prevLoopStart
+	c.loopEnd = prevLoopEnd
 }
 
 func (c *codegen) VisitReturn(stmt *ast.Return) {

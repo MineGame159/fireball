@@ -77,16 +77,22 @@ func (c *checker) VisitIf(stmt *ast.If) {
 
 func (c *checker) VisitFor(stmt *ast.For) {
 	// Visit children
+	c.pushScope()
 	c.loopDepth++
+
 	stmt.AcceptChildren(c)
+
 	c.loopDepth--
+	c.popScope()
 
 	// Check condition value
-	if stmt.Condition.Result().Kind != ast.ValueResultKind {
-		c.errorRange(stmt.Condition.Range(), "Invalid value.")
-	} else {
-		if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Result().Type, types.Bool) {
-			c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Result().Type)
+	if stmt.Condition != nil && stmt.Condition.Result().Kind != ast.InvalidResultKind {
+		if stmt.Condition.Result().Kind != ast.ValueResultKind {
+			c.errorRange(stmt.Condition.Range(), "Invalid value.")
+		} else {
+			if stmt.Condition != nil && !types.IsPrimitive(stmt.Condition.Result().Type, types.Bool) {
+				c.errorRange(stmt.Condition.Range(), "Condition needs to be of type 'bool' but got '%s'.", stmt.Condition.Result().Type)
+			}
 		}
 	}
 }

@@ -130,7 +130,9 @@ var stmts = []item{
 		name: "For",
 		fields: []field{
 			{name: "Token_", type_: "Token"},
+			{name: "Initializer", type_: "Stmt"},
 			{name: "Condition", type_: "Expr"},
+			{name: "Increment", type_: "Expr"},
 			{name: "Body", type_: "Stmt"},
 		},
 		token: "Token_",

@@ -374,9 +374,11 @@ type For struct {
 	range_ core.Range
 	parent Node
 
-	Token_    scanner.Token
-	Condition Expr
-	Body      Stmt
+	Token_      scanner.Token
+	Initializer Stmt
+	Condition   Expr
+	Increment   Expr
+	Body        Stmt
 }
 
 func (f *For) Token() scanner.Token {
@@ -424,8 +426,14 @@ func (f *For) Accept(visitor StmtVisitor) {
 }
 
 func (f *For) AcceptChildren(visitor Acceptor) {
+	if f.Initializer != nil {
+		visitor.AcceptStmt(f.Initializer)
+	}
 	if f.Condition != nil {
 		visitor.AcceptExpr(f.Condition)
+	}
+	if f.Increment != nil {
+		visitor.AcceptExpr(f.Increment)
 	}
 	if f.Body != nil {
 		visitor.AcceptStmt(f.Body)
@@ -447,8 +455,14 @@ func (f *For) String() string {
 }
 
 func (f *For) SetChildrenParent() {
+	if f.Initializer != nil {
+		f.Initializer.SetParent(f)
+	}
 	if f.Condition != nil {
 		f.Condition.SetParent(f)
+	}
+	if f.Increment != nil {
+		f.Increment.SetParent(f)
 	}
 	if f.Body != nil {
 		f.Body.SetParent(f)

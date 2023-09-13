@@ -204,22 +204,52 @@ func (p *parser) if_() ast.Stmt {
 func (p *parser) for_() ast.Stmt {
 	token := p.current
 
+	// Left paren
+	if token := p.consume(scanner.LeftParen, "Expected '(' before for clauses."); token.IsError() {
+		return nil
+	}
+
+	// Initializer
+	var initializer ast.Stmt
+
+	if p.match(scanner.Var) {
+		initializer = p.variable()
+		if initializer == nil {
+			return nil
+		}
+	} else {
+		if token := p.consume(scanner.Semicolon, "Expected ';' before for clauses."); token.IsError() {
+			return nil
+		}
+	}
+
+	// Condition
 	var condition ast.Expr
 
-	// Left paren
-	if p.match(scanner.LeftParen) {
-		// Condition
-		expr := p.expression()
-		if expr == nil {
+	if !p.check(scanner.Semicolon) {
+		condition = p.expression()
+		if condition == nil {
 			return nil
 		}
+	}
 
-		condition = expr
+	if token := p.consume(scanner.Semicolon, "Expected ';' before for clauses."); token.IsError() {
+		return nil
+	}
 
-		// Right paren
-		if token := p.consume(scanner.RightParen, "Expected ')' before condition."); token.IsError() {
+	// Increment
+	var increment ast.Expr
+
+	if !p.check(scanner.RightParen) {
+		increment = p.expression()
+		if increment == nil {
 			return nil
 		}
+	}
+
+	// Right paren
+	if token := p.consume(scanner.RightParen, "Expected ')' before body."); token.IsError() {
+		return nil
 	}
 
 	// Body
@@ -230,9 +260,11 @@ func (p *parser) for_() ast.Stmt {
 
 	// Return
 	stmt := &ast.For{
-		Token_:    token,
-		Condition: condition,
-		Body:      body,
+		Token_:      token,
+		Initializer: initializer,
+		Condition:   condition,
+		Increment:   increment,
+		Body:        body,
 	}
 
 	stmt.SetRangeToken(token, p.current)

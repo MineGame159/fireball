@@ -112,6 +112,9 @@ func (v *variableResolver) Accept(node ast.Node) {
 	if _, ok := node.(*ast.Func); ok {
 		v.pushScope()
 		pop = true
+	} else if _, ok := node.(*ast.For); ok {
+		v.pushScope()
+		pop = true
 	} else if _, ok := node.(*ast.Block); ok {
 		v.pushScope()
 		pop = true
