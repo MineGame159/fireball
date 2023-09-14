@@ -60,8 +60,16 @@ func (s *Scanner) Next() Token {
 		return s.make(Semicolon)
 
 	case '+':
+		if s.match('+') {
+			return s.make(PlusPlus)
+		}
+
 		return s.matchToken('=', PlusEqual, Plus)
 	case '-':
+		if s.match('-') {
+			return s.make(MinusMinus)
+		}
+
 		return s.matchToken('=', MinusEqual, Minus)
 	case '*':
 		return s.matchToken('=', StarEqual, Star)
@@ -75,15 +83,13 @@ func (s *Scanner) Next() Token {
 	case '!':
 		return s.matchToken('=', BangEqual, Bang)
 	case '<':
-		if s.peek() == '<' {
-			s.advance()
+		if s.match('<') {
 			return s.make(LessLess)
 		}
 
 		return s.matchToken('=', LessEqual, Less)
 	case '>':
-		if s.peek() == '>' {
-			s.advance()
+		if s.match('>') {
 			return s.make(GreaterGreater)
 		}
 

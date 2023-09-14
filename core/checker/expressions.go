@@ -152,67 +152,113 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 func (c *checker) VisitUnary(expr *ast.Unary) {
 	expr.AcceptChildren(c)
 
-	if expr.Right.Result().Kind == ast.InvalidResultKind {
+	// Check value
+	result := expr.Value.Result()
+
+	if result.Kind == ast.InvalidResultKind {
 		return // Do not cascade errors
 	}
 
-	switch expr.Op.Kind {
-	case scanner.Bang:
-		if expr.Right.Result().Kind != ast.ValueResultKind {
-			c.errorRange(expr.Right.Range(), "Cannot negate this value.")
-			expr.Result().SetInvalid()
+	if expr.Prefix {
+		// Prefix
+		switch expr.Op.Kind {
+		case scanner.Bang:
+			if result.Kind != ast.ValueResultKind {
+				c.errorRange(expr.Value.Range(), "Cannot negate this value.")
+				expr.Result().SetInvalid()
 
-			return
-		}
-
-		if !types.IsPrimitive(expr.Right.Result().Type, types.Bool) {
-			c.errorRange(expr.Right.Range(), "Expected a 'bool' but got a '%s'.", expr.Right.Result().Type)
-		}
-
-		expr.Result().SetValue(types.Primitive(types.Bool, core.Range{}), 0)
-
-	case scanner.Minus:
-		if expr.Right.Result().Kind != ast.ValueResultKind {
-			c.errorRange(expr.Right.Range(), "Cannot negate this value.")
-			expr.Result().SetInvalid()
-
-			return
-		}
-
-		if v, ok := expr.Right.Result().Type.(*types.PrimitiveType); ok {
-			if types.IsFloating(v.Kind) || types.IsSigned(v.Kind) {
-				expr.Result().SetValue(expr.Right.Result().Type, 0)
 				return
 			}
-		}
 
-		c.errorRange(expr.Right.Range(), "Expected either a floating pointer number or signed integer but got a '%s'.", expr.Right.Result().Type)
-		expr.Result().SetInvalid()
+			if !types.IsPrimitive(result.Type, types.Bool) {
+				c.errorRange(expr.Value.Range(), "Expected a 'bool' but got a '%s'.", result.Type)
+			}
 
-	case scanner.Ampersand:
-		if !expr.Right.Result().IsAddressable() {
-			c.errorRange(expr.Right.Range(), "Cannot take address of this expression.")
-		}
+			expr.Result().SetValue(types.Primitive(types.Bool, core.Range{}), 0)
 
-		expr.Result().SetValue(types.Pointer(expr.Right.Result().Type, core.Range{}), 0)
+		case scanner.Minus:
+			if result.Kind != ast.ValueResultKind {
+				c.errorRange(expr.Value.Range(), "Cannot negate this value.")
+				expr.Result().SetInvalid()
 
-	case scanner.Star:
-		if expr.Right.Result().Kind != ast.ValueResultKind {
-			c.errorRange(expr.Right.Range(), "Cannot dereference this value.")
+				return
+			}
+
+			if v, ok := result.Type.(*types.PrimitiveType); ok {
+				if types.IsFloating(v.Kind) || types.IsSigned(v.Kind) {
+					expr.Result().SetValue(result.Type, 0)
+					return
+				}
+			}
+
+			c.errorRange(expr.Value.Range(), "Expected either a floating pointer number or signed integer but got a '%s'.", result.Type)
 			expr.Result().SetInvalid()
 
-			return
-		}
+		case scanner.Ampersand:
+			if !result.IsAddressable() {
+				c.errorRange(expr.Value.Range(), "Cannot take address of this expression.")
+			}
 
-		if p, ok := expr.Right.Result().Type.(*types.PointerType); ok {
-			expr.Result().SetValue(p.Pointee, 0)
-		} else {
-			c.errorRange(expr.Right.Range(), "Can only dereference pointer types, not '%s'.", expr.Right.Result().Type)
-			expr.Result().SetInvalid()
-		}
+			expr.Result().SetValue(types.Pointer(result.Type, core.Range{}), 0)
 
-	default:
-		log.Fatalln("checker.VisitUnary() - Invalid unary operator")
+		case scanner.Star:
+			if result.Kind != ast.ValueResultKind {
+				c.errorRange(expr.Value.Range(), "Cannot dereference this value.")
+				expr.Result().SetInvalid()
+
+				return
+			}
+
+			if p, ok := result.Type.(*types.PointerType); ok {
+				expr.Result().SetValue(p.Pointee, 0)
+			} else {
+				c.errorRange(expr.Value.Range(), "Can only dereference pointer types, not '%s'.", result.Type)
+				expr.Result().SetInvalid()
+			}
+
+		case scanner.PlusPlus, scanner.MinusMinus:
+			if !result.IsAddressable() {
+				c.errorRange(expr.Value.Range(), "Invalid value.")
+				expr.Result().SetInvalid()
+
+				return
+			}
+
+			if type_, ok := result.Type.(*types.PrimitiveType); !ok || (!types.IsInteger(type_.Kind) && !types.IsFloating(type_.Kind)) {
+				c.errorRange(expr.Value.Range(), "Cannot increment or decrement '%s'.", result.Type)
+				expr.Result().SetInvalid()
+
+				return
+			}
+
+			expr.Result().SetValue(result.Type, 0)
+
+		default:
+			panic("checker.VisitUnary() - Invalid unary prefix operator")
+		}
+	} else {
+		// Postfix
+		switch expr.Op.Kind {
+		case scanner.PlusPlus, scanner.MinusMinus:
+			if !result.IsAddressable() {
+				c.errorRange(expr.Value.Range(), "Invalid value.")
+				expr.Result().SetInvalid()
+
+				return
+			}
+
+			if type_, ok := result.Type.(*types.PrimitiveType); !ok || (!types.IsInteger(type_.Kind) && !types.IsFloating(type_.Kind)) {
+				c.errorRange(expr.Value.Range(), "Cannot increment or decrement '%s'.", result.Type)
+				expr.Result().SetInvalid()
+
+				return
+			}
+
+			expr.Result().SetValue(result.Type, 0)
+
+		default:
+			panic("checker.VisitUnary() - Invalid unary postfix operator")
+		}
 	}
 }
 

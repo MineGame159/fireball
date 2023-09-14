@@ -308,8 +308,9 @@ type Unary struct {
 	parent Node
 	result ExprResult
 
-	Op    scanner.Token
-	Right Expr
+	Op     scanner.Token
+	Value  Expr
+	Prefix bool
 }
 
 func (u *Unary) Token() scanner.Token {
@@ -357,8 +358,8 @@ func (u *Unary) Accept(visitor ExprVisitor) {
 }
 
 func (u *Unary) AcceptChildren(visitor Acceptor) {
-	if u.Right != nil {
-		visitor.AcceptExpr(u.Right)
+	if u.Value != nil {
+		visitor.AcceptExpr(u.Value)
 	}
 }
 
@@ -385,8 +386,8 @@ func (u *Unary) Result() *ExprResult {
 }
 
 func (u *Unary) SetChildrenParent() {
-	if u.Right != nil {
-		u.Right.SetParent(u)
+	if u.Value != nil {
+		u.Value.SetParent(u)
 	}
 }
 

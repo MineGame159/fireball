@@ -103,45 +103,68 @@ func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
 	loc := c.debug.location(expr.Token())
-	value := c.acceptExpr(expr.Right)
+	value := c.acceptExpr(expr.Value)
 
-	switch expr.Op.Kind {
-	case scanner.Bang:
-		result := c.locals.unnamed()
-		c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", result, c.load(value, expr.Right.Result().Type), loc)
-		c.exprResult = result
-
-	case scanner.Minus:
-		if v, ok := expr.Right.Result().Type.(*types.PrimitiveType); ok {
+	if expr.Prefix {
+		// Prefix
+		switch expr.Op.Kind {
+		case scanner.Bang:
 			result := c.locals.unnamed()
-			value := c.load(value, expr.Right.Result().Type)
+			c.writeFmt("%s = xor i1 %s, true, !dbg %s\n", result, c.load(value, expr.Value.Result().Type), loc)
+			c.exprResult = result
 
-			if types.IsFloating(v.Kind) {
-				// floating
-				c.writeFmt("%s = fneg %s %s, !dbg %s\n", result, c.getType(expr.Right.Result().Type), value, loc)
+		case scanner.Minus:
+			if v, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
+				result := c.locals.unnamed()
+				value := c.load(value, expr.Value.Result().Type)
+
+				if types.IsFloating(v.Kind) {
+					// floating
+					c.writeFmt("%s = fneg %s %s, !dbg %s\n", result, c.getType(expr.Value.Result().Type), value, loc)
+				} else {
+					// signed
+					c.writeFmt("%s = sub nsw %s 0, %s, !dbg %s\n", result, c.getType(expr.Value.Result().Type), value, loc)
+				}
+
+				c.exprResult = result
 			} else {
-				// signed
-				c.writeFmt("%s = sub nsw %s 0, %s, !dbg %s\n", result, c.getType(expr.Right.Result().Type), value, loc)
+				log.Fatalln("codegen.VisitUnary() - Invalid type")
 			}
 
+		case scanner.Ampersand:
+			c.exprResult = exprValue{
+				identifier:  value.identifier,
+				addressable: true,
+			}
+
+		case scanner.Star:
+			result := c.locals.unnamed()
+			c.writeFmt("%s = load %s, ptr %s, !dbg %s\n", result, c.getType(expr.Result().Type), c.load(value, expr.Value.Result().Type), loc)
 			c.exprResult = result
-		} else {
-			log.Fatalln("codegen.VisitUnary() - Invalid type")
+
+		case scanner.PlusPlus, scanner.MinusMinus:
+			newValue := c.binary(expr.Op, value, expr.Value.Result().Type, c.globals.constant("1"), expr.Value.Result().Type)
+			c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(expr.Value.Result().Type), newValue, value, loc)
+
+			c.exprResult = newValue
+
+		default:
+			panic("codegen.VisitUnary() - Invalid unary prefix operator")
 		}
+	} else {
+		// Postfix
+		switch expr.Op.Kind {
+		case scanner.PlusPlus, scanner.MinusMinus:
+			prevValue := c.load(value, expr.Value.Result().Type)
 
-	case scanner.Ampersand:
-		c.exprResult = exprValue{
-			identifier:  value.identifier,
-			addressable: true,
+			newValue := c.binary(expr.Op, prevValue, expr.Value.Result().Type, c.globals.constant("1"), expr.Value.Result().Type)
+			c.writeFmt("store %s %s, ptr %s, !dbg %s\n", c.getType(expr.Value.Result().Type), newValue, value, loc)
+
+			c.exprResult = prevValue
+
+		default:
+			panic("codegen.VisitUnary() - Invalid unary prefix operator")
 		}
-
-	case scanner.Star:
-		result := c.locals.unnamed()
-		c.writeFmt("%s = load %s, ptr %s, !dbg %s\n", result, c.getType(expr.Result().Type), c.load(value, expr.Right.Result().Type), loc)
-		c.exprResult = result
-
-	default:
-		log.Fatalln("codegen.VisitUnary() - Invalid unary operator")
 	}
 }
 
@@ -492,9 +515,9 @@ func (c *codegen) binary(op scanner.Token, left exprValue, leftType types.Type, 
 	inst := ""
 
 	switch op.Kind {
-	case scanner.Plus, scanner.PlusEqual:
+	case scanner.Plus, scanner.PlusEqual, scanner.PlusPlus:
 		inst = ternary(floating, "fadd", "add")
-	case scanner.Minus, scanner.MinusEqual:
+	case scanner.Minus, scanner.MinusEqual, scanner.MinusMinus:
 		inst = ternary(floating, "fsub", "sub")
 	case scanner.Star, scanner.StarEqual:
 		inst = ternary(floating, "fmul", "mul")

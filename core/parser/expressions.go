@@ -351,8 +351,8 @@ func (p *parser) factor() ast.Expr {
 }
 
 func (p *parser) unary() ast.Expr {
-	// ! - & *
-	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand, scanner.Star) {
+	// ! - & * ++ --
+	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand, scanner.Star, scanner.PlusPlus, scanner.MinusMinus) {
 		op := p.current
 
 		// Cascade
@@ -363,8 +363,9 @@ func (p *parser) unary() ast.Expr {
 
 		// Return
 		expr := &ast.Unary{
-			Op:    op,
-			Right: right,
+			Op:     op,
+			Value:  right,
+			Prefix: true,
 		}
 
 		expr.SetRangeToken(op, p.current)
@@ -374,7 +375,32 @@ func (p *parser) unary() ast.Expr {
 	}
 
 	// Return cascade
-	return p.call()
+	return p.postfix()
+}
+
+func (p *parser) postfix() ast.Expr {
+	// Cascade
+	expr := p.call()
+	if expr == nil {
+		return nil
+	}
+
+	// ++ --
+	if p.match(scanner.PlusPlus, scanner.MinusMinus) {
+		expr := &ast.Unary{
+			Op:     p.current,
+			Value:  expr,
+			Prefix: false,
+		}
+
+		expr.SetRangePos(expr.Range().Start, core.TokenToPos(p.current, true))
+		expr.SetChildrenParent()
+
+		return expr
+	}
+
+	// Return
+	return expr
 }
 
 func (p *parser) call() ast.Expr {

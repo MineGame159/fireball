@@ -27,6 +27,9 @@ const (
 	SlashEqual
 	PercentageEqual
 
+	PlusPlus
+	MinusMinus
+
 	Equal
 	EqualEqual
 	Bang

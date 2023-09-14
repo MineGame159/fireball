@@ -204,7 +204,8 @@ var exprs = []item{
 		name: "Unary",
 		fields: []field{
 			{name: "Op", type_: "Token"},
-			{name: "Right", type_: "Expr"},
+			{name: "Value", type_: "Expr"},
+			{name: "Prefix", type_: "bool"},
 		},
 		token: "Op",
 		ast:   true,

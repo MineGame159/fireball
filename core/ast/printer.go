@@ -149,7 +149,7 @@ func (p *printer) VisitInitializer(expr *Initializer) {
 
 func (p *printer) VisitUnary(expr *Unary) {
 	p.print(expr.Op.Lexeme)
-	p.AcceptExpr(expr.Right)
+	p.AcceptExpr(expr.Value)
 }
 
 func (p *printer) VisitBinary(expr *Binary) {
