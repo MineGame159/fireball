@@ -121,9 +121,13 @@ func (h *highlighter) VisitLiteral(expr *ast.Literal) {
 	expr.AcceptChildren(h)
 }
 
-func (h *highlighter) VisitInitializer(expr *ast.Initializer) {
+func (h *highlighter) VisitStructInitializer(expr *ast.StructInitializer) {
 	h.addToken(expr.Name, classKind)
 
+	expr.AcceptChildren(h)
+}
+
+func (h *highlighter) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	expr.AcceptChildren(h)
 }
 

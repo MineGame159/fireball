@@ -116,7 +116,7 @@ func (v *get) Accept(node Node) {
 		}
 
 		// TODO: Work around the fact that some nodes store names as scanner.Token which does not inherit ast.Node
-		if initializer, ok := node.(*Initializer); ok {
+		if initializer, ok := node.(*StructInitializer); ok {
 			for _, field := range initializer.Fields {
 				if core.TokenToRange(field.Name).Contains(v.pos) {
 					v.node = node

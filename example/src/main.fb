@@ -48,10 +48,5 @@ func getVec() Vec2 {
 }
 
 func getArray() [2]i32 {
-    var array [2]i32;
-
-    array[0] = 3;
-    array[1] = 9;
-
-    return array;
+    return [ 3, 9 ];
 }

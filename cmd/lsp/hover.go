@@ -41,7 +41,7 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 				}
 
 				return nil
-			} else if i, ok := node.(*ast.Initializer); ok {
+			} else if i, ok := node.(*ast.StructInitializer); ok {
 				// ast.Initializer
 				for _, field := range i.Fields {
 					range_ := core.TokenToRange(field.Name)

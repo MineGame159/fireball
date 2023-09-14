@@ -80,7 +80,7 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	c.exprResult = c.locals.constant(raw)
 }
 
-func (c *codegen) VisitInitializer(expr *ast.Initializer) {
+func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	struct_, _ := expr.Result().Type.(*ast.Struct)
 	type_ := c.getType(expr.Result().Type)
 
@@ -93,6 +93,24 @@ func (c *codegen) VisitInitializer(expr *ast.Initializer) {
 		value, valueType := c.loadExpr(field.Value)
 		i, _ := struct_.GetField(field.Name.Lexeme)
 
+		c.writeFmt("%s = insertvalue %s %s, %s %s, %d, !dbg %s\n", newResult, type_, result, valueType, value, i, loc)
+
+		result = newResult
+	}
+
+	c.exprResult = result
+}
+
+func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
+	type_ := c.getType(expr.Result().Type)
+
+	result := c.locals.constant("zeroinitializer")
+
+	for i, valueExpr := range expr.Values {
+		loc := c.debug.location(valueExpr.Token())
+		newResult := c.locals.unnamed()
+
+		value, valueType := c.loadExpr(valueExpr)
 		c.writeFmt("%s = insertvalue %s %s, %s %s, %d, !dbg %s\n", newResult, type_, result, valueType, value, i, loc)
 
 		result = newResult

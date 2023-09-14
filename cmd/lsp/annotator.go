@@ -104,7 +104,11 @@ func (a *annotator) VisitLiteral(expr *ast.Literal) {
 	expr.AcceptChildren(a)
 }
 
-func (a *annotator) VisitInitializer(expr *ast.Initializer) {
+func (a *annotator) VisitStructInitializer(expr *ast.StructInitializer) {
+	expr.AcceptChildren(a)
+}
+
+func (a *annotator) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	expr.AcceptChildren(a)
 }
 

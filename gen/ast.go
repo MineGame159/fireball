@@ -184,7 +184,7 @@ var exprs = []item{
 		ast:   true,
 	},
 	{
-		name: "Initializer",
+		name: "StructInitializer",
 		fields: []field{
 			{name: "Name", type_: "Token"},
 			{name: "Fields", type_: "[]InitField"},
@@ -199,6 +199,15 @@ var exprs = []item{
 			{name: "Value", type_: "Expr"},
 		},
 		ast: false,
+	},
+	{
+		name: "ArrayInitializer",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Values", type_: "[]Expr"},
+		},
+		token: "Token_",
+		ast:   true,
 	},
 	{
 		name: "Unary",

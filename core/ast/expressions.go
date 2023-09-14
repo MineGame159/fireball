@@ -10,7 +10,8 @@ import "fireball/core/scanner"
 type ExprVisitor interface {
 	VisitGroup(expr *Group)
 	VisitLiteral(expr *Literal)
-	VisitInitializer(expr *Initializer)
+	VisitStructInitializer(expr *StructInitializer)
+	VisitArrayInitializer(expr *ArrayInitializer)
 	VisitUnary(expr *Unary)
 	VisitBinary(expr *Binary)
 	VisitLogical(expr *Logical)
@@ -201,9 +202,9 @@ func (l *Literal) Result() *ExprResult {
 func (l *Literal) SetChildrenParent() {
 }
 
-// Initializer
+// StructInitializer
 
-type Initializer struct {
+type StructInitializer struct {
 	range_ core.Range
 	parent Node
 	result ExprResult
@@ -212,84 +213,84 @@ type Initializer struct {
 	Fields []InitField
 }
 
-func (i *Initializer) Token() scanner.Token {
-	return i.Name
+func (s *StructInitializer) Token() scanner.Token {
+	return s.Name
 }
 
-func (i *Initializer) Range() core.Range {
-	return i.range_
+func (s *StructInitializer) Range() core.Range {
+	return s.range_
 }
 
-func (i *Initializer) SetRangeToken(start, end scanner.Token) {
-	i.range_ = core.Range{
+func (s *StructInitializer) SetRangeToken(start, end scanner.Token) {
+	s.range_ = core.Range{
 		Start: core.TokenToPos(start, false),
 		End:   core.TokenToPos(end, true),
 	}
 }
 
-func (i *Initializer) SetRangePos(start, end core.Pos) {
-	i.range_ = core.Range{
+func (s *StructInitializer) SetRangePos(start, end core.Pos) {
+	s.range_ = core.Range{
 		Start: start,
 		End:   end,
 	}
 }
 
-func (i *Initializer) SetRangeNode(start, end Node) {
-	i.range_ = core.Range{
+func (s *StructInitializer) SetRangeNode(start, end Node) {
+	s.range_ = core.Range{
 		Start: start.Range().Start,
 		End:   end.Range().End,
 	}
 }
 
-func (i *Initializer) Parent() Node {
-	return i.parent
+func (s *StructInitializer) Parent() Node {
+	return s.parent
 }
 
-func (i *Initializer) SetParent(parent Node) {
-	if i.parent != nil && parent != nil {
-		log.Fatalln("Initializer.SetParent() - Node already has a parent")
+func (s *StructInitializer) SetParent(parent Node) {
+	if s.parent != nil && parent != nil {
+		log.Fatalln("StructInitializer.SetParent() - Node already has a parent")
 	}
-	i.parent = parent
+	s.parent = parent
 }
 
-func (i *Initializer) Accept(visitor ExprVisitor) {
-	visitor.VisitInitializer(i)
+func (s *StructInitializer) Accept(visitor ExprVisitor) {
+	visitor.VisitStructInitializer(s)
 }
 
-func (i *Initializer) AcceptChildren(visitor Acceptor) {
-	for i_ := range i.Fields {
-		if i.Fields[i_].Value != nil {
-			visitor.AcceptExpr(i.Fields[i_].Value)
+func (s *StructInitializer) AcceptChildren(visitor Acceptor) {
+	for i_ := range s.Fields {
+		if s.Fields[i_].Value != nil {
+			visitor.AcceptExpr(s.Fields[i_].Value)
 		}
 	}
 }
 
-func (i *Initializer) AcceptTypes(visitor types.Visitor) {
-	if i.result.Type != nil {
-		visitor.VisitType(i.result.Type)
+func (s *StructInitializer) AcceptTypes(visitor types.Visitor) {
+	if s.result.Type != nil {
+		visitor.VisitType(s.result.Type)
 	}
 }
 
-func (i *Initializer) AcceptTypesPtr(visitor types.PtrVisitor) {
-	visitor.VisitType(&i.result.Type)
+func (s *StructInitializer) AcceptTypesPtr(visitor types.PtrVisitor) {
+	visitor.VisitType(&s.result.Type)
 }
 
-func (i *Initializer) Leaf() bool {
+func (s *StructInitializer) Leaf() bool {
 	return false
 }
 
-func (i *Initializer) String() string {
-	return i.Token().Lexeme
+func (s *StructInitializer) String() string {
+	return s.Token().Lexeme
 }
 
-func (i *Initializer) Result() *ExprResult {
-	return &i.result
+func (s *StructInitializer) Result() *ExprResult {
+	return &s.result
 }
 
-func (i *Initializer) SetChildrenParent() {
-	for i_ := range i.Fields {
-		if i.Fields[i_].Value != nil {
-			i.Fields[i_].Value.SetParent(i)
+func (s *StructInitializer) SetChildrenParent() {
+	for i_ := range s.Fields {
+		if s.Fields[i_].Value != nil {
+			s.Fields[i_].Value.SetParent(s)
 		}
 	}
 }
@@ -299,6 +300,99 @@ func (i *Initializer) SetChildrenParent() {
 type InitField struct {
 	Name  scanner.Token
 	Value Expr
+}
+
+// ArrayInitializer
+
+type ArrayInitializer struct {
+	range_ core.Range
+	parent Node
+	result ExprResult
+
+	Token_ scanner.Token
+	Values []Expr
+}
+
+func (a *ArrayInitializer) Token() scanner.Token {
+	return a.Token_
+}
+
+func (a *ArrayInitializer) Range() core.Range {
+	return a.range_
+}
+
+func (a *ArrayInitializer) SetRangeToken(start, end scanner.Token) {
+	a.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
+	}
+}
+
+func (a *ArrayInitializer) SetRangePos(start, end core.Pos) {
+	a.range_ = core.Range{
+		Start: start,
+		End:   end,
+	}
+}
+
+func (a *ArrayInitializer) SetRangeNode(start, end Node) {
+	a.range_ = core.Range{
+		Start: start.Range().Start,
+		End:   end.Range().End,
+	}
+}
+
+func (a *ArrayInitializer) Parent() Node {
+	return a.parent
+}
+
+func (a *ArrayInitializer) SetParent(parent Node) {
+	if a.parent != nil && parent != nil {
+		log.Fatalln("ArrayInitializer.SetParent() - Node already has a parent")
+	}
+	a.parent = parent
+}
+
+func (a *ArrayInitializer) Accept(visitor ExprVisitor) {
+	visitor.VisitArrayInitializer(a)
+}
+
+func (a *ArrayInitializer) AcceptChildren(visitor Acceptor) {
+	for i_ := range a.Values {
+		if a.Values[i_] != nil {
+			visitor.AcceptExpr(a.Values[i_])
+		}
+	}
+}
+
+func (a *ArrayInitializer) AcceptTypes(visitor types.Visitor) {
+	if a.result.Type != nil {
+		visitor.VisitType(a.result.Type)
+	}
+}
+
+func (a *ArrayInitializer) AcceptTypesPtr(visitor types.PtrVisitor) {
+	visitor.VisitType(&a.result.Type)
+}
+
+func (a *ArrayInitializer) Leaf() bool {
+	return false
+}
+
+func (a *ArrayInitializer) String() string {
+	return a.Token().Lexeme
+}
+
+func (a *ArrayInitializer) Result() *ExprResult {
+	return &a.result
+}
+
+func (a *ArrayInitializer) SetChildrenParent() {
+	for i_ := range a.Values {
+		if a.Values[i_] != nil {
+			a.Values[i_].SetParent(a)
+		}
+	}
 }
 
 // Unary

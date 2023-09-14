@@ -563,7 +563,7 @@ func (p *parser) primary() ast.Expr {
 
 		// Initializer
 		if p.match(scanner.LeftBrace) {
-			return p.initializer(token)
+			return p.structInitializer(token)
 		}
 
 		// abc
@@ -575,6 +575,11 @@ func (p *parser) primary() ast.Expr {
 		expr.SetChildrenParent()
 
 		return expr
+	}
+
+	// [
+	if p.match(scanner.LeftBracket) {
+		return p.arrayInitializer()
 	}
 
 	// (
@@ -609,11 +614,11 @@ func (p *parser) primary() ast.Expr {
 	return nil
 }
 
-func (p *parser) initializer(name scanner.Token) ast.Expr {
+func (p *parser) structInitializer(name scanner.Token) ast.Expr {
 	// Fields
 	fields := make([]ast.InitField, 0, 4)
 
-	for !p.check(scanner.RightBrace) {
+	for p.canLoop(scanner.RightBrace) {
 		// Comma
 		if len(fields) > 0 {
 			if token := p.consume(scanner.Comma, "Expected ',' between fields."); token.IsError() {
@@ -651,12 +656,52 @@ func (p *parser) initializer(name scanner.Token) ast.Expr {
 	}
 
 	// Return
-	expr := &ast.Initializer{
+	expr := &ast.StructInitializer{
 		Name:   name,
 		Fields: fields,
 	}
 
 	expr.SetRangeToken(name, p.current)
+	expr.SetChildrenParent()
+
+	return expr
+}
+
+func (p *parser) arrayInitializer() ast.Expr {
+	token := p.current
+
+	// Values
+	values := make([]ast.Expr, 0, 8)
+
+	for p.canLoop(scanner.RightBracket) {
+		// Comma
+		if len(values) > 0 {
+			if token := p.consume(scanner.Comma, "Expected ',' between array values."); token.IsError() {
+				return nil
+			}
+		}
+
+		// Value
+		expr := p.expression()
+		if expr == nil {
+			return nil
+		}
+
+		values = append(values, expr)
+	}
+
+	// Right bracket
+	if token := p.consume(scanner.RightBracket, "Expected ']' after array values."); token.IsError() {
+		return nil
+	}
+
+	// Return
+	expr := &ast.ArrayInitializer{
+		Token_: token,
+		Values: values,
+	}
+
+	expr.SetRangeToken(token, p.current)
 	expr.SetChildrenParent()
 
 	return expr

@@ -135,13 +135,24 @@ func (p *printer) VisitLiteral(expr *Literal) {
 	p.print(expr.Value.Lexeme)
 }
 
-func (p *printer) VisitInitializer(expr *Initializer) {
+func (p *printer) VisitStructInitializer(expr *StructInitializer) {
 	p.print("%s {}", expr.Name)
 	p.depth++
 
 	for _, field := range expr.Fields {
 		p.print("%s:", field.Name)
 		p.AcceptExpr(field.Value)
+	}
+
+	p.depth--
+}
+
+func (p *printer) VisitArrayInitializer(expr *ArrayInitializer) {
+	p.print("[]")
+	p.depth++
+
+	for _, value := range expr.Values {
+		p.AcceptExpr(value)
 	}
 
 	p.depth--

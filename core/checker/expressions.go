@@ -96,7 +96,7 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 	}
 }
 
-func (c *checker) VisitInitializer(expr *ast.Initializer) {
+func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	expr.AcceptChildren(c)
 
 	// Check struct
@@ -146,6 +146,51 @@ func (c *checker) VisitInitializer(expr *ast.Initializer) {
 		if !initField.Value.Result().Type.CanAssignTo(field.Type) {
 			c.errorRange(initField.Value.Range(), "Expected a '%s' but got '%s'.", field.Type, initField.Value.Result().Type)
 		}
+	}
+}
+
+func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
+	expr.AcceptChildren(c)
+
+	// Check empty
+	if len(expr.Values) == 0 {
+		c.errorRange(expr.Range(), "Array initializers need to have at least one value.")
+		expr.Result().SetInvalid()
+
+		return
+	}
+
+	// Check values
+	ok := true
+	var type_ types.Type
+
+	for _, value := range expr.Values {
+		if value.Result().Kind == ast.InvalidResultKind {
+			ok = false
+			continue
+		}
+
+		if value.Result().Kind != ast.ValueResultKind {
+			c.errorRange(value.Range(), "Invalid value.")
+			ok = false
+
+			continue
+		}
+
+		if type_ == nil {
+			type_ = value.Result().Type
+		} else {
+			if !value.Result().Type.CanAssignTo(type_) {
+				c.errorRange(value.Range(), "Expected a '%s' but got '%s'.", type_, value.Result().Type)
+				ok = false
+			}
+		}
+	}
+
+	if ok {
+		expr.Result().SetValue(types.Array(uint32(len(expr.Values)), type_, core.Range{}), 0)
+	} else {
+		expr.Result().SetInvalid()
 	}
 }
 
@@ -667,13 +712,18 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 		ok = false
 	}
 
-	if !ok {
-		expr.Result().SetInvalid()
-		return
+	// Check if value is not an array initializer
+	if _, ok := expr.Value.(*ast.ArrayInitializer); ok {
+		c.errorRange(expr.Value.Range(), "Cannot index into a temporary array created directly from an array initializer.")
+		ok = false
 	}
 
 	// Set result
-	expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag)
+	if ok {
+		expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag)
+	} else {
+		expr.Result().SetInvalid()
+	}
 }
 
 func (c *checker) VisitMember(expr *ast.Member) {
