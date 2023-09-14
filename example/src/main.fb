@@ -15,12 +15,17 @@ func main() i32 {
     printVec(Vec2 {});
 
     printf("\n");
+
     printf("Y: %d\n", Vec2 { x: 6, y: 4 }.y);
     printf("Y: %d\n", getVec().y);
 
-    var array [2]i32;
-    array[0] = 9;
+    printf("\n");
+
+    var array = getArray();
     printf("0: %d\n", array[0]);
+    printf("1: %d\n", getArray()[1]);
+
+    foo();
 
     return 0;
 }
@@ -31,4 +36,18 @@ func printVec(vec Vec2) {
 
 func getVec() Vec2 {
     return Vec2 { x: 6, y: 4 };
+}
+
+func getArray() [2]i32 {
+    var array [2]i32;
+
+    array[0] = 3;
+    array[1] = 9;
+
+    return array;
+}
+
+func foo() i32 {
+    printf("foo()\n");
+    return 0;
 }

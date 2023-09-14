@@ -357,15 +357,19 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	type_ := c.getType(expr.Result().Type)
 	callee := c.acceptExpr(expr.Callee)
+	loc := c.debug.location(expr.Token())
+	hasReturnValue := false
 
-	if types.IsPrimitive(f.Returns, types.Void) {
-		builder.WriteString(fmt.Sprintf("call %s %s(", type_, callee))
-
-		c.exprResult = exprValue{identifier: ""}
-	} else {
+	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(f.Returns, types.Void) {
 		result := c.locals.unnamed()
+
 		builder.WriteString(fmt.Sprintf("%s = call %s %s(", result, type_, callee))
+
 		c.exprResult = result
+		hasReturnValue = true
+	} else {
+		builder.WriteString(fmt.Sprintf("call %s %s(", type_, callee))
+		c.exprResult = exprValue{identifier: ""}
 	}
 
 	for i, arg := range args {
@@ -377,9 +381,24 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	builder.WriteString("), !dbg ")
-	builder.WriteString(c.debug.location(expr.Token()))
+	builder.WriteString(loc)
 	builder.WriteRune('\n')
 	c.writeStr(builder.String())
+
+	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
+	if hasReturnValue {
+		if _, ok := expr.Result().Type.(*types.ArrayType); ok {
+			if _, ok := expr.Parent().(*ast.Index); ok {
+				result := c.locals.unnamed()
+				result.addressable = true
+
+				c.writeFmt("%s = alloca %s, !dbg %s\n", result, type_, loc)
+				c.writeFmt("store %s %s, ptr %s, !dbg %s\n", type_, c.exprResult, result, loc)
+
+				c.exprResult = result
+			}
+		}
+	}
 }
 
 func (c *codegen) VisitIndex(expr *ast.Index) {
