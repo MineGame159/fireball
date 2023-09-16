@@ -78,12 +78,20 @@ type Token struct {
 	Kind   TokenKind
 	Lexeme string
 
-	Line   int
-	Column int
+	line   int
+	column int
 }
 
 func (t Token) IsError() bool {
 	return t.Kind == Error
+}
+
+func (t Token) Line() int {
+	return t.line
+}
+
+func (t Token) Column() int {
+	return t.column
 }
 
 func (t Token) String() string {

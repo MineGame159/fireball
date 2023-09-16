@@ -373,8 +373,8 @@ func (s *Scanner) make(kind TokenKind) Token {
 	return Token{
 		Kind:   kind,
 		Lexeme: lexeme,
-		Line:   s.line,
-		Column: s.column - len(lexeme),
+		line:   s.line,
+		column: s.column - len(lexeme),
 	}
 }
 
@@ -382,8 +382,8 @@ func (s *Scanner) error(msg string) Token {
 	return Token{
 		Kind:   Error,
 		Lexeme: msg,
-		Line:   s.line,
-		Column: s.column,
+		line:   s.line,
+		column: s.column,
 	}
 }
 

@@ -58,7 +58,7 @@ func TokenToPos(token scanner.Token, end bool) Pos {
 	}
 
 	return Pos{
-		Line:   token.Line,
-		Column: token.Column + offset,
+		Line:   token.Line(),
+		Column: token.Column() + offset,
 	}
 }

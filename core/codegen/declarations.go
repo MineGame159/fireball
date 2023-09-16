@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fireball/core/ast"
+	"fireball/core/llvm"
 	"fireball/core/types"
 )
 
@@ -12,86 +13,55 @@ func (c *codegen) VisitEnum(_ *ast.Enum) {
 }
 
 func (c *codegen) VisitFunc(decl *ast.Func) {
+	// Get function
+	mangledName := mangleName(decl.Name.Lexeme)
+	var function *llvm.Function
+
+	for _, f := range c.functions {
+		if f.Name() == mangledName {
+			if fu, ok := f.(*llvm.Function); ok {
+				function = fu
+				break
+			}
+		}
+	}
+
+	if function == nil {
+		return
+	}
+
 	// Setup state
+	c.function = function
+	c.beginBlock(function.Block("entry"))
+
 	c.pushScope()
-	c.locals.reset()
+	function.PushScope()
 
-	// Debug
-	var dbg string
-
-	if !decl.Extern {
-		dbgTypes := make([]string, len(decl.Params)+1)
-
-		dbgTypes[0] = c.getDbgType(decl.Returns)
-
-		for i, param := range decl.Params {
-			dbgTypes[i+1] = c.getDbgType(param.Type)
-		}
-
-		type_ := c.debug.subroutineType(c.debug.tuple(dbgTypes))
-		dbg = c.debug.subprogram(decl.Name.Lexeme, type_, decl.Name.Line)
-
-		c.debug.pushScope(dbg)
-	}
-
-	// Signature
-	name := decl.Name.Lexeme
-	if !decl.Extern {
-		name = mangleName(name)
-	}
-
-	c.writeFmt("%s %s @%s(", ternary(decl.Extern, "declare", "define"), c.getType(decl.Returns), name)
-
+	// Copy parameters
 	for i, param := range decl.Params {
-		if i > 0 {
-			c.writeStr(", ")
-		}
+		type_ := c.getType(param.Type)
 
-		c.writeFmt("%s %%%s", c.getType(param.Type), param.Name)
-	}
+		pointer := c.block.Alloca(type_)
+		pointer.SetName(param.Name.Lexeme + ".var")
 
-	if decl.Variadic {
-		if len(decl.Params) > 0 {
-			c.writeStr(", ")
-		}
-
-		c.writeStr("...")
+		c.block.Store(pointer, function.GetParameter(i))
+		c.addVariable(param.Name, exprValue{v: pointer})
 	}
 
 	// Body
-	if decl.Extern {
-		c.writeStr(")\n\n")
-	} else {
-		c.writeFmt(") !dbg %s {\n", dbg)
-		c.writeBlock(c.blocks.unnamedRaw())
-
-		for i, param := range decl.Params {
-			val := c.locals.named(param.Name.Lexeme + ".var")
-			type_ := c.getType(param.Type)
-
-			loc := c.debug.location(param.Name)
-			c.writeFmt("%s = alloca %s, !dbg %s\n", val, type_, loc)
-			c.writeFmt("store %s %%%s, ptr %s, !dbg %s\n", type_, param.Name, val, loc)
-
-			c.addVariable(param.Name, val)
-			c.variableDebug(param.Name, val, param.Type, i+1, loc)
-		}
-
-		for _, stmt := range decl.Body {
-			c.acceptStmt(stmt)
-		}
-
-		if types.IsPrimitive(decl.Returns, types.Void) {
-			c.writeStr("ret void\n")
-		}
-
-		c.writeStr("}\n\n")
+	for _, stmt := range decl.Body {
+		c.acceptStmt(stmt)
 	}
 
-	// Restore state
-	if !decl.Extern {
-		c.debug.popScope()
+	// Add return if needed
+	if types.IsPrimitive(decl.Returns, types.Void) {
+		c.block.Ret(nil)
 	}
 
+	// Reset state
+	function.PopScope()
 	c.popScope()
+
+	c.block = nil
+	c.function = nil
 }

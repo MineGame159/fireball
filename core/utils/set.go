@@ -1,12 +1,12 @@
 package utils
 
 type Set[T comparable] struct {
-	data map[T]struct{}
+	Data map[T]struct{}
 }
 
 func NewSet[T comparable]() Set[T] {
 	return Set[T]{
-		data: make(map[T]struct{}),
+		Data: make(map[T]struct{}),
 	}
 }
 
@@ -15,11 +15,11 @@ func (s Set[T]) Add(value T) bool {
 		return false
 	}
 
-	s.data[value] = struct{}{}
+	s.Data[value] = struct{}{}
 	return true
 }
 
 func (s Set[T]) Contains(value T) bool {
-	_, contains := s.data[value]
+	_, contains := s.Data[value]
 	return contains
 }

@@ -259,8 +259,8 @@ func newSemantic(line, column, length int, kind semanticKind) semantic {
 }
 
 func (h *highlighter) addToken(token scanner.Token, kind semanticKind) {
-	if token.Column < 256 {
-		h.tokens = append(h.tokens, newSemantic(token.Line, token.Column, len(token.Lexeme), kind))
+	if token.Column() < 256 {
+		h.tokens = append(h.tokens, newSemantic(token.Line(), token.Column(), len(token.Lexeme), kind))
 	}
 }
 
