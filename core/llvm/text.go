@@ -167,17 +167,21 @@ func (w *textWriter) body(blocks []*Block) {
 
 		for _, inst := range block.instructions {
 			w.raw("    ")
-			w.instruction(inst)
+
+			if w.instruction(inst) {
+				break
+			}
 		}
 	}
 }
 
-func (w *textWriter) instruction(i Value) {
+func (w *textWriter) instruction(i Value) bool {
 	if _, ok := i.Type().(*voidType); i.Type() != nil && !ok {
 		w.fmt("%s = ", w.value(i))
 	}
 
 	location := -1
+	terminal := false
 
 	switch inst := i.(type) {
 	case *variable:
@@ -206,28 +210,28 @@ func (w *textWriter) instruction(i Value) {
 
 		switch inst.op {
 		case Add:
-			a = ternary(isFloating(inst.Type()), "fadd", "add")
+			a = ternary(isFloating(inst.left.Type()), "fadd", "add")
 		case Sub:
-			a = ternary(isFloating(inst.Type()), "fsub", "sub")
+			a = ternary(isFloating(inst.left.Type()), "fsub", "sub")
 		case Mul:
-			a = ternary(isFloating(inst.Type()), "fmul", "mul")
+			a = ternary(isFloating(inst.left.Type()), "fmul", "mul")
 		case Div:
-			a = ternary(isFloating(inst.Type()), "fdiv", ternary(isSigned(inst.Type()), "sdiv", "udiv"))
+			a = ternary(isFloating(inst.left.Type()), "fdiv", ternary(isSigned(inst.Type()), "sdiv", "udiv"))
 		case Rem:
-			a = ternary(isFloating(inst.Type()), "frem", ternary(isSigned(inst.Type()), "srem", "urem"))
+			a = ternary(isFloating(inst.left.Type()), "frem", ternary(isSigned(inst.Type()), "srem", "urem"))
 
 		case Eq:
-			a = ternary(isFloating(inst.Type()), "fcmp oeq", "icmp eq")
+			a = ternary(isFloating(inst.left.Type()), "fcmp oeq", "icmp eq")
 		case Ne:
-			a = ternary(isFloating(inst.Type()), "fcmp one", "icmp ne")
+			a = ternary(isFloating(inst.left.Type()), "fcmp one", "icmp ne")
 		case Lt:
-			a = ternary(isFloating(inst.Type()), "fcmp olt", ternary(isSigned(inst.Type()), "icmp slt", "icmp ult"))
+			a = ternary(isFloating(inst.left.Type()), "fcmp olt", ternary(isSigned(inst.Type()), "icmp slt", "icmp ult"))
 		case Le:
-			a = ternary(isFloating(inst.Type()), "fcmp ole", ternary(isSigned(inst.Type()), "icmp sle", "icmp ule"))
+			a = ternary(isFloating(inst.left.Type()), "fcmp ole", ternary(isSigned(inst.Type()), "icmp sle", "icmp ule"))
 		case Gt:
-			a = ternary(isFloating(inst.Type()), "fcmp ogt", ternary(isSigned(inst.Type()), "icmp sgt", "icmp ugt"))
+			a = ternary(isFloating(inst.left.Type()), "fcmp ogt", ternary(isSigned(inst.Type()), "icmp sgt", "icmp ugt"))
 		case Ge:
-			a = ternary(isFloating(inst.Type()), "fcmp oge", ternary(isSigned(inst.Type()), "icmp sge", "icmp uge"))
+			a = ternary(isFloating(inst.left.Type()), "fcmp oge", ternary(isSigned(inst.Type()), "icmp sge", "icmp uge"))
 
 		case Or:
 			a = "or"
@@ -238,10 +242,10 @@ func (w *textWriter) instruction(i Value) {
 		case Shl:
 			a = "shl"
 		case Shr:
-			a = ternary(isSigned(inst.Type()), "ashr", "lshr")
+			a = ternary(isSigned(inst.left.Type()), "ashr", "lshr")
 		}
 
-		w.fmt("%s %s %s, %s", a, w.type_(inst.Type()), w.value(inst.left), w.value(inst.right))
+		w.fmt("%s %s %s, %s", a, w.type_(inst.left.Type()), w.value(inst.left), w.value(inst.right))
 		location = inst.location
 
 	case *cast:
@@ -313,6 +317,7 @@ func (w *textWriter) instruction(i Value) {
 		}
 
 		location = inst.location
+		terminal = true
 
 	case *phi:
 		w.fmt("%s [ %s, %s ], [ %s, %s ]", w.type_(inst.type_), w.value(inst.firstValue), w.value(inst.firstBlock), w.value(inst.secondValue), w.value(inst.secondBlock))
@@ -340,6 +345,7 @@ func (w *textWriter) instruction(i Value) {
 		}
 
 		location = inst.location
+		terminal = true
 
 	default:
 		panic("textWriter.instruction() - Invalid instruction")
@@ -350,6 +356,7 @@ func (w *textWriter) instruction(i Value) {
 	}
 
 	w.raw("\n")
+	return terminal
 }
 
 // Types

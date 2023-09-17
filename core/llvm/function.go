@@ -193,10 +193,27 @@ func (b *Block) FNeg(value Value) InstructionValue {
 }
 
 func (b *Block) Binary(op BinaryKind, left, right Value) InstructionValue {
+	var type_ Type
+
+	switch op {
+	case Eq, Ne, Lt, Le, Gt, Ge:
+		for _, t := range b.module.types {
+			if t2, ok := t.(*primitiveType); ok && t2.encoding == BooleanEncoding {
+				type_ = t2
+			}
+		}
+
+		if type_ == nil {
+			type_ = b.module.Primitive("i1", 1, BooleanEncoding)
+		}
+	default:
+		type_ = left.Type()
+	}
+
 	i := &binary{
 		instruction: instruction{
 			module:   b.module,
-			type_:    left.Type(),
+			type_:    type_,
 			location: -1,
 		},
 		op:    op,
