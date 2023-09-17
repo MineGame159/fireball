@@ -14,8 +14,9 @@ type symbol struct {
 	file *workspace.File
 	kind protocol.SymbolKind
 
-	name   string
-	detail string
+	name          string
+	containerName string
+	detail        string
 
 	range_         core.Range
 	selectionRange core.Range
@@ -52,6 +53,25 @@ func getSymbols(symbols symbolConsumer, file *workspace.File) {
 					range_:         range_,
 					selectionRange: range_,
 				})
+			}
+		} else if impl, ok := decl.(*ast.Impl); ok {
+			for _, f := range impl.Functions {
+				function := f.(*ast.Func)
+				detail := ""
+
+				if symbols.supportsDetail() {
+					detail = function.Signature(true)
+				}
+
+				symbols.add(symbol{
+					file:           file,
+					kind:           protocol.SymbolKindMethod,
+					name:           function.Name.Lexeme,
+					containerName:  impl.Struct.Lexeme,
+					detail:         detail,
+					range_:         function.Range(),
+					selectionRange: core.TokenToRange(function.Name),
+				}, 0)
 			}
 		} else if enum, ok := decl.(*ast.Enum); ok {
 			// Enum
@@ -155,9 +175,9 @@ func (w *workspaceSymbolConsumer) supportsDetail() bool {
 }
 
 func (w *workspaceSymbolConsumer) convert(symbol symbol, parent int) protocol.SymbolInformation {
-	containerName := ""
+	containerName := symbol.containerName
 
-	if parent >= 0 {
+	if parent >= 0 && containerName == "" {
 		containerName = w.symbols[parent].Name
 	}
 
