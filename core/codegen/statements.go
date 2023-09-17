@@ -22,16 +22,13 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 
 func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Variable
-	pointer := c.block.Alloca(c.getType(stmt.Type))
-	pointer.SetName(stmt.Name.Lexeme + ".var")
-	pointer.SetLocation(stmt.Name)
-
-	c.addVariable(stmt.Name, exprValue{v: pointer})
+	pointer := c.allocas[stmt]
+	c.addVariable(stmt.Name, pointer)
 
 	// Initializer
 	if stmt.Initializer != nil {
 		initializer := c.loadExpr(stmt.Initializer)
-		c.block.Store(pointer, initializer.v).SetLocation(stmt.Name)
+		c.block.Store(pointer.v, initializer.v).SetLocation(stmt.Name)
 	}
 }
 

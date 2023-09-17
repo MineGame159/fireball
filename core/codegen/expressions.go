@@ -474,18 +474,11 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
-	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(function.Returns, types.Void) {
-		if _, ok := function.Returns.(*types.ArrayType); ok {
-			if _, ok := expr.Parent().(*ast.Index); ok {
-				result := c.block.Alloca(c.getType(function.Returns))
-				c.block.Store(result, c.exprResult.v)
+	if callNeedsTempVariable(expr) {
+		pointer := c.allocas[expr]
+		c.block.Store(pointer.v, c.exprResult.v)
 
-				c.exprResult = exprValue{
-					v:           result,
-					addressable: true,
-				}
-			}
-		}
+		c.exprResult = pointer
 	}
 }
 
@@ -556,8 +549,15 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 		// Method
 		if expr.Result().Kind == ast.FunctionResultKind {
+			if !value.addressable {
+				pointer := c.allocas[expr]
+				c.block.Store(pointer.v, value.v)
+
+				value = pointer
+			}
+
 			c.exprResult = c.getFunction(expr.Result().Function)
-			c.this = c.toAddressable(value)
+			c.this = value
 
 			return
 		}

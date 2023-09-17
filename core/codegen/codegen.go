@@ -20,6 +20,8 @@ type codegen struct {
 	scopes    []scope
 	variables []variable
 
+	allocas map[ast.Node]exprValue
+
 	function *llvm.Function
 	block    *llvm.Block
 
@@ -132,20 +134,6 @@ func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 	return c.load(c.acceptExpr(expr))
 }
 
-func (c *codegen) toAddressable(value exprValue) exprValue {
-	if value.addressable {
-		return value
-	}
-
-	pointer := c.block.Alloca(value.v.Type())
-	c.block.Store(pointer, value.v)
-
-	return exprValue{
-		v:           pointer,
-		addressable: true,
-	}
-}
-
 // Functions
 
 func (c *codegen) createFunctionType(function *ast.Func, this *ast.Struct) llvm.Type {
@@ -196,6 +184,67 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 
 func (c *codegen) beginBlock(block *llvm.Block) {
 	c.block = block
+}
+
+func (c *codegen) findAllocas(function *ast.Func) {
+	c.allocas = make(map[ast.Node]exprValue)
+
+	a := &allocaFinder{c: c}
+	a.AcceptDecl(function)
+}
+
+type allocaFinder struct {
+	c *codegen
+}
+
+func (a *allocaFinder) AcceptDecl(decl ast.Decl) {
+	decl.AcceptChildren(a)
+}
+
+func (a *allocaFinder) AcceptStmt(stmt ast.Stmt) {
+	if variable, ok := stmt.(*ast.Variable); ok {
+		pointer := a.c.block.Alloca(a.c.getType(variable.Type))
+		pointer.SetName(variable.Name.Lexeme + ".var")
+
+		a.c.allocas[variable] = exprValue{
+			v:           pointer,
+			addressable: true,
+		}
+	}
+
+	stmt.AcceptChildren(a)
+}
+
+func (a *allocaFinder) AcceptExpr(expr ast.Expr) {
+	if call, ok := expr.(*ast.Call); ok && callNeedsTempVariable(call) {
+		a.c.allocas[call] = exprValue{
+			v:           a.c.block.Alloca(a.c.getType(call.Callee.Result().Function.Returns)),
+			addressable: true,
+		}
+	} else if member, ok := expr.(*ast.Member); ok {
+		if member.Result().Kind == ast.FunctionResultKind && !member.Value.Result().IsAddressable() {
+			a.c.allocas[member] = exprValue{
+				v:           a.c.block.Alloca(a.c.getType(member.Value.Result().Type)),
+				addressable: true,
+			}
+		}
+	}
+
+	expr.AcceptChildren(a)
+}
+
+func callNeedsTempVariable(expr *ast.Call) bool {
+	function := expr.Callee.Result().Function
+
+	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(function.Returns, types.Void) {
+		if _, ok := function.Returns.(*types.ArrayType); ok {
+			if _, ok := expr.Parent().(*ast.Index); ok {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // Types

@@ -61,6 +61,8 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	}
 
 	// Body
+	c.findAllocas(decl)
+
 	for _, stmt := range decl.Body {
 		c.acceptStmt(stmt)
 	}
