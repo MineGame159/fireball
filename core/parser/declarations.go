@@ -14,6 +14,9 @@ func (p *parser) declaration() ast.Decl {
 	if p.match(scanner.Struct) {
 		return p.struct_()
 	}
+	if p.match(scanner.Impl) {
+		return p.impl()
+	}
 	if p.match(scanner.Enum) {
 		return p.enum()
 	}
@@ -105,6 +108,55 @@ func (p *parser) struct_() ast.Decl {
 	decl := &ast.Struct{
 		Name:   name,
 		Fields: fields,
+	}
+
+	decl.SetRangeToken(start, p.current)
+	decl.SetChildrenParent()
+
+	return decl
+}
+
+func (p *parser) impl() ast.Decl {
+	start := p.current
+
+	// Name
+	struct_ := p.consume(scanner.Identifier, "Expected struct name.")
+
+	if struct_.IsError() {
+		p.syncToDecl()
+		return nil
+	}
+
+	// Left brace
+	if brace := p.consume(scanner.LeftBrace, "Expected '{' after struct name."); brace.IsError() {
+		p.syncToDecl()
+		return nil
+	}
+
+	// Functions
+	functions := make([]ast.Decl, 0, 8)
+
+	for p.canLoopAdvanced(scanner.Func, scanner.RightBrace) {
+		p.advance()
+
+		function := p.function(p.current)
+		if function == nil {
+			p.syncToDecl()
+			return nil
+		}
+
+		functions = append(functions, function)
+	}
+
+	// Right brace
+	if brace := p.consume(scanner.RightBrace, "Expected '}' after struct methods."); brace.IsError() {
+		p.syncToDecl()
+	}
+
+	// Return
+	decl := &ast.Impl{
+		Struct:    struct_,
+		Functions: functions,
 	}
 
 	decl.SetRangeToken(start, p.current)

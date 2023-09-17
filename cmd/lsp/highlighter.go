@@ -53,6 +53,12 @@ func (h *highlighter) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitImpl(decl *ast.Impl) {
+	h.addToken(decl.Struct, classKind)
+
+	decl.AcceptChildren(h)
+}
+
 func (h *highlighter) VisitEnum(decl *ast.Enum) {
 	h.addToken(decl.Name, enumKind)
 
@@ -182,7 +188,9 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 }
 
 func (h *highlighter) VisitMember(expr *ast.Member) {
-	if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
+	if call, ok := expr.Parent().(*ast.Call); ok && call.Callee == expr {
+		h.addToken(expr.Name, functionKind)
+	} else if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 		h.addToken(expr.Name, enumMemberKind)
 	} else {
 		h.addToken(expr.Name, propertyKind)

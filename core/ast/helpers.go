@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fireball/core/types"
+	"fmt"
 	"strings"
 )
 
@@ -15,6 +16,18 @@ func (s *Struct) GetField(name string) (int, *Field) {
 	}
 
 	return 0, nil
+}
+
+func (i *Impl) GetMethod(name string) *Func {
+	for _, decl := range i.Functions {
+		function := decl.(*Func)
+
+		if function.Name.Lexeme == name {
+			return function
+		}
+	}
+
+	return nil
 }
 
 func (e *Enum) GetCase(name string) *EnumCase {
@@ -54,4 +67,26 @@ func (f *Func) Signature(paramNames bool) string {
 	}
 
 	return signature.String()
+}
+
+func (f *Func) Method() *Struct {
+	if impl, ok := f.Parent().(*Impl); ok {
+		return impl.Type_
+	}
+
+	return nil
+}
+
+func (f *Func) MangledName() string {
+	name := f.Name.Lexeme
+
+	if f.Extern {
+		return name
+	}
+
+	if struct_ := f.Method(); struct_ != nil {
+		name = fmt.Sprintf("%s.%s", struct_, name)
+	}
+
+	return "fb$" + name
 }

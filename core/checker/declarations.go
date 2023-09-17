@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fireball/core/ast"
+	"fireball/core/scanner"
 	"fireball/core/types"
 	"fireball/core/utils"
 )
@@ -22,6 +23,19 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 		if types.IsPrimitive(field.Type, types.Void) {
 			c.errorToken(field.Name, "Field cannot be of type 'void'.")
 		}
+	}
+}
+
+func (c *checker) VisitImpl(decl *ast.Impl) {
+	if decl.Type_ != nil {
+		c.pushScope()
+		c.addVariable(scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}, decl.Type_)
+	}
+
+	decl.AcceptChildren(c)
+
+	if decl.Type_ != nil {
+		c.popScope()
 	}
 }
 

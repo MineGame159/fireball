@@ -9,6 +9,7 @@ import "fireball/core/scanner"
 
 type DeclVisitor interface {
 	VisitStruct(decl *Struct)
+	VisitImpl(decl *Impl)
 	VisitEnum(decl *Enum)
 	VisitFunc(decl *Func)
 }
@@ -111,6 +112,91 @@ func (s *Struct) SetChildrenParent() {
 type Field struct {
 	Name scanner.Token
 	Type types.Type
+}
+
+// Impl
+
+type Impl struct {
+	range_ core.Range
+	parent Node
+
+	Struct    scanner.Token
+	Type_     *Struct
+	Functions []Decl
+}
+
+func (i *Impl) Token() scanner.Token {
+	return i.Struct
+}
+
+func (i *Impl) Range() core.Range {
+	return i.range_
+}
+
+func (i *Impl) SetRangeToken(start, end scanner.Token) {
+	i.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
+	}
+}
+
+func (i *Impl) SetRangePos(start, end core.Pos) {
+	i.range_ = core.Range{
+		Start: start,
+		End:   end,
+	}
+}
+
+func (i *Impl) SetRangeNode(start, end Node) {
+	i.range_ = core.Range{
+		Start: start.Range().Start,
+		End:   end.Range().End,
+	}
+}
+
+func (i *Impl) Parent() Node {
+	return i.parent
+}
+
+func (i *Impl) SetParent(parent Node) {
+	if i.parent != nil && parent != nil {
+		log.Fatalln("Impl.SetParent() - Node already has a parent")
+	}
+	i.parent = parent
+}
+
+func (i *Impl) Accept(visitor DeclVisitor) {
+	visitor.VisitImpl(i)
+}
+
+func (i *Impl) AcceptChildren(visitor Acceptor) {
+	for i_ := range i.Functions {
+		if i.Functions[i_] != nil {
+			visitor.AcceptDecl(i.Functions[i_])
+		}
+	}
+}
+
+func (i *Impl) AcceptTypes(visitor types.Visitor) {
+}
+
+func (i *Impl) AcceptTypesPtr(visitor types.PtrVisitor) {
+}
+
+func (i *Impl) Leaf() bool {
+	return false
+}
+
+func (i *Impl) String() string {
+	return i.Token().Lexeme
+}
+
+func (i *Impl) SetChildrenParent() {
+	for i_ := range i.Functions {
+		if i.Functions[i_] != nil {
+			i.Functions[i_].SetParent(i)
+		}
+	}
 }
 
 // Enum

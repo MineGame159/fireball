@@ -3,50 +3,21 @@ struct Vec2 {
     y i32,
 }
 
-enum Animal {
-    Dog = 9,
-    Cat,
+impl Vec2 {
+    func add(v Vec2) Vec2 {
+        return Vec2 { x: this.x + v.x, y: this.y + v.y };
+    }
+
+    func print() {
+        printf("X: %d, Y: %d\n", this.x, this.y);
+    }
 }
 
 func main() i32 {
-    printVec(Vec2 { x: 2, y: 5 });
-    printVec(Vec2 { x: 2 });
-    printVec(Vec2 { y: 5 });
-    printVec(Vec2 {});
+    var a = Vec2 { x: 2, y: 9 };
+    var b = Vec2 { x: 6, y: 2 };
 
-    printf("\n");
-
-    printf("Y: %d\n", Vec2 { x: 6, y: 4 }.y);
-    printf("Y: %d\n", getVec().y);
-
-    printf("\n");
-
-    var array = getArray();
-    printf("0: %d\n", array[0]);
-    printf("1: %d\n", getArray()[1]);
-
-    printf("\n");
-
-    var i = 0;
-    printf("i  : %d\n", i);
-    printf("++i: %d\n", ++i);
-    printf("i++: %d\n", i++);
-    printf("i  : %d\n", i);
-    printf("--i: %d\n", --i);
-    printf("i--: %d\n", i--);
-    printf("i  : %d\n", i);
+    a.add(b).print();
 
     return 0;
-}
-
-func printVec(vec Vec2) {
-    printf("X: %d, Y: %d\n", vec.x, vec.y);
-}
-
-func getVec() Vec2 {
-    return Vec2 { x: 6, y: 4 };
-}
-
-func getArray() [2]i32 {
-    return [ 3, 9 ];
 }

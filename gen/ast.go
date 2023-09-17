@@ -42,6 +42,16 @@ var decls = []item{
 		ast: false,
 	},
 	{
+		name: "Impl",
+		fields: []field{
+			{name: "Struct", type_: "Token"},
+			{name: "Type_", type_: "*Struct"},
+			{name: "Functions", type_: "[]Decl"},
+		},
+		token: "Struct",
+		ast:   true,
+	},
+	{
 		name: "Enum",
 		fields: []field{
 			{name: "Name", type_: "Token"},

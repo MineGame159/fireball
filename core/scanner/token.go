@@ -61,6 +61,7 @@ const (
 	Break
 	Return
 	Struct
+	Impl
 	Enum
 
 	Number

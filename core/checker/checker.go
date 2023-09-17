@@ -92,11 +92,13 @@ func (c *checker) pushScope() {
 
 func (c *checker) popScope() {
 	// Check unused variables
-	for i := len(c.variables) - 1; i >= c.peekScope().variableI; i-- {
-		v := c.variables[i]
+	if c.function != nil {
+		for i := len(c.variables) - 1; i >= c.peekScope().variableI; i-- {
+			v := c.variables[i]
 
-		if !v.used && v.name.Lexeme[0] != '_' && (!c.function.Extern || !v.param) {
-			c.warningToken(v.name, "Unused variable '%s'. Prefix with '_' to ignore.", v.name)
+			if !v.used && v.name.Lexeme[0] != '_' && (!c.function.Extern || !v.param) {
+				c.warningToken(v.name, "Unused variable '%s'. Prefix with '_' to ignore.", v.name)
+			}
 		}
 	}
 

@@ -77,8 +77,14 @@ func (p *parser) expressionStmt() ast.Stmt {
 
 	_, isAssignment := expr.(*ast.Assignment)
 	_, isCall := expr.(*ast.Call)
+	unary, isUnary := expr.(*ast.Unary)
 
-	if !isAssignment && !isCall {
+	if !isAssignment && !isCall && !isUnary {
+		p.error(token, "Invalid statement.")
+		return nil
+	}
+
+	if isUnary && unary.Op.Kind != scanner.PlusPlus && unary.Op.Kind != scanner.MinusMinus {
 		p.error(token, "Invalid statement.")
 		return nil
 	}

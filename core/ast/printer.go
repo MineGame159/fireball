@@ -36,6 +36,14 @@ func (p *printer) VisitStruct(decl *Struct) {
 	}
 }
 
+func (p *printer) VisitImpl(decl *Impl) {
+	p.print("impl %s", decl.Struct)
+
+	for _, function := range decl.Functions {
+		p.AcceptDecl(function)
+	}
+}
+
 func (p *printer) VisitEnum(decl *Enum) {
 	p.print("enum %s %s", decl.Name, decl.Type)
 	p.depth++

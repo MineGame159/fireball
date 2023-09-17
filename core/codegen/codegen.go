@@ -15,7 +15,7 @@ type codegen struct {
 
 	types []typePair
 
-	functions []llvm.Value
+	functions map[*ast.Func]llvm.Value
 
 	scopes    []scope
 	variables []variable
@@ -27,6 +27,7 @@ type codegen struct {
 	loopEnd   *llvm.Block
 
 	exprResult exprValue
+	this       exprValue
 
 	module *llvm.Module
 }
@@ -57,6 +58,8 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 		path:     path,
 		resolver: resolver,
 
+		functions: make(map[*ast.Func]llvm.Value),
+
 		module: llvm.NewModule(),
 	}
 
@@ -65,22 +68,14 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 
 	// Define and declare functions
 	for _, decl := range decls {
-		if function, ok := decl.(*ast.Func); ok {
-			t := c.createFunctionType(function)
-
-			if function.Extern {
-				// Declare
-				c.functions = append(c.functions, c.module.Declare(t))
-			} else {
-				// Define
-				f := c.module.Define(t)
-				c.functions = append(c.functions, f)
-
-				// Set parameter names
-				for i, param := range function.Params {
-					f.GetParameter(i).SetName(param.Name.Lexeme)
+		if impl, ok := decl.(*ast.Impl); ok {
+			for _, decl := range impl.Functions {
+				if function, ok := decl.(*ast.Func); ok {
+					c.defineOrDeclare(function, impl.Type_)
 				}
 			}
+		} else if function, ok := decl.(*ast.Func); ok {
+			c.defineOrDeclare(function, nil)
 		}
 	}
 
@@ -91,6 +86,33 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 
 	// Write
 	llvm.WriteText(c.module, writer)
+}
+
+func (c *codegen) defineOrDeclare(function *ast.Func, this *ast.Struct) {
+	t := c.createFunctionType(function, this)
+
+	if function.Extern {
+		// Declare
+		c.functions[function] = c.module.Declare(t)
+	} else {
+		// Define
+		f := c.module.Define(t)
+		c.functions[function] = f
+
+		// Set parameter names
+		if this != nil {
+			f.GetParameter(0).SetName("this")
+		}
+
+		for i, param := range function.Params {
+			index := i
+			if this != nil {
+				index++
+			}
+
+			f.GetParameter(index).SetName(param.Name.Lexeme)
+		}
+	}
 }
 
 // IR
@@ -110,54 +132,66 @@ func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 	return c.load(c.acceptExpr(expr))
 }
 
+func (c *codegen) toAddressable(value exprValue) exprValue {
+	if value.addressable {
+		return value
+	}
+
+	pointer := c.block.Alloca(value.v.Type())
+	c.block.Store(pointer, value.v)
+
+	return exprValue{
+		v:           pointer,
+		addressable: true,
+	}
+}
+
 // Functions
 
-func mangleName(name string) string {
-	return "fb$" + name
-}
+func (c *codegen) createFunctionType(function *ast.Func, this *ast.Struct) llvm.Type {
+	parameterCount := len(function.Params)
+	if this != nil {
+		parameterCount++
+	}
 
-func (c *codegen) createFunctionType(function *ast.Func) llvm.Type {
-	parameters := make([]llvm.Type, len(function.Params))
+	parameters := make([]llvm.Type, parameterCount)
+
+	if this != nil {
+		type_ := types.PointerType{Pointee: this}
+		parameters[0] = c.getType(&type_)
+	}
 
 	for i, param := range function.Params {
-		parameters[i] = c.getType(param.Type)
+		index := i
+		if this != nil {
+			index++
+		}
+
+		parameters[index] = c.getType(param.Type)
 	}
 
-	name := function.Name.Lexeme
-	if !function.Extern {
-		name = mangleName(name)
-	}
-
-	return c.module.Function(name, parameters, function.Variadic, c.getType(function.Returns))
+	return c.module.Function(function.MangledName(), parameters, function.Variadic, c.getType(function.Returns))
 }
 
-func (c *codegen) getFunction(name scanner.Token) exprValue {
-	// Get function in this file
-	mangledName := mangleName(name.Lexeme)
-
-	for _, function := range c.functions {
-		if function.Name() == mangledName || function.Name() == name.Lexeme {
-			return exprValue{
-				v: function,
-			}
+func (c *codegen) getFunction(function *ast.Func) exprValue {
+	// Get function already in this module
+	for f, value := range c.functions {
+		if f.Equals(function) {
+			return exprValue{v: value}
 		}
 	}
 
 	// Resolve function from project
-	function, filePath := c.resolver.GetFunction(name.Lexeme)
+	_, filePath := c.resolver.GetFunction(function.Name.Lexeme)
 
 	if filePath == c.path {
-		panic("codegen.getFunction() - Local function not found in functions array")
+		panic("codegen.getFunction() - Local function not found in functions map")
 	}
 
-	t := c.createFunctionType(function)
+	value := c.module.Declare(c.createFunctionType(function, nil))
+	c.functions[function] = value
 
-	value := c.module.Declare(t)
-	c.functions = append(c.functions, value)
-
-	return exprValue{
-		v: value,
-	}
+	return exprValue{v: value}
 }
 
 func (c *codegen) beginBlock(block *llvm.Block) {

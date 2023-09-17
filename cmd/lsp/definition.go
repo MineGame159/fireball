@@ -3,6 +3,7 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
+	"fireball/core/types"
 	"fireball/core/workspace"
 	"github.com/MineGame159/protocol"
 	"go.lsp.dev/uri"
@@ -71,6 +72,22 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 					}}
 				}
 			}
+		} else if member, ok := node.(*ast.Member); ok && member.Result().Kind == ast.FunctionResultKind {
+			type_ := member.Value.Result().Type
+
+			if pointer, ok := type_.(*types.PointerType); ok {
+				type_ = pointer.Pointee
+			}
+
+			function, path := file.Project.GetMethod(type_, member.Name.Lexeme)
+			if function == nil {
+				return nil
+			}
+
+			return []protocol.Location{{
+				URI:   uri.New(filepath.Join(file.Project.Path, path)),
+				Range: convertRange(function.Range()),
+			}}
 		}
 	}
 

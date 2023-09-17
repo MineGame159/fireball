@@ -117,6 +117,8 @@ func (p *Project) LoadFiles() error {
 
 	for _, file := range p.Files {
 		file.CollectTypesAndFunctions()
+		file.ResolveTypes()
+
 		file.parseWaitGroup.Done()
 	}
 
@@ -143,6 +145,22 @@ func (p *Project) GetFunction(name string) (*ast.Func, string) {
 	for _, file := range p.Files {
 		if v, ok := file.Functions[name]; ok {
 			return v, file.Path
+		}
+	}
+
+	return nil, ""
+}
+
+func (p *Project) GetMethod(type_ types.Type, name string) (*ast.Func, string) {
+	for _, file := range p.Files {
+		for _, decl := range file.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil && impl.Type_.Equals(type_) {
+				function := impl.GetMethod(name)
+
+				if function != nil {
+					return function, file.Path
+				}
+			}
 		}
 	}
 

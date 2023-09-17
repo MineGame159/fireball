@@ -1,3 +1,0 @@
-func print(a *i32) {
-    printf("Number: %d\n", *a);
-}

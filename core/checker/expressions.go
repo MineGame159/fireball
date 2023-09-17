@@ -773,11 +773,25 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			return
 		}
 
+		// Check if parent expression is a call expression
+		if call, ok := expr.Parent().(*ast.Call); ok && call.Callee == expr {
+			function, _ := c.resolver.GetMethod(s, expr.Name.Lexeme)
+
+			if function != nil {
+				expr.Result().SetFunction(function)
+			} else {
+				c.errorToken(expr.Name, "Struct '%s' does not contain method '%s'.", s, expr.Name)
+				expr.Result().SetInvalid()
+			}
+
+			return
+		}
+
 		// Check field
 		_, field := s.GetField(expr.Name.Lexeme)
 
 		if field == nil {
-			c.errorToken(expr.Name, "Struct '%s' does not contain member '%s'.", s, expr.Name)
+			c.errorToken(expr.Name, "Struct '%s' does not contain field '%s'.", s, expr.Name)
 			expr.Result().SetInvalid()
 
 			return

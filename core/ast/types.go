@@ -111,6 +111,9 @@ func (f *Func) WithRange(range_ core.Range) types.Type {
 
 func (f *Func) Equals(other types.Type) bool {
 	if v, ok := other.(*Func); ok {
+		if f.Name.Lexeme != v.Name.Lexeme {
+			return false
+		}
 		if !f.Returns.Equals(v.Returns) {
 			return false
 		}

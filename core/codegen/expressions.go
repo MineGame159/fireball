@@ -293,7 +293,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 	switch expr.Kind {
 	case ast.FunctionKind:
-		c.exprResult = c.getFunction(expr.Identifier)
+		c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
 		return
 
 	case ast.EnumKind:
@@ -441,23 +441,32 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type,
 
 func (c *codegen) VisitCall(expr *ast.Call) {
 	// Get type
-	var f *ast.Func
-
-	if v, ok := expr.Callee.Result().Type.(*ast.Func); ok {
-		f = v
-	}
+	callee := c.acceptExpr(expr.Callee)
+	function := expr.Callee.Result().Function
 
 	// Load arguments
-	args := make([]llvm.Value, len(expr.Args))
+	argCount := len(expr.Args)
+	if function.Method() != nil {
+		argCount++
+	}
+
+	args := make([]llvm.Value, argCount)
+
+	if function.Method() != nil {
+		args[0] = c.this.v
+	}
 
 	for i, arg := range expr.Args {
-		args[i] = c.loadExpr(arg).v
+		index := i
+		if function.Method() != nil {
+			index++
+		}
+
+		args[index] = c.loadExpr(arg).v
 	}
 
 	// Call
-	callee := c.acceptExpr(expr.Callee)
-
-	result := c.block.Call(callee.v, args, c.getType(f.Returns))
+	result := c.block.Call(callee.v, args, c.getType(function.Returns))
 	result.SetLocation(expr.Token())
 
 	c.exprResult = exprValue{
@@ -465,10 +474,10 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
-	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(f.Returns, types.Void) {
-		if _, ok := f.Returns.(*types.ArrayType); ok {
+	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(function.Returns, types.Void) {
+		if _, ok := function.Returns.(*types.ArrayType); ok {
 			if _, ok := expr.Parent().(*ast.Index); ok {
-				result := c.block.Alloca(c.getType(f.Returns))
+				result := c.block.Alloca(c.getType(function.Returns))
 				c.block.Store(result, c.exprResult.v)
 
 				c.exprResult = exprValue{
@@ -545,6 +554,15 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			log.Fatalln("Invalid member value")
 		}
 
+		// Method
+		if expr.Result().Kind == ast.FunctionResultKind {
+			c.exprResult = c.getFunction(expr.Result().Function)
+			c.this = c.toAddressable(value)
+
+			return
+		}
+
+		// Field
 		i, field := s.GetField(expr.Name.Lexeme)
 
 		if value.addressable {

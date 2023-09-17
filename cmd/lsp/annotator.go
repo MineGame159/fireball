@@ -38,6 +38,10 @@ func (a *annotator) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(a)
 }
 
+func (a *annotator) VisitImpl(decl *ast.Impl) {
+	decl.AcceptChildren(a)
+}
+
 func (a *annotator) VisitEnum(decl *ast.Enum) {
 	if decl.InferType {
 		a.addToken(decl.Name, " "+decl.Type.String(), protocol.InlayHintKindType)

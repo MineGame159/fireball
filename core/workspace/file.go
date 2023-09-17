@@ -44,7 +44,10 @@ func (f *File) SetText(text string, parse bool) {
 
 		// Parse
 		f.Decls = parser.Parse(f, scanner.NewScanner(text))
+
 		f.CollectTypesAndFunctions()
+		f.ResolveTypes()
+
 		f.parseWaitGroup.Done()
 
 		// Check
@@ -144,6 +147,24 @@ func (f *File) CollectTypesAndFunctions() {
 
 	f.Types = typeMap
 	f.Functions = functionMap
+}
+
+func (f *File) ResolveTypes() {
+	for _, decl := range f.Decls {
+		if impl, ok := decl.(*ast.Impl); ok {
+			type_, _ := f.Project.GetType(impl.Struct.Lexeme)
+
+			if s, ok := type_.(*ast.Struct); ok {
+				impl.Type_ = s
+			} else {
+				f.Report(utils.Diagnostic{
+					Kind:    utils.ErrorKind,
+					Range:   core.TokenToRange(impl.Struct),
+					Message: fmt.Sprintf("Struct with the name '%s' does not exist.", impl.Struct),
+				})
+			}
+		}
+	}
 }
 
 func (f *File) Report(diag utils.Diagnostic) {
