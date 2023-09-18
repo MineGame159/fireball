@@ -114,6 +114,9 @@ func (f *Func) Equals(other types.Type) bool {
 		if f.Name.Lexeme != v.Name.Lexeme {
 			return false
 		}
+		if f.Parent() != v.Parent() {
+			return false
+		}
 		if !f.Returns.Equals(v.Returns) {
 			return false
 		}

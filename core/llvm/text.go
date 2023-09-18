@@ -320,7 +320,7 @@ func (w *textWriter) instruction(i Value) bool {
 		terminal = true
 
 	case *phi:
-		w.fmt("%s [ %s, %s ], [ %s, %s ]", w.type_(inst.type_), w.value(inst.firstValue), w.value(inst.firstBlock), w.value(inst.secondValue), w.value(inst.secondBlock))
+		w.fmt("phi %s [ %s, %s ], [ %s, %s ]", w.type_(inst.type_), w.value(inst.firstValue), w.value(inst.firstBlock), w.value(inst.secondValue), w.value(inst.secondBlock))
 		location = inst.location
 
 	case *call:
