@@ -140,6 +140,10 @@ func (a *annotator) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(a)
 }
 
+func (a *annotator) VisitSizeof(expr *ast.Sizeof) {
+	expr.AcceptChildren(a)
+}
+
 func (a *annotator) VisitCall(expr *ast.Call) {
 	if false {
 		if i, ok := expr.Callee.(*ast.Identifier); ok && i.Kind == ast.FunctionKind {

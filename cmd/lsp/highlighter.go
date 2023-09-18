@@ -179,6 +179,12 @@ func (h *highlighter) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitSizeof(expr *ast.Sizeof) {
+	h.addToken(expr.Token(), functionKind)
+
+	expr.AcceptChildren(h)
+}
+
 func (h *highlighter) VisitCall(expr *ast.Call) {
 	expr.AcceptChildren(h)
 }

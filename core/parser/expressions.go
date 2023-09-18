@@ -566,6 +566,11 @@ func (p *parser) primary() ast.Expr {
 			return p.structInitializer(token)
 		}
 
+		// Sizeof
+		if token.Lexeme == "sizeof" && p.match(scanner.LeftParen) {
+			return p.sizeof(token)
+		}
+
 		// abc
 		expr := &ast.Identifier{
 			Identifier: token,
@@ -699,6 +704,30 @@ func (p *parser) arrayInitializer() ast.Expr {
 	expr := &ast.ArrayInitializer{
 		Token_: token,
 		Values: values,
+	}
+
+	expr.SetRangeToken(token, p.current)
+	expr.SetChildrenParent()
+
+	return expr
+}
+
+func (p *parser) sizeof(token scanner.Token) ast.Expr {
+	// Type
+	type_ := p.parseType()
+	if type_ == nil {
+		return nil
+	}
+
+	// Right paren
+	if token := p.consume(scanner.RightParen, "Expected ')' after type."); token.IsError() {
+		return nil
+	}
+
+	// Return
+	expr := &ast.Sizeof{
+		Token_: token,
+		Target: type_,
 	}
 
 	expr.SetRangeToken(token, p.current)

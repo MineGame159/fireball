@@ -198,6 +198,10 @@ func (p *printer) VisitCast(expr *Cast) {
 	p.AcceptExpr(expr.Expr)
 }
 
+func (p *printer) VisitSizeof(expr *Sizeof) {
+	p.print("sizeof %s", expr.Target)
+}
+
 func (p *printer) VisitCall(expr *Call) {
 	p.print("call")
 	p.AcceptExpr(expr.Callee)

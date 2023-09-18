@@ -18,6 +18,7 @@ type ExprVisitor interface {
 	VisitIdentifier(expr *Identifier)
 	VisitAssignment(expr *Assignment)
 	VisitCast(expr *Cast)
+	VisitSizeof(expr *Sizeof)
 	VisitCall(expr *Call)
 	VisitIndex(expr *Index)
 	VisitMember(expr *Member)
@@ -954,6 +955,93 @@ func (c *Cast) SetChildrenParent() {
 	if c.Expr != nil {
 		c.Expr.SetParent(c)
 	}
+}
+
+// Sizeof
+
+type Sizeof struct {
+	range_ core.Range
+	parent Node
+	result ExprResult
+
+	Token_ scanner.Token
+	Target types.Type
+}
+
+func (s *Sizeof) Token() scanner.Token {
+	return s.Token_
+}
+
+func (s *Sizeof) Range() core.Range {
+	return s.range_
+}
+
+func (s *Sizeof) SetRangeToken(start, end scanner.Token) {
+	s.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
+	}
+}
+
+func (s *Sizeof) SetRangePos(start, end core.Pos) {
+	s.range_ = core.Range{
+		Start: start,
+		End:   end,
+	}
+}
+
+func (s *Sizeof) SetRangeNode(start, end Node) {
+	s.range_ = core.Range{
+		Start: start.Range().Start,
+		End:   end.Range().End,
+	}
+}
+
+func (s *Sizeof) Parent() Node {
+	return s.parent
+}
+
+func (s *Sizeof) SetParent(parent Node) {
+	if s.parent != nil && parent != nil {
+		log.Fatalln("Sizeof.SetParent() - Node already has a parent")
+	}
+	s.parent = parent
+}
+
+func (s *Sizeof) Accept(visitor ExprVisitor) {
+	visitor.VisitSizeof(s)
+}
+
+func (s *Sizeof) AcceptChildren(visitor Acceptor) {
+}
+
+func (s *Sizeof) AcceptTypes(visitor types.Visitor) {
+	if s.result.Type != nil {
+		visitor.VisitType(s.result.Type)
+	}
+	if s.Target != nil {
+		visitor.VisitType(s.Target)
+	}
+}
+
+func (s *Sizeof) AcceptTypesPtr(visitor types.PtrVisitor) {
+	visitor.VisitType(&s.result.Type)
+	visitor.VisitType(&s.Target)
+}
+
+func (s *Sizeof) Leaf() bool {
+	return true
+}
+
+func (s *Sizeof) String() string {
+	return s.Token().Lexeme
+}
+
+func (s *Sizeof) Result() *ExprResult {
+	return &s.result
+}
+
+func (s *Sizeof) SetChildrenParent() {
 }
 
 // Call

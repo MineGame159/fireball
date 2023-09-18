@@ -439,6 +439,15 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type,
 	}
 }
 
+func (c *codegen) VisitSizeof(expr *ast.Sizeof) {
+	c.exprResult = exprValue{
+		v: c.function.Literal(
+			c.getType(expr.Result().Type),
+			llvm.Literal{Signed: int64(expr.Target.Size())},
+		),
+	}
+}
+
 func (c *codegen) VisitCall(expr *ast.Call) {
 	// Get type
 	callee := c.acceptExpr(expr.Callee)

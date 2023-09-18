@@ -21,7 +21,7 @@ func (p *PointerType) Range() core.Range {
 }
 
 func (p *PointerType) Size() int {
-	return 4
+	return 8
 }
 
 func (p *PointerType) WithRange(range_ core.Range) Type {

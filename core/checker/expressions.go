@@ -595,6 +595,12 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	}
 }
 
+func (c *checker) VisitSizeof(expr *ast.Sizeof) {
+	expr.AcceptChildren(c)
+
+	expr.Result().SetValue(types.Primitive(types.I32, core.Range{}), 0)
+}
+
 func (c *checker) VisitCall(expr *ast.Call) {
 	expr.AcceptChildren(c)
 
