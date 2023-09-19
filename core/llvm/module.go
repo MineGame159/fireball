@@ -84,7 +84,7 @@ func (m *Module) Declare(type_ Type) Value {
 	}
 }
 
-func (m *Module) Define(type_ Type) *Function {
+func (m *Module) Define(type_ Type, debugName string) *Function {
 	t := type_.(*functionType)
 
 	metadata := m.addMetadata(Metadata{
@@ -93,7 +93,7 @@ func (m *Module) Define(type_ Type) *Function {
 		Fields: []MetadataField{
 			{
 				Name:  "name",
-				Value: stringMetadataValue(t.name),
+				Value: stringMetadataValue(debugName),
 			},
 			{
 				Name:  "scope",

@@ -98,7 +98,7 @@ func (c *codegen) defineOrDeclare(function *ast.Func, this *ast.Struct) {
 		c.functions[function] = c.module.Declare(t)
 	} else {
 		// Define
-		f := c.module.Define(t)
+		f := c.module.Define(t, function.MangledName()[3:])
 		c.functions[function] = f
 
 		// Set parameter names
