@@ -321,7 +321,7 @@ func (s *Scanner) skipWhitespace() {
 				s.advance()
 				s.advance()
 
-				for !s.isAtEnd() && s.peek() != '*' && s.peekNext() != '/' {
+				for !s.isAtEnd() && (s.peek() != '*' || s.peekNext() != '/') {
 					if s.peek() == '\n' {
 						s.line++
 						s.column = 0
