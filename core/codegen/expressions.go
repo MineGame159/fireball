@@ -175,7 +175,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		case scanner.Ampersand:
 			c.exprResult = exprValue{
 				v:           value.v,
-				addressable: true,
+				addressable: false,
 			}
 
 			return
