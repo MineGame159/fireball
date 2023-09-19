@@ -109,7 +109,7 @@ func (v *aliasType) Size() int {
 
 func isSigned(type_ Type) bool {
 	if v, ok := type_.(*primitiveType); ok {
-		return v.encoding == SignedEncoding
+		return v.encoding == SignedEncoding || v.encoding == BooleanEncoding
 	}
 
 	return false

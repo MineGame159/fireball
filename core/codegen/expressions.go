@@ -1,7 +1,6 @@
 package codegen
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
@@ -137,10 +136,12 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		// Prefix
 		switch expr.Op.Kind {
 		case scanner.Bang:
+			t := types.PrimitiveType{Kind: types.Bool}
+
 			r := c.block.Binary(
 				llvm.Xor,
 				c.function.Literal(
-					c.getType(types.Primitive(types.Bool, core.Range{})),
+					c.getType(&t),
 					llvm.Literal{Signed: 1},
 				),
 				c.load(value).v,
