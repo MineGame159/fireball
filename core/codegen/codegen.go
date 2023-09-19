@@ -266,7 +266,7 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 		case types.Void:
 			llvmType = c.module.Void()
 		case types.Bool:
-			llvmType = c.module.Primitive("bool", 1, llvm.BooleanEncoding)
+			llvmType = c.module.Primitive("bool", 8, llvm.BooleanEncoding)
 
 		case types.U8:
 			llvmType = c.module.Primitive("u8", 8, llvm.UnsignedEncoding)
