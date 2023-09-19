@@ -3,6 +3,8 @@ package cmd
 import (
 	"fireball/cmd/build"
 	"fireball/core/codegen"
+	"fireball/core/llvm"
+	"fireball/core/types"
 	"fireball/core/utils"
 	"fireball/core/workspace"
 	"fmt"
@@ -86,16 +88,7 @@ func buildProject() string {
 	entrypointPath := filepath.Join(project.Path, "build", "__entrypoint.ll")
 	irPaths = append(irPaths, entrypointPath)
 
-	err = os.WriteFile(entrypointPath, []byte(`
-define i32 @main() {
-entry:
-	%0 = call i32 @fb$main()
-	ret i32 %0
-}
-
-declare i32 @fb$main()
-`), 0750)
-
+	err = generateEntrypoint(project, entrypointPath)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
@@ -142,6 +135,50 @@ declare i32 @fb$main()
 
 	// Return
 	return output
+}
+
+func generateEntrypoint(project *workspace.Project, path string) error {
+	// Create module
+	m := llvm.NewModule()
+	m.Source("__entrypoint")
+
+	function, _ := project.GetFunction("main")
+
+	void := m.Void()
+	i32 := m.Primitive("i32", 32, llvm.SignedEncoding)
+
+	main := m.Define(m.Function("main", []llvm.Type{}, false, i32), "_fireball_entrypoint")
+	mainBlock := main.Block("")
+
+	if function != nil {
+		var fbMain llvm.Value
+
+		if types.IsPrimitive(function.Returns, types.I32) {
+			fbMain = m.Declare(m.Function(function.MangledName(), []llvm.Type{}, false, i32))
+		} else {
+			fbMain = m.Declare(m.Function(function.MangledName(), []llvm.Type{}, false, void))
+		}
+
+		if types.IsPrimitive(function.Returns, types.I32) {
+			mainBlock.Ret(mainBlock.Call(fbMain, []llvm.Value{}, i32))
+		} else {
+			mainBlock.Call(fbMain, []llvm.Value{}, void)
+			mainBlock.Ret(main.Literal(i32, llvm.Literal{Signed: 0}))
+		}
+	} else {
+		mainBlock.Ret(main.Literal(i32, llvm.Literal{Signed: 0}))
+	}
+
+	// Write module
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	llvm.WriteText(m, file)
+
+	_ = file.Close()
+	return nil
 }
 
 type consoleReporter struct {

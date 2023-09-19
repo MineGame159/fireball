@@ -13,11 +13,9 @@ impl Vec2 {
     }
 }
 
-func main() i32 {
+func main() {
     var a = Vec2 { x: 2, y: 9 };
     var b = Vec2 { x: 6, y: 2 };
 
     a.add(b).print();
-
-    return 0;
 }
