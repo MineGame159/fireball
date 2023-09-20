@@ -333,7 +333,7 @@ func (h *handler) DocumentSymbol(_ context.Context, params *protocol.DocumentSym
 
 	// Get symbols
 	symbols := documentSymbolConsumer{symbols: make([]any, 0, 16)}
-	getSymbols(&symbols, file)
+	getSymbols(&symbols, []*workspace.File{file})
 
 	return symbols.symbols, nil
 }
@@ -390,9 +390,15 @@ func (h *handler) Symbols(_ context.Context, _ *protocol.WorkspaceSymbolParams) 
 	symbols := workspaceSymbolConsumer{symbols: make([]protocol.SymbolInformation, 0, 64)}
 
 	for _, project := range h.projects {
+		files := make([]*workspace.File, len(project.Files))
+		i := 0
+
 		for _, file := range project.Files {
-			getSymbols(&symbols, file)
+			files[i] = file
+			i++
 		}
+
+		getSymbols(&symbols, files)
 	}
 
 	return symbols.symbols, nil

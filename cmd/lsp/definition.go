@@ -72,27 +72,72 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 					}}
 				}
 			}
-		} else if member, ok := node.(*ast.Member); ok && member.Result().Kind == ast.FunctionResultKind {
+		} else if member, ok := node.(*ast.Member); ok {
 			type_ := member.Value.Result().Type
 
 			if pointer, ok := type_.(*types.PointerType); ok {
 				type_ = pointer.Pointee
 			}
 
-			function, path := file.Project.GetMethod(type_, member.Name.Lexeme, false)
+			switch member.Result().Kind {
+			case ast.ValueResultKind:
+				switch type_.(type) {
+				case *ast.Struct:
+					if t, path := file.Project.GetType(type_.String()); t != nil {
+						_, field := t.(*ast.Struct).GetField(member.Name.Lexeme)
 
-			if function == nil {
-				function, path = file.Project.GetMethod(type_, member.Name.Lexeme, true)
+						if field != nil {
+							return []protocol.Location{{
+								URI:   uri.New(filepath.Join(file.Project.Path, path)),
+								Range: convertRange(core.TokenToRange(field.Name)),
+							}}
+						}
+					}
+
+				case *ast.Enum:
+					if t, path := file.Project.GetType(type_.String()); t != nil {
+						case_ := t.(*ast.Enum).GetCase(member.Name.Lexeme)
+
+						if case_ != nil {
+							return []protocol.Location{{
+								URI:   uri.New(filepath.Join(file.Project.Path, path)),
+								Range: convertRange(core.TokenToRange(case_.Name)),
+							}}
+						}
+					}
+				}
+
+			case ast.FunctionResultKind:
+				function, path := file.Project.GetMethod(type_, member.Name.Lexeme, false)
 
 				if function == nil {
-					return nil
+					function, path = file.Project.GetMethod(type_, member.Name.Lexeme, true)
+
+					if function == nil {
+						return nil
+					}
+				}
+
+				return []protocol.Location{{
+					URI:   uri.New(filepath.Join(file.Project.Path, path)),
+					Range: convertRange(function.Range()),
+				}}
+			}
+		} else if initializer, ok := node.(*ast.StructInitializer); ok {
+			if t, path := file.Project.GetType(initializer.Result().Type.String()); t != nil {
+				for _, field := range initializer.Fields {
+					if core.TokenToRange(field.Name).Contains(pos) {
+						_, field := t.(*ast.Struct).GetField(field.Name.Lexeme)
+
+						if field != nil {
+							return []protocol.Location{{
+								URI:   uri.New(filepath.Join(file.Project.Path, path)),
+								Range: convertRange(core.TokenToRange(field.Name)),
+							}}
+						}
+					}
 				}
 			}
-
-			return []protocol.Location{{
-				URI:   uri.New(filepath.Join(file.Project.Path, path)),
-				Range: convertRange(function.Range()),
-			}}
 		}
 	}
 

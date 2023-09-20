@@ -151,11 +151,12 @@ func (p *parser) impl() ast.Decl {
 	functions := make([]ast.Decl, 0, 8)
 
 	for p.canLoopAdvanced(scanner.RightBrace, scanner.Static, scanner.Extern, scanner.Func) {
+		start := p.next
 		flags := p.functionFlags()
 
 		p.advance()
 
-		function := p.function(p.current, flags)
+		function := p.function(start, flags)
 		if function == nil {
 			p.syncToDecl()
 			return nil

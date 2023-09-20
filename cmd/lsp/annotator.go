@@ -146,16 +146,16 @@ func (a *annotator) VisitSizeof(expr *ast.Sizeof) {
 
 func (a *annotator) VisitCall(expr *ast.Call) {
 	if false {
-		if i, ok := expr.Callee.(*ast.Identifier); ok && i.Kind == ast.FunctionKind {
-			if f, ok := a.functions[i.Identifier.Lexeme]; ok {
-				for i, arg := range expr.Args {
-					if i >= len(f.Params) {
-						break
-					}
+		if expr.Callee.Result().Kind == ast.FunctionResultKind {
+			function := expr.Callee.Result().Function
 
-					param := f.Params[i]
-					a.add(arg.Range().Start, param.Name.Lexeme+": ", protocol.InlayHintKindParameter)
+			for i, arg := range expr.Args {
+				if i >= len(function.Params) {
+					break
 				}
+
+				param := function.Params[i]
+				a.add(arg.Range().Start, param.Name.Lexeme+": ", protocol.InlayHintKindParameter)
 			}
 		}
 	}

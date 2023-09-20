@@ -14,9 +14,8 @@ type symbol struct {
 	file *workspace.File
 	kind protocol.SymbolKind
 
-	name          string
-	containerName string
-	detail        string
+	name   string
+	detail string
 
 	range_         core.Range
 	selectionRange core.Range
@@ -29,34 +28,107 @@ type symbolConsumer interface {
 	supportsDetail() bool
 }
 
-func getSymbols(symbols symbolConsumer, file *workspace.File) {
-	for _, decl := range file.Decls {
-		if struct_, ok := decl.(*ast.Struct); ok {
-			// Struct
-			parent := symbols.add(symbol{
-				kind:           protocol.SymbolKindStruct,
-				name:           struct_.Name.Lexeme,
-				detail:         "",
-				range_:         struct_.Range(),
-				selectionRange: core.TokenToRange(struct_.Name),
-				file:           file,
-			}, len(struct_.Fields))
+func getSymbols(symbols symbolConsumer, files []*workspace.File) {
+	// Find method count per struct
+	methodCount := make(map[*ast.Struct]int)
 
-			for _, field := range struct_.Fields {
-				range_ := core.TokenToRange(field.Name)
-
-				symbols.addChild(parent, symbol{
-					file:           file,
-					kind:           protocol.SymbolKindField,
-					name:           field.Name.Lexeme,
-					detail:         field.Type.String(),
-					range_:         range_,
-					selectionRange: range_,
-				})
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil {
+				methodCount[impl.Type_] += len(impl.Functions)
 			}
-		} else if impl, ok := decl.(*ast.Impl); ok {
-			for _, f := range impl.Functions {
-				function := f.(*ast.Func)
+		}
+	}
+
+	// Structs
+	structs := make(map[*ast.Struct]int)
+
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			if struct_, ok := decl.(*ast.Struct); ok {
+				id := symbols.add(symbol{
+					kind:           protocol.SymbolKindStruct,
+					name:           struct_.Name.Lexeme,
+					range_:         struct_.Range(),
+					selectionRange: core.TokenToRange(struct_.Name),
+					file:           file,
+				}, len(struct_.Fields)+methodCount[struct_])
+
+				for _, field := range struct_.Fields {
+					range_ := core.TokenToRange(field.Name)
+
+					symbols.addChild(id, symbol{
+						file:           file,
+						kind:           protocol.SymbolKindField,
+						name:           field.Name.Lexeme,
+						detail:         field.Type.String(),
+						range_:         range_,
+						selectionRange: range_,
+					})
+				}
+
+				structs[struct_] = id
+			}
+		}
+	}
+
+	// Rest
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil {
+				// Methods
+				id, ok := structs[impl.Type_]
+
+				if !ok {
+					id = symbols.add(symbol{
+						kind: protocol.SymbolKindStruct,
+						name: impl.Type_.Name.Lexeme,
+					}, methodCount[impl.Type_])
+
+					structs[impl.Type_] = id
+				}
+
+				for _, f := range impl.Functions {
+					function := f.(*ast.Func)
+					detail := ""
+
+					if symbols.supportsDetail() {
+						detail = function.Signature(true)
+					}
+
+					symbols.addChild(id, symbol{
+						file:           file,
+						kind:           protocol.SymbolKindMethod,
+						name:           function.Name.Lexeme,
+						detail:         detail,
+						range_:         function.Range(),
+						selectionRange: core.TokenToRange(function.Name),
+					})
+				}
+			} else if enum, ok := decl.(*ast.Enum); ok {
+				// Enum
+				id := symbols.add(symbol{
+					kind:           protocol.SymbolKindEnum,
+					name:           enum.Name.Lexeme,
+					range_:         enum.Range(),
+					selectionRange: core.TokenToRange(enum.Name),
+					file:           file,
+				}, len(enum.Cases))
+
+				for _, case_ := range enum.Cases {
+					range_ := core.TokenToRange(case_.Name)
+
+					symbols.addChild(id, symbol{
+						file:           file,
+						kind:           protocol.SymbolKindEnumMember,
+						name:           case_.Name.Lexeme,
+						detail:         strconv.Itoa(case_.Value),
+						range_:         range_,
+						selectionRange: range_,
+					})
+				}
+			} else if function, ok := decl.(*ast.Func); ok {
+				// Function
 				detail := ""
 
 				if symbols.supportsDetail() {
@@ -65,53 +137,13 @@ func getSymbols(symbols symbolConsumer, file *workspace.File) {
 
 				symbols.add(symbol{
 					file:           file,
-					kind:           protocol.SymbolKindMethod,
+					kind:           protocol.SymbolKindFunction,
 					name:           function.Name.Lexeme,
-					containerName:  impl.Struct.Lexeme,
 					detail:         detail,
 					range_:         function.Range(),
 					selectionRange: core.TokenToRange(function.Name),
 				}, 0)
 			}
-		} else if enum, ok := decl.(*ast.Enum); ok {
-			// Enum
-			parent := symbols.add(symbol{
-				kind:           protocol.SymbolKindEnum,
-				name:           enum.Name.Lexeme,
-				detail:         "",
-				range_:         enum.Range(),
-				selectionRange: core.TokenToRange(enum.Name),
-				file:           file,
-			}, len(enum.Cases))
-
-			for _, case_ := range enum.Cases {
-				range_ := core.TokenToRange(case_.Name)
-
-				symbols.addChild(parent, symbol{
-					file:           file,
-					kind:           protocol.SymbolKindEnumMember,
-					name:           case_.Name.Lexeme,
-					detail:         strconv.Itoa(case_.Value),
-					range_:         range_,
-					selectionRange: range_,
-				})
-			}
-		} else if function, ok := decl.(*ast.Func); ok {
-			// Function
-			detail := ""
-
-			if symbols.supportsDetail() {
-				detail = function.Signature(true)
-			}
-
-			symbols.add(symbol{
-				file:           file,
-				kind:           protocol.SymbolKindFunction,
-				name:           function.Name.Lexeme,
-				detail:         detail,
-				range_:         function.Range(),
-				selectionRange: core.TokenToRange(function.Name),
-			}, 0)
 		}
 	}
 }
@@ -175,9 +207,9 @@ func (w *workspaceSymbolConsumer) supportsDetail() bool {
 }
 
 func (w *workspaceSymbolConsumer) convert(symbol symbol, parent int) protocol.SymbolInformation {
-	containerName := symbol.containerName
+	containerName := ""
 
-	if parent >= 0 && containerName == "" {
+	if parent >= 0 {
 		containerName = w.symbols[parent].Name
 	}
 
