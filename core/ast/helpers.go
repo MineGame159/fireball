@@ -18,11 +18,16 @@ func (s *Struct) GetField(name string) (int, *Field) {
 	return 0, nil
 }
 
-func (i *Impl) GetMethod(name string) *Func {
+func (i *Impl) GetMethod(name string, static bool) *Func {
+	staticValue := FuncFlags(0)
+	if static {
+		staticValue = 1
+	}
+
 	for _, decl := range i.Functions {
 		function := decl.(*Func)
 
-		if function.Name.Lexeme == name {
+		if function.Name.Lexeme == name && function.Flags&Static == staticValue {
 			return function
 		}
 	}
@@ -40,6 +45,20 @@ func (e *Enum) GetCase(name string) *EnumCase {
 	}
 
 	return nil
+}
+
+// Func
+
+func (f *Func) IsStatic() bool {
+	return f.Flags&Static != 0
+}
+
+func (f *Func) IsExtern() bool {
+	return f.Flags&Extern != 0
+}
+
+func (f *Func) IsVariadic() bool {
+	return f.Flags&Variadic != 0
 }
 
 func (f *Func) Signature(paramNames bool) string {
@@ -70,7 +89,7 @@ func (f *Func) Signature(paramNames bool) string {
 }
 
 func (f *Func) Method() *Struct {
-	if impl, ok := f.Parent().(*Impl); ok {
+	if impl, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
 		return impl.Type_
 	}
 
@@ -80,11 +99,11 @@ func (f *Func) Method() *Struct {
 func (f *Func) MangledName() string {
 	name := f.Name.Lexeme
 
-	if f.Extern {
+	if f.IsExtern() {
 		return name
 	}
 
-	if struct_ := f.Method(); struct_ != nil {
+	if struct_, ok := f.Parent().(*Impl); ok {
 		name = fmt.Sprintf("%s.%s", struct_, name)
 	}
 

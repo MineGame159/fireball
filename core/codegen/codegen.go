@@ -73,11 +73,11 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 		if impl, ok := decl.(*ast.Impl); ok {
 			for _, decl := range impl.Functions {
 				if function, ok := decl.(*ast.Func); ok {
-					c.defineOrDeclare(function, impl.Type_)
+					c.defineOrDeclare(function)
 				}
 			}
 		} else if function, ok := decl.(*ast.Func); ok {
-			c.defineOrDeclare(function, nil)
+			c.defineOrDeclare(function)
 		}
 	}
 
@@ -90,14 +90,16 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 	llvm.WriteText(c.module, writer)
 }
 
-func (c *codegen) defineOrDeclare(function *ast.Func, this *ast.Struct) {
-	t := c.createFunctionType(function, this)
+func (c *codegen) defineOrDeclare(function *ast.Func) {
+	t := c.createFunctionType(function)
 
-	if function.Extern {
+	if function.IsExtern() {
 		// Declare
 		c.functions[function] = c.module.Declare(t)
 	} else {
 		// Define
+		this := function.Method()
+
 		f := c.module.Define(t, function.MangledName()[3:])
 		c.functions[function] = f
 
@@ -136,7 +138,9 @@ func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 
 // Functions
 
-func (c *codegen) createFunctionType(function *ast.Func, this *ast.Struct) llvm.Type {
+func (c *codegen) createFunctionType(function *ast.Func) llvm.Type {
+	this := function.Method()
+
 	parameterCount := len(function.Params)
 	if this != nil {
 		parameterCount++
@@ -158,7 +162,7 @@ func (c *codegen) createFunctionType(function *ast.Func, this *ast.Struct) llvm.
 		parameters[index] = c.getType(param.Type)
 	}
 
-	return c.module.Function(function.MangledName(), parameters, function.Variadic, c.getType(function.Returns))
+	return c.module.Function(function.MangledName(), parameters, function.IsVariadic(), c.getType(function.Returns))
 }
 
 func (c *codegen) getFunction(function *ast.Func) exprValue {
@@ -176,7 +180,7 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 		panic("codegen.getFunction() - Local function not found in functions map")
 	}
 
-	value := c.module.Declare(c.createFunctionType(function, nil))
+	value := c.module.Declare(c.createFunctionType(function))
 	c.functions[function] = value
 
 	return exprValue{v: value}

@@ -156,6 +156,9 @@ func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
 	case ast.FunctionKind:
 		kind = functionKind
 
+	case ast.StructKind:
+		kind = classKind
+
 	case ast.EnumKind:
 		kind = enumKind
 

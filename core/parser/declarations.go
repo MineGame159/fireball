@@ -9,7 +9,7 @@ import (
 )
 
 func (p *parser) declaration() ast.Decl {
-	p.extern = false
+	start := p.next
 
 	if p.match(scanner.Struct) {
 		return p.struct_()
@@ -21,14 +21,12 @@ func (p *parser) declaration() ast.Decl {
 		return p.enum()
 	}
 	if p.match(scanner.Func) {
-		return p.function(p.current)
+		return p.function(start, 0)
 	}
 
-	if p.match(scanner.Extern) {
-		p.extern = true
-
+	if flags := p.functionFlags(); flags != 0 {
 		if p.match(scanner.Func) {
-			return p.function(p.previous)
+			return p.function(start, flags)
 		}
 	}
 
@@ -37,6 +35,22 @@ func (p *parser) declaration() ast.Decl {
 	p.syncToDecl()
 
 	return nil
+}
+
+func (p *parser) functionFlags() ast.FuncFlags {
+	flags := ast.FuncFlags(0)
+
+	for {
+		if p.match(scanner.Static) {
+			flags |= ast.Static
+		} else if p.match(scanner.Extern) {
+			flags |= ast.Extern
+		} else {
+			break
+		}
+	}
+
+	return flags
 }
 
 func (p *parser) struct_() ast.Decl {
@@ -59,7 +73,7 @@ func (p *parser) struct_() ast.Decl {
 	// Fields
 	fields := make([]ast.Field, 0, 4)
 
-	for p.canLoopAdvanced(scanner.Identifier, scanner.RightBrace) {
+	for p.canLoopAdvanced(scanner.RightBrace, scanner.Identifier) {
 		// Name
 		name := p.consume(scanner.Identifier, "Expected field name.")
 
@@ -136,10 +150,12 @@ func (p *parser) impl() ast.Decl {
 	// Functions
 	functions := make([]ast.Decl, 0, 8)
 
-	for p.canLoopAdvanced(scanner.Func, scanner.RightBrace) {
+	for p.canLoopAdvanced(scanner.RightBrace, scanner.Static, scanner.Extern, scanner.Func) {
+		flags := p.functionFlags()
+
 		p.advance()
 
-		function := p.function(p.current)
+		function := p.function(p.current, flags)
 		if function == nil {
 			p.syncToDecl()
 			return nil
@@ -200,7 +216,7 @@ func (p *parser) enum() ast.Decl {
 	cases := make([]ast.EnumCase, 0, 8)
 	lastValue := -1
 
-	for p.canLoopAdvanced(scanner.Identifier, scanner.RightBrace) {
+	for p.canLoopAdvanced(scanner.RightBrace, scanner.Identifier) {
 		// Name
 		name := p.consume(scanner.Identifier, "Expected enum case name.")
 
@@ -280,7 +296,7 @@ func (p *parser) enum() ast.Decl {
 	return decl
 }
 
-func (p *parser) function(start scanner.Token) ast.Decl {
+func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 	// Name
 	name := p.consume(scanner.Identifier, "Expected function name.")
 
@@ -296,7 +312,6 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	}
 
 	params := make([]ast.Param, 0, 4)
-	variadic := false
 
 	for p.canLoop(scanner.RightParen, scanner.Dot) {
 		name := p.consume(scanner.Identifier, "Expected parameter name.")
@@ -320,13 +335,7 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	}
 
 	if p.match(scanner.Dot) && p.match(scanner.Dot) && p.match(scanner.Dot) {
-		variadic = true
-
-		if !p.extern {
-			p.error(p.current, "Only extern functions can be variadic.")
-			p.syncToDecl()
-			return nil
-		}
+		flags |= ast.Variadic
 	}
 
 	if paren := p.consume(scanner.RightParen, "Expected ')' after function parameters."); paren.IsError() {
@@ -352,7 +361,7 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 	// Body
 	var body []ast.Stmt
 
-	if !p.extern {
+	if flags&ast.Extern == 0 {
 		body = make([]ast.Stmt, 0, 8)
 
 		if brace := p.consume(scanner.LeftBrace, "Expected '{' before function body."); brace.IsError() {
@@ -380,12 +389,11 @@ func (p *parser) function(start scanner.Token) ast.Decl {
 
 	// Return
 	decl := &ast.Func{
-		Extern:   p.extern,
-		Name:     name,
-		Params:   params,
-		Variadic: variadic,
-		Returns:  returns,
-		Body:     body,
+		Flags:   flags,
+		Name:    name,
+		Params:  params,
+		Returns: returns,
+		Body:    body,
 	}
 
 	decl.SetRangeToken(start, p.current)

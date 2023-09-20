@@ -63,6 +63,17 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	// Need to resolve return type sooner
 	decl.AcceptTypesPtr(c)
 
+	// Check flags
+	_, isImpl := decl.Parent().(*ast.Impl)
+
+	if isImpl && decl.IsExtern() && !decl.IsStatic() {
+		c.errorToken(decl.Name, "Non static methods can't be extern.")
+	}
+
+	if decl.IsVariadic() && !decl.IsExtern() {
+		c.errorToken(decl.Name, "Only extern functions can be variadic.")
+	}
+
 	// Push scope
 	c.function = decl
 	c.pushScope()
@@ -93,7 +104,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	}
 
 	// Check last return
-	if !decl.Extern && !types.IsPrimitive(decl.Returns, types.Void) {
+	if !decl.IsExtern() && !types.IsPrimitive(decl.Returns, types.Void) {
 		valid := len(decl.Body) > 0
 
 		if valid {

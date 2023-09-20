@@ -474,14 +474,19 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		return
 	}
 
-	// Enum
+	// Type
 	if t, _ := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
-		if e, ok := t.(*ast.Enum); ok {
-			expr.Result().SetType(e)
-			expr.Kind = ast.EnumKind
+		expr.Result().SetType(t.WithRange(core.Range{}))
 
-			return
+		if _, ok := t.(*ast.Enum); ok {
+			expr.Kind = ast.EnumKind
+		} else if _, ok := t.(*ast.Struct); ok {
+			expr.Kind = ast.StructKind
+		} else {
+			panic("checker.VisitIdentifier() - Invalid type")
 		}
+
+		return
 	}
 
 	// Variable
@@ -636,7 +641,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 	toCheck := min(len(function.Params), len(expr.Args))
 
 	//     Check argument count
-	if function.Variadic {
+	if function.IsVariadic() {
 		if len(expr.Args) < len(function.Params) {
 			c.errorRange(expr.Range(), "Got '%d' arguments but function takes at least '%d'.", len(expr.Args), len(function.Params))
 			ok = false
@@ -741,6 +746,23 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 	// Type result
 	if expr.Value.Result().Kind == ast.TypeResultKind {
+		// Struct
+		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.StructKind {
+			if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
+				function, _ := c.resolver.GetMethod(v, expr.Name.Lexeme, true)
+
+				if function == nil {
+					c.errorToken(expr.Name, "Struct '%s' does not contain static method with the name '%s'.", v, expr.Name)
+					expr.Result().SetInvalid()
+
+					return
+				}
+
+				expr.Result().SetFunction(function)
+				return
+			}
+		}
+
 		// Enum
 		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 			if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
@@ -781,7 +803,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 		// Check if parent expression is a call expression
 		if call, ok := expr.Parent().(*ast.Call); ok && call.Callee == expr {
-			function, _ := c.resolver.GetMethod(s, expr.Name.Lexeme)
+			function, _ := c.resolver.GetMethod(s, expr.Name.Lexeme, false)
 
 			if function != nil {
 				expr.Result().SetFunction(function)

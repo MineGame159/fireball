@@ -55,6 +55,7 @@ const (
 	While
 	For
 	As
+	Static
 	Extern
 	Func
 	Continue

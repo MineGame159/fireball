@@ -151,11 +151,11 @@ func (p *Project) GetFunction(name string) (*ast.Func, string) {
 	return nil, ""
 }
 
-func (p *Project) GetMethod(type_ types.Type, name string) (*ast.Func, string) {
+func (p *Project) GetMethod(type_ types.Type, name string, static bool) (*ast.Func, string) {
 	for _, file := range p.Files {
 		for _, decl := range file.Decls {
 			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil && impl.Type_.Equals(type_) {
-				function := impl.GetMethod(name)
+				function := impl.GetMethod(name, static)
 
 				if function != nil {
 					return function, file.Path

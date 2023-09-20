@@ -34,7 +34,7 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 					Range: convertRange(type_.Range()),
 				}}
 
-			case ast.EnumKind:
+			case ast.StructKind, ast.EnumKind:
 				type_, path := file.Project.GetType(name)
 				if type_ == nil {
 					return nil
@@ -79,9 +79,14 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 				type_ = pointer.Pointee
 			}
 
-			function, path := file.Project.GetMethod(type_, member.Name.Lexeme)
+			function, path := file.Project.GetMethod(type_, member.Name.Lexeme, false)
+
 			if function == nil {
-				return nil
+				function, path = file.Project.GetMethod(type_, member.Name.Lexeme, true)
+
+				if function == nil {
+					return nil
+				}
 			}
 
 			return []protocol.Location{{

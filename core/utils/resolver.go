@@ -10,5 +10,5 @@ type Resolver interface {
 
 	GetFunction(name string) (*ast.Func, string)
 
-	GetMethod(type_ types.Type, name string) (*ast.Func, string)
+	GetMethod(type_ types.Type, name string, static bool) (*ast.Func, string)
 }

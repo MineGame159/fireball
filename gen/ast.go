@@ -12,6 +12,8 @@ type item struct {
 	fields []field
 	cases  []string
 
+	bitField bool
+
 	token    string
 	ast      bool
 	noString bool
@@ -74,16 +76,24 @@ var decls = []item{
 	{
 		name: "Func",
 		fields: []field{
-			{name: "Extern", type_: "bool"},
+			{name: "Flags", type_: "FuncFlags"},
 			{name: "Name", type_: "Token"},
 			{name: "Params", type_: "[]Param"},
-			{name: "Variadic", type_: "bool"},
 			{name: "Returns", type_: "Type"},
 			{name: "Body", type_: "[]Stmt"},
 		},
 		token:    "Name",
 		ast:      true,
 		noString: true,
+	},
+	{
+		name: "FuncFlags",
+		cases: []string{
+			"Static",
+			"Extern",
+			"Variadic",
+		},
+		bitField: true,
 	},
 	{
 		name: "Param",
@@ -262,6 +272,7 @@ var exprs = []item{
 		name: "IdentifierKind",
 		cases: []string{
 			"FunctionKind",
+			"StructKind",
 			"EnumKind",
 			"VariableKind",
 			"ParameterKind",
@@ -396,7 +407,11 @@ func generate(w *writer, kind string, items []item) {
 			w.depth++
 
 			for i, case_ := range item.cases {
-				w.write("%s %s = %d", case_, item.name, i)
+				if item.bitField {
+					w.write("%s %s = 1 << %d", case_, item.name, i)
+				} else {
+					w.write("%s %s = %d", case_, item.name, i)
+				}
 			}
 
 			w.depth--

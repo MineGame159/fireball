@@ -17,8 +17,6 @@ type parser struct {
 	current  scanner.Token
 	next     scanner.Token
 
-	extern bool
-
 	reporter utils.Reporter
 }
 
@@ -210,12 +208,21 @@ func (p *parser) canLoop(notNext ...scanner.TokenKind) bool {
 	return true
 }
 
-func (p *parser) canLoopAdvanced(next, notNext scanner.TokenKind) bool {
+func (p *parser) canLoopAdvanced(notNext scanner.TokenKind, next ...scanner.TokenKind) bool {
 	if p.isAtEnd() {
 		return false
 	}
 
-	if p.next.Kind != next {
+	ok := false
+
+	for _, kind := range next {
+		if p.next.Kind == kind {
+			ok = true
+			break
+		}
+	}
+
+	if !ok {
 		return false
 	}
 

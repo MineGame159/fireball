@@ -96,7 +96,7 @@ func (c *checker) popScope() {
 		for i := len(c.variables) - 1; i >= c.peekScope().variableI; i-- {
 			v := c.variables[i]
 
-			if !v.used && v.name.Lexeme[0] != '_' && (!c.function.Extern || !v.param) {
+			if !v.used && v.name.Lexeme[0] != '_' && (!c.function.IsExtern() || !v.param) {
 				c.warningToken(v.name, "Unused variable '%s'. Prefix with '_' to ignore.", v.name)
 			}
 		}

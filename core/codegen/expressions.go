@@ -297,13 +297,8 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 		c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
 		return
 
-	case ast.EnumKind:
-		if expr.Kind == ast.EnumKind {
-			c.exprResult = exprValue{
-				v: c.function.LiteralRaw(nil, "$enum$"),
-			}
-			return
-		}
+	case ast.StructKind, ast.EnumKind:
+		return
 
 	case ast.VariableKind, ast.ParameterKind:
 		if v := c.getVariable(expr.Identifier); v != nil {
@@ -523,16 +518,24 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 func (c *codegen) VisitMember(expr *ast.Member) {
 	value := c.acceptExpr(expr.Value)
 
-	if value.v.Name() == "$enum$" {
-		// Enum
-		e := expr.Value.Result().Type.(*ast.Enum)
-		case_ := e.GetCase(expr.Name.Lexeme)
+	if expr.Value.Result().Kind == ast.TypeResultKind {
+		// Type
 
-		c.exprResult = exprValue{
-			v: c.function.Literal(
-				c.getType(e.Type),
-				llvm.Literal{Signed: int64(case_.Value), Unsigned: uint64(case_.Value)},
-			),
+		if _, ok := expr.Value.Result().Type.(*ast.Struct); ok {
+			// Struct
+			c.exprResult = c.getFunction(expr.Result().Function)
+		} else if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
+			// Enum
+			case_ := v.GetCase(expr.Name.Lexeme)
+
+			c.exprResult = exprValue{
+				v: c.function.Literal(
+					c.getType(v.Type),
+					llvm.Literal{Signed: int64(case_.Value), Unsigned: uint64(case_.Value)},
+				),
+			}
+		} else {
+			panic("codegen.VisitMember() - Invalid type")
 		}
 	} else {
 		// Member

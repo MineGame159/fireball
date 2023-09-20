@@ -767,9 +767,10 @@ type IdentifierKind uint8
 
 const (
 	FunctionKind  IdentifierKind = 0
-	EnumKind      IdentifierKind = 1
-	VariableKind  IdentifierKind = 2
-	ParameterKind IdentifierKind = 3
+	StructKind    IdentifierKind = 1
+	EnumKind      IdentifierKind = 2
+	VariableKind  IdentifierKind = 3
+	ParameterKind IdentifierKind = 4
 )
 
 // Assignment

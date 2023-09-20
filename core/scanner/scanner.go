@@ -161,7 +161,19 @@ func (s *Scanner) identifierKind() TokenKind {
 	case 'r':
 		return s.checkKeyword(1, "eturn", Return)
 	case 's':
-		return s.checkKeyword(1, "truct", Struct)
+		if s.currentI-s.startI > 1 {
+			switch s.text[s.startI+1] {
+			case 't':
+				if s.currentI-s.startI > 2 {
+					switch s.text[s.startI+2] {
+					case 'a':
+						return s.checkKeyword(3, "tic", Static)
+					case 'r':
+						return s.checkKeyword(3, "uct", Struct)
+					}
+				}
+			}
+		}
 	case 't':
 		return s.checkKeyword(1, "rue", True)
 	case 'v':

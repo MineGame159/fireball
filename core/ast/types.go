@@ -98,14 +98,13 @@ func (f *Func) Size() int {
 
 func (f *Func) WithRange(range_ core.Range) types.Type {
 	return &Func{
-		range_:   range_,
-		parent:   f.parent,
-		Extern:   f.Extern,
-		Name:     f.Name,
-		Params:   f.Params,
-		Variadic: f.Variadic,
-		Returns:  f.Returns,
-		Body:     f.Body,
+		range_:  range_,
+		parent:  f.parent,
+		Flags:   f.Flags,
+		Name:    f.Name,
+		Params:  f.Params,
+		Returns: f.Returns,
+		Body:    f.Body,
 	}
 }
 
