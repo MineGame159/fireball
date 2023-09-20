@@ -15,6 +15,7 @@ func (c *checker) VisitGroup(expr *ast.Group) {
 	expr.AcceptChildren(c)
 
 	*expr.Result() = *expr.Expr.Result()
+	expr.Result().Flags = 0
 }
 
 func (c *checker) VisitLiteral(expr *ast.Literal) {
@@ -255,7 +256,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 
 			if p, ok := result.Type.(*types.PointerType); ok {
-				expr.Result().SetValue(p.Pointee, 0)
+				expr.Result().SetValue(p.Pointee, ast.AssignableFlag)
 			} else {
 				c.errorRange(expr.Value.Range(), "Can only dereference pointer types, not '%s'.", result.Type)
 				expr.Result().SetInvalid()

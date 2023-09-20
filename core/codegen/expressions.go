@@ -182,7 +182,11 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			return
 
 		case scanner.Star:
-			result = c.block.Load(c.load(value).v)
+			result = c.load(value).v
+
+			if _, ok := expr.Parent().(*ast.Assignment); !ok {
+				result = c.block.Load(result)
+			}
 
 		case scanner.PlusPlus, scanner.MinusMinus:
 			newValue := c.binary(
