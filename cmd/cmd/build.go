@@ -4,6 +4,7 @@ import (
 	"fireball/cmd/build"
 	"fireball/core/codegen"
 	"fireball/core/llvm"
+	"fireball/core/scanner"
 	"fireball/core/types"
 	"fireball/core/utils"
 	"fireball/core/workspace"
@@ -148,6 +149,7 @@ func generateEntrypoint(project *workspace.Project, path string) error {
 	i32 := m.Primitive("i32", 32, llvm.SignedEncoding)
 
 	main := m.Define(m.Function("main", []llvm.Type{}, false, i32), "_fireball_entrypoint")
+	main.PushScope()
 	mainBlock := main.Block("")
 
 	if function != nil {
@@ -160,9 +162,14 @@ func generateEntrypoint(project *workspace.Project, path string) error {
 		}
 
 		if types.IsPrimitive(function.Returns, types.I32) {
-			mainBlock.Ret(mainBlock.Call(fbMain, []llvm.Value{}, i32))
+			call := mainBlock.Call(fbMain, []llvm.Value{}, i32)
+			call.SetLocation(scanner.Token{})
+
+			mainBlock.Ret(call)
 		} else {
-			mainBlock.Call(fbMain, []llvm.Value{}, void)
+			call := mainBlock.Call(fbMain, []llvm.Value{}, void)
+			call.SetLocation(scanner.Token{})
+
 			mainBlock.Ret(main.Literal(i32, llvm.Literal{Signed: 0}))
 		}
 	} else {
