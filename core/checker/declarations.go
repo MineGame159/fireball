@@ -69,9 +69,18 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	if isImpl && decl.IsExtern() && !decl.IsStatic() {
 		c.errorToken(decl.Name, "Non static methods can't be extern.")
 	}
+	if isImpl && decl.IsIntrinsic() && !decl.IsStatic() {
+		c.errorToken(decl.Name, "Non static methods can't be intrinsics.")
+	}
 
 	if decl.IsVariadic() && !decl.IsExtern() {
 		c.errorToken(decl.Name, "Only extern functions can be variadic.")
+	}
+
+	// Intrinsic
+	if decl.IsIntrinsic() {
+		c.checkIntrinsic(decl)
+		return
 	}
 
 	// Push scope
@@ -104,7 +113,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	}
 
 	// Check last return
-	if !decl.IsExtern() && !types.IsPrimitive(decl.Returns, types.Void) {
+	if decl.HasBody() && !types.IsPrimitive(decl.Returns, types.Void) {
 		valid := len(decl.Body) > 0
 
 		if valid {
@@ -117,4 +126,113 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 			c.errorToken(decl.Name, "Function needs to return a '%s' value.", decl.Returns)
 		}
 	}
+}
+
+func (c *checker) checkIntrinsic(decl *ast.Func) {
+	valid := false
+
+	switch decl.Name.Lexeme {
+	case "abs":
+		valid = isSimpleIntrinsic(decl, 1, signedPredicate|floatingPredicate)
+
+	case "min", "max":
+		valid = isSimpleIntrinsic(decl, 2, unsignedPredicate|signedPredicate|floatingPredicate)
+
+	case "pow", "copysign":
+		valid = isSimpleIntrinsic(decl, 2, floatingPredicate)
+
+	case "sqrt", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "floor", "ceil", "round":
+		valid = isSimpleIntrinsic(decl, 1, floatingPredicate)
+
+	case "fma":
+		valid = isSimpleIntrinsic(decl, 3, floatingPredicate)
+
+	case "memcpy", "memmove":
+		valid = isExactIntrinsic(decl, types.Void, types.Void, types.U32)
+
+	case "memset":
+		valid = isExactIntrinsic(decl, types.Void, types.U8, types.U32)
+	}
+
+	if !valid {
+		c.errorToken(decl.Name, "Unknown intrinsic.")
+	}
+}
+
+type simpleIntrinsicPredicate uint8
+
+const (
+	unsignedPredicate simpleIntrinsicPredicate = 1 << iota
+	signedPredicate
+	floatingPredicate
+)
+
+func isSimpleIntrinsic(decl *ast.Func, paramCount int, predicate simpleIntrinsicPredicate) bool {
+	if len(decl.Params) != paramCount {
+		return false
+	}
+
+	for _, param := range decl.Params {
+		if !isSimpleIntrinsicType(param.Type, predicate) {
+			return false
+		}
+	}
+
+	if !isSimpleIntrinsicType(decl.Returns, predicate) {
+		return false
+	}
+
+	for i, param := range decl.Params {
+		if i > 0 {
+			if !param.Type.Equals(decl.Params[0].Type) {
+				return false
+			}
+		}
+	}
+
+	if !decl.Returns.Equals(decl.Params[0].Type) {
+		return false
+	}
+
+	return true
+}
+
+func isSimpleIntrinsicType(type_ types.Type, predicate simpleIntrinsicPredicate) bool {
+	valid := false
+
+	if v, ok := type_.(*types.PrimitiveType); ok {
+		if predicate&unsignedPredicate != 0 && types.IsUnsigned(v.Kind) {
+			valid = true
+		} else if predicate&signedPredicate != 0 && types.IsSigned(v.Kind) {
+			valid = true
+		} else if predicate&floatingPredicate != 0 && types.IsFloating(v.Kind) {
+			valid = true
+		}
+	}
+
+	return valid
+}
+
+func isExactIntrinsic(decl *ast.Func, params ...types.PrimitiveKind) bool {
+	if len(decl.Params) != len(params) {
+		return false
+	}
+
+	for i, param := range decl.Params {
+		if params[i] == types.Void {
+			if _, ok := param.Type.(*types.PointerType); !ok {
+				return false
+			}
+		} else {
+			if !types.IsPrimitive(param.Type, params[i]) {
+				return false
+			}
+		}
+	}
+
+	if !types.IsPrimitive(decl.Returns, types.Void) {
+		return false
+	}
+
+	return true
 }

@@ -61,6 +61,14 @@ func (f *Func) IsVariadic() bool {
 	return f.Flags&Variadic != 0
 }
 
+func (f *Func) IsIntrinsic() bool {
+	return f.Flags&Intrinsic != 0
+}
+
+func (f *Func) HasBody() bool {
+	return !f.IsExtern() && !f.IsIntrinsic()
+}
+
 func (f *Func) Signature(paramNames bool) string {
 	signature := strings.Builder{}
 	signature.WriteRune('(')

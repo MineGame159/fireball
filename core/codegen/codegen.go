@@ -93,10 +93,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 func (c *codegen) defineOrDeclare(function *ast.Func) {
 	t := c.getType(function)
 
-	if function.IsExtern() {
-		// Declare
-		c.functions[function] = c.module.Declare(t)
-	} else {
+	if function.HasBody() {
 		// Define
 		this := function.Method()
 
@@ -116,6 +113,9 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 
 			f.GetParameter(index).SetName(param.Name.Lexeme)
 		}
+	} else {
+		// Declare
+		c.functions[function] = c.module.Declare(t)
 	}
 }
 
@@ -280,30 +280,42 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 		llvmType = c.module.Pointer(v.String(), c.getType(v.Pointee))
 	} else if v, ok := type_.(*ast.Func); ok {
 		// Function
-		this := v.Method()
+		var parameters []llvm.Type
+		var returns llvm.Type
 
-		parameterCount := len(v.Params)
-		if this != nil {
-			parameterCount++
-		}
+		if v.IsIntrinsic() {
+			intrinsic := c.getIntrinsic(v)
 
-		parameters := make([]llvm.Type, parameterCount)
+			parameters = intrinsic[1:]
+			returns = intrinsic[0]
+		} else {
+			this := v.Method()
 
-		if this != nil {
-			type_ := types.PointerType{Pointee: this}
-			parameters[0] = c.getType(&type_)
-		}
-
-		for i, param := range v.Params {
-			index := i
+			parameterCount := len(v.Params)
 			if this != nil {
-				index++
+				parameterCount++
 			}
 
-			parameters[index] = c.getType(param.Type)
+			parameters = make([]llvm.Type, parameterCount)
+
+			if this != nil {
+				type_ := types.PointerType{Pointee: this}
+				parameters[0] = c.getType(&type_)
+			}
+
+			for i, param := range v.Params {
+				index := i
+				if this != nil {
+					index++
+				}
+
+				parameters[index] = c.getType(param.Type)
+			}
+
+			returns = c.getType(v.Returns)
 		}
 
-		llvmType = c.module.Function(v.MangledName(), parameters, v.IsVariadic(), c.getType(v.Returns))
+		llvmType = c.module.Function(getMangledName(v), parameters, v.IsVariadic(), returns)
 	} else if v, ok := type_.(*ast.Struct); ok {
 		// Struct
 		fields := make([]llvm.Field, len(v.Fields))
@@ -331,6 +343,146 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 	}
 
 	panic("codegen.getType() - Invalid type")
+}
+
+func (c *codegen) getIntrinsic(function *ast.Func) []llvm.Type {
+	param := c.getType(function.Params[0].Type)
+
+	switch function.Name.Lexeme {
+	case "abs":
+		if isFloating(function.Params[0].Type) {
+			return []llvm.Type{
+				param,
+				param,
+			}
+		} else {
+			i1 := c.getPrimitiveType(types.Bool)
+
+			return []llvm.Type{
+				param,
+				param,
+				i1,
+			}
+		}
+
+	case "pow", "min", "max", "copysign":
+		return []llvm.Type{param, param, param}
+
+	case "sqrt", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "floor", "ceil", "round":
+		return []llvm.Type{param, param}
+
+	case "fma":
+		return []llvm.Type{param, param, param, param}
+
+	case "memcpy", "memmove":
+		void := c.getPrimitiveType(types.Void)
+		i1 := c.getPrimitiveType(types.Bool)
+		i32 := c.getPrimitiveType(types.I32)
+
+		return []llvm.Type{
+			void,
+			param,
+			param,
+			i32,
+			i1,
+		}
+
+	case "memset":
+		void := c.getPrimitiveType(types.Void)
+		i1 := c.getPrimitiveType(types.Bool)
+		i8 := c.getPrimitiveType(types.I8)
+		i32 := c.getPrimitiveType(types.I32)
+
+		return []llvm.Type{
+			void,
+			param,
+			i8,
+			i32,
+			i1,
+		}
+
+	default:
+		panic("codegen.getIntrinsic() - Invalid intrinsic")
+	}
+}
+
+func (c *codegen) modifyIntrinsicArgs(function *ast.Func, args []llvm.Value) []llvm.Value {
+	switch function.Name.Lexeme {
+	case "abs":
+		if !isFloating(function.Returns) {
+			i1 := c.getPrimitiveType(types.Bool)
+			args = append(args, c.function.Literal(i1, llvm.Literal{}))
+		}
+
+	case "memcpy", "memmove", "memset":
+		i1 := c.getPrimitiveType(types.Bool)
+		args = append(args, c.function.Literal(i1, llvm.Literal{}))
+	}
+
+	return args
+}
+
+func getMangledName(function *ast.Func) string {
+	if function.IsIntrinsic() {
+		name := ""
+
+		switch function.Name.Lexeme {
+		case "abs":
+			name = ternary(isFloating(function.Returns), "llvm.fabs", "llvm.abs")
+
+		case "min":
+			name = ternary(isFloating(function.Returns), "llvm.minnum", ternary(isSigned(function.Returns), "llvm.smin", "llvm.umin"))
+
+		case "max":
+			name = ternary(isFloating(function.Returns), "llvm.maxnum", ternary(isSigned(function.Returns), "llvm.smax", "llvm.umax"))
+
+		case "sqrt", "pow", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "fma", "copysign", "floor", "ceil", "round":
+			name = "llvm." + function.Name.Lexeme
+
+		case "memcpy", "memmove":
+			return "llvm.memcpy.p0.p0.i32"
+
+		case "memset":
+			return "llvm.memset.p0.i32"
+		}
+
+		if name == "" {
+			panic("codegen getMangledName() - Invalid intrinsic")
+		}
+
+		return name + "." + function.Returns.String()
+	}
+
+	return function.MangledName()
+}
+
+func isSigned(type_ types.Type) bool {
+	if v, ok := type_.(*types.PrimitiveType); ok {
+		return types.IsSigned(v.Kind)
+	}
+
+	return false
+}
+
+func isFloating(type_ types.Type) bool {
+	if v, ok := type_.(*types.PrimitiveType); ok {
+		return types.IsFloating(v.Kind)
+	}
+
+	return false
+}
+
+func ternary[T any](condition bool, true T, false T) T {
+	if condition {
+		return true
+	}
+
+	return false
+}
+
+func (c *codegen) getPrimitiveType(kind types.PrimitiveKind) llvm.Type {
+	type_ := types.PrimitiveType{Kind: kind}
+	return c.getType(&type_)
 }
 
 // Scope / Variables

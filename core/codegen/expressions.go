@@ -375,7 +375,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 }
 
 func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type, fromKind, toKind types.PrimitiveKind, location llvm.Location) {
-	if fromKind == toKind {
+	if fromKind == toKind || (types.EqualsPrimitiveCategory(fromKind, toKind) && types.GetBitSize(fromKind) == types.GetBitSize(toKind)) {
 		c.exprResult = value
 		return
 	}
@@ -478,6 +478,11 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 		}
 
 		args[index] = c.loadExpr(arg).v
+	}
+
+	// Intrinsic
+	if function.IsIntrinsic() {
+		args = c.modifyIntrinsicArgs(function, args)
 	}
 
 	// Call

@@ -92,6 +92,7 @@ var decls = []item{
 			"Static",
 			"Extern",
 			"Variadic",
+			"Intrinsic",
 		},
 		bitField: true,
 	},

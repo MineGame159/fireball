@@ -57,6 +57,7 @@ const (
 	As
 	Static
 	Extern
+	Intrinsic
 	Func
 	Continue
 	Break

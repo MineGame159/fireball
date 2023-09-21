@@ -387,9 +387,10 @@ func (f *Func) SetChildrenParent() {
 type FuncFlags uint8
 
 const (
-	Static   FuncFlags = 1 << 0
-	Extern   FuncFlags = 1 << 1
-	Variadic FuncFlags = 1 << 2
+	Static    FuncFlags = 1 << 0
+	Extern    FuncFlags = 1 << 1
+	Variadic  FuncFlags = 1 << 2
+	Intrinsic FuncFlags = 1 << 3
 )
 
 // Param

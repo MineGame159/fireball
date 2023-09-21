@@ -117,7 +117,7 @@
       "name": "string.quoted.double.fb"
     },
     "keyword": {
-      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|static|extern|func|continue|break|return|struct|impl|enum)\\b",
+      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|static|extern|intrinsic|func|continue|break|return|struct|impl|enum)\\b",
       "name": "keyword.fb"
     }
   }

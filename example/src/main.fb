@@ -19,6 +19,9 @@ impl Vec2 {
 
 func main() {
     foo(&Vec2.new);
+
+    LibC.printf("\n");
+    LibC.printf("%f\n", sqrt(4.0));
 }
 
 func foo(new (x i32, y i32) Vec2) {
@@ -27,3 +30,5 @@ func foo(new (x i32, y i32) Vec2) {
 
     a.add(b).print();
 }
+
+intrinsic func sqrt(a f64) f64

@@ -45,6 +45,8 @@ func (p *parser) functionFlags() ast.FuncFlags {
 			flags |= ast.Static
 		} else if p.match(scanner.Extern) {
 			flags |= ast.Extern
+		} else if p.match(scanner.Intrinsic) {
+			flags |= ast.Intrinsic
 		} else {
 			break
 		}
@@ -150,7 +152,7 @@ func (p *parser) impl() ast.Decl {
 	// Functions
 	functions := make([]ast.Decl, 0, 8)
 
-	for p.canLoopAdvanced(scanner.RightBrace, scanner.Static, scanner.Extern, scanner.Func) {
+	for p.canLoopAdvanced(scanner.RightBrace, scanner.Static, scanner.Extern, scanner.Intrinsic, scanner.Func) {
 		start := p.next
 		flags := p.functionFlags()
 
@@ -362,7 +364,7 @@ func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 	// Body
 	var body []ast.Stmt
 
-	if flags&ast.Extern == 0 {
+	if flags&ast.Extern == 0 && flags&ast.Intrinsic == 0 {
 		body = make([]ast.Stmt, 0, 8)
 
 		if brace := p.consume(scanner.LeftBrace, "Expected '{' before function body."); brace.IsError() {
@@ -408,7 +410,7 @@ func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 func (p *parser) syncBeforeFieldOrDecl() bool {
 	for !p.isAtEnd() {
 		switch p.next.Kind {
-		case scanner.Struct, scanner.Enum, scanner.Extern, scanner.Func:
+		case scanner.Struct, scanner.Enum, scanner.Static, scanner.Extern, scanner.Intrinsic, scanner.Func:
 			return false
 
 		case scanner.Comma:

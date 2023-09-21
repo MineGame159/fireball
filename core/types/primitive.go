@@ -154,6 +154,31 @@ func IsInteger(kind PrimitiveKind) bool {
 	return IsSigned(kind) || IsUnsigned(kind)
 }
 
+func GetBitSize(kind PrimitiveKind) int {
+	switch kind {
+	case Void:
+		return 0
+	case Bool:
+		return 1
+
+	case U8, I8:
+		return 8
+	case U16, I16:
+		return 16
+	case U32, I32, F32:
+		return 32
+	case U64, I64, F64:
+		return 64
+
+	default:
+		panic("types GetBitSize() - Invalid type")
+	}
+}
+
+func EqualsPrimitiveCategory(a, b PrimitiveKind) bool {
+	return (IsInteger(a) && IsInteger(b)) || (IsFloating(a) && IsFloating(b))
+}
+
 func GetUnsignedRange(kind PrimitiveKind) (min, max uint64) {
 	switch kind {
 	case U8:
