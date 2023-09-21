@@ -8,14 +8,18 @@ import (
 )
 
 func GetRunCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run project.",
 		Run:   runCmd,
 	}
+
+	cmd.Flags().Uint8VarP(&opt, "opt", "O", 0, "Optimization level. [-O0, -O1, -O2, or -O3] (default = '-O0')")
+
+	return cmd
 }
 
-func runCmd(_ *cobra.Command, args []string) {
+func runCmd(_ *cobra.Command, _ []string) {
 	// Build
 	output := buildProject()
 

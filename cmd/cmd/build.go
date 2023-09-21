@@ -18,12 +18,18 @@ import (
 	"time"
 )
 
+var opt uint8
+
 func GetBuildCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "build",
 		Short: "Build project.",
 		Run:   buildCmd,
 	}
+
+	cmd.Flags().Uint8VarP(&opt, "opt", "O", 0, "Optimization level. [-O0, -O1, -O2, or -O3] (default = '-O0')")
+
+	return cmd
 }
 
 func buildCmd(_ *cobra.Command, _ []string) {
@@ -94,30 +100,21 @@ func buildProject() string {
 		log.Fatalln(err.Error())
 	}
 
-	// Compile LLVM IR files to object files
-	c := build.Compiler{OptimizationLevel: 0}
-
-	for _, irPath := range irPaths {
-		path := irPath[:len(irPath)-3] + ".o"
-		err := c.Compile(irPath, path)
-
-		if err != nil {
-			log.Fatalln(err.Error())
-		}
+	// Compile
+	c := build.Compiler{
+		OptimizationLevel: min(max(int(opt), 0), 3),
+		Crt:               true,
 	}
 
-	// Link all object files to final executable
-	l := build.Linker{Crt: true}
-
-	l.AddLibrary("c")
-	l.AddLibrary("m")
-
 	for _, irPath := range irPaths {
-		l.AddInput(irPath[:len(irPath)-3] + ".o")
+		c.AddInput(irPath)
 	}
+
+	c.AddLibrary("m")
+	c.AddLibrary("c")
 
 	output := filepath.Join(project.Path, "build", project.Config.Name)
-	err = l.Link(output)
+	err = c.Compile(output)
 
 	if err != nil {
 		log.Fatalln(err.Error())
