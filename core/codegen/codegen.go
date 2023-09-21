@@ -91,7 +91,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 }
 
 func (c *codegen) defineOrDeclare(function *ast.Func) {
-	t := c.createFunctionType(function)
+	t := c.getType(function)
 
 	if function.IsExtern() {
 		// Declare
@@ -138,33 +138,6 @@ func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 
 // Functions
 
-func (c *codegen) createFunctionType(function *ast.Func) llvm.Type {
-	this := function.Method()
-
-	parameterCount := len(function.Params)
-	if this != nil {
-		parameterCount++
-	}
-
-	parameters := make([]llvm.Type, parameterCount)
-
-	if this != nil {
-		type_ := types.PointerType{Pointee: this}
-		parameters[0] = c.getType(&type_)
-	}
-
-	for i, param := range function.Params {
-		index := i
-		if this != nil {
-			index++
-		}
-
-		parameters[index] = c.getType(param.Type)
-	}
-
-	return c.module.Function(function.MangledName(), parameters, function.IsVariadic(), c.getType(function.Returns))
-}
-
 func (c *codegen) getFunction(function *ast.Func) exprValue {
 	// Get function already in this module
 	for f, value := range c.functions {
@@ -180,7 +153,7 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 		panic("codegen.getFunction() - Local function not found in functions map")
 	}
 
-	value := c.module.Declare(c.createFunctionType(function))
+	value := c.module.Declare(c.getType(function))
 	c.functions[function] = value
 
 	return exprValue{v: value}
@@ -239,6 +212,10 @@ func (a *allocaFinder) AcceptExpr(expr ast.Expr) {
 
 func callNeedsTempVariable(expr *ast.Call) bool {
 	function := expr.Callee.Result().Function
+
+	if f, ok := expr.Callee.Result().Type.(*ast.Func); ok && function == nil {
+		function = f
+	}
 
 	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(function.Returns, types.Void) {
 		if _, ok := function.Returns.(*types.ArrayType); ok {
@@ -301,6 +278,32 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 	} else if v, ok := type_.(*types.PointerType); ok {
 		// Pointer
 		llvmType = c.module.Pointer(v.String(), c.getType(v.Pointee))
+	} else if v, ok := type_.(*ast.Func); ok {
+		// Function
+		this := v.Method()
+
+		parameterCount := len(v.Params)
+		if this != nil {
+			parameterCount++
+		}
+
+		parameters := make([]llvm.Type, parameterCount)
+
+		if this != nil {
+			type_ := types.PointerType{Pointee: this}
+			parameters[0] = c.getType(&type_)
+		}
+
+		for i, param := range v.Params {
+			index := i
+			if this != nil {
+				index++
+			}
+
+			parameters[index] = c.getType(param.Type)
+		}
+
+		llvmType = c.module.Function(v.MangledName(), parameters, v.IsVariadic(), c.getType(v.Returns))
 	} else if v, ok := type_.(*ast.Struct); ok {
 		// Struct
 		fields := make([]llvm.Field, len(v.Fields))

@@ -18,8 +18,12 @@ impl Vec2 {
 }
 
 func main() {
-    var a = Vec2.new(2, 9);
-    var b = Vec2.new(6, 2);
+    foo(&Vec2.new);
+}
+
+func foo(new (x i32, y i32) Vec2) {
+    var a = new(2, 9);
+    var b = new(6, 2);
 
     a.add(b).print();
 }

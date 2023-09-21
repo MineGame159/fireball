@@ -241,11 +241,21 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			expr.Result().SetInvalid()
 
 		case scanner.Ampersand:
-			if !result.IsAddressable() {
-				c.errorRange(expr.Value.Range(), "Cannot take address of this expression.")
-			}
+			if result.IsAddressable() {
+				expr.Result().SetValue(types.Pointer(result.Type, core.Range{}), 0)
+			} else if result.Kind == ast.FunctionResultKind {
+				if result.Function.Method() != nil {
+					c.errorRange(expr.Value.Range(), "Cannot take address of a non-static method.")
+					expr.Result().SetInvalid()
 
-			expr.Result().SetValue(types.Pointer(result.Type, core.Range{}), 0)
+					return
+				}
+
+				expr.Result().SetValue(expr.Value.Result().Function, 0)
+			} else {
+				c.errorRange(expr.Value.Range(), "Cannot take address of this expression.")
+				expr.Result().SetInvalid()
+			}
 
 		case scanner.Star:
 			if result.Kind != ast.ValueResultKind {
@@ -466,13 +476,10 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	if parent, ok := expr.Parent().(*ast.Call); ok && parent.Callee == expr {
 		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
 			expr.Result().SetFunction(f)
-		} else {
-			c.errorToken(expr.Identifier, "Function with the name '%s' does not exist.", expr.Identifier)
-			expr.Result().SetInvalid()
-		}
+			expr.Kind = ast.FunctionKind
 
-		expr.Kind = ast.FunctionKind
-		return
+			return
+		}
 	}
 
 	// Type
@@ -503,6 +510,16 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		}
 
 		return
+	}
+
+	// Function pointer
+	if parent, ok := expr.Parent().(*ast.Unary); ok && parent.Op.Kind == scanner.Ampersand {
+		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
+			expr.Result().SetFunction(f)
+			expr.Kind = ast.FunctionKind
+
+			return
+		}
 	}
 
 	// Error

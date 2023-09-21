@@ -52,6 +52,9 @@ func (p *parser) parseType() types.Type {
 	if p.match(scanner.Star) {
 		return p.parsePointerType()
 	}
+	if p.match(scanner.LeftParen) {
+		return p.parseFunctionType()
+	}
 
 	return p.parseIdentifierType()
 }
@@ -103,6 +106,57 @@ func (p *parser) parsePointerType() types.Type {
 
 	// return
 	return types.Pointer(pointee, core.TokensToRange(start, p.current))
+}
+
+func (p *parser) parseFunctionType() types.Type {
+	start := p.current
+	flags := ast.FuncFlags(0)
+
+	// Parameters
+	params := make([]ast.Param, 0, 4)
+
+	for p.canLoop(scanner.RightParen, scanner.Dot) {
+		name := p.consume(scanner.Identifier, "Expected parameter name.")
+		if name.IsError() {
+			return nil
+		}
+
+		type_ := p.parseType()
+		if type_ == nil {
+			return nil
+		}
+
+		p.match(scanner.Comma)
+
+		params = append(params, ast.Param{
+			Name: name,
+			Type: type_,
+		})
+	}
+
+	if p.match(scanner.Dot) && p.match(scanner.Dot) && p.match(scanner.Dot) {
+		flags |= ast.Variadic
+	}
+
+	if paren := p.consume(scanner.RightParen, "Expected ')' after function parameters."); paren.IsError() {
+		return nil
+	}
+
+	// Returns
+	returns := p.parseType()
+	if returns == nil {
+		return nil
+	}
+
+	// Return
+	type_ := &ast.Func{
+		Flags:   flags,
+		Params:  params,
+		Returns: returns,
+	}
+
+	type_.SetRangeToken(start, p.current)
+	return type_
 }
 
 func (p *parser) parseIdentifierType() types.Type {

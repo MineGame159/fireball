@@ -393,6 +393,9 @@ func (w *textWriter) type_(type_ Type) string {
 	} else if _, ok := type_.(*pointerType); ok {
 		// Pointer
 		name = "ptr"
+	} else if _, ok := type_.(*functionType); ok {
+		// Function
+		name = "ptr"
 	} else if v, ok := type_.(*aliasType); ok {
 		// Alias
 		name = w.type_(v.underlying)

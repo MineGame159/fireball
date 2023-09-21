@@ -451,7 +451,13 @@ func (c *codegen) VisitSizeof(expr *ast.Sizeof) {
 func (c *codegen) VisitCall(expr *ast.Call) {
 	// Get type
 	callee := c.acceptExpr(expr.Callee)
+
 	function := expr.Callee.Result().Function
+
+	if f, ok := expr.Callee.Result().Type.(*ast.Func); ok && function == nil {
+		function = f
+		callee = c.load(callee)
+	}
 
 	// Load arguments
 	argCount := len(expr.Args)

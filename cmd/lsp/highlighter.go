@@ -197,7 +197,7 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 }
 
 func (h *highlighter) VisitMember(expr *ast.Member) {
-	if call, ok := expr.Parent().(*ast.Call); ok && call.Callee == expr {
+	if expr.Result().Kind == ast.FunctionResultKind {
 		h.addToken(expr.Name, functionKind)
 	} else if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 		h.addToken(expr.Name, enumMemberKind)
