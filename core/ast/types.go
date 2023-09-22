@@ -2,19 +2,30 @@ package ast
 
 import (
 	"fireball/core"
+	"fireball/core/architecture"
 	"fireball/core/types"
 )
 
 // Struct
 
 func (s *Struct) Size() int {
-	size := 0
+	layout := architecture.CLayout{}
 
 	for _, field := range s.Fields {
-		size += field.Type.Size()
+		layout.Add(field.Type)
 	}
 
-	return size
+	return layout.Offset
+}
+
+func (s *Struct) Align() int {
+	biggest := 0
+
+	for _, field := range s.Fields {
+		biggest = max(biggest, field.Type.Align())
+	}
+
+	return biggest
 }
 
 func (s *Struct) WithRange(range_ core.Range) types.Type {
@@ -55,6 +66,10 @@ func (e *Enum) Size() int {
 	return e.Type.Size()
 }
 
+func (e *Enum) Align() int {
+	return e.Type.Align()
+}
+
 func (e *Enum) WithRange(range_ core.Range) types.Type {
 	return &Enum{
 		range_:    range_,
@@ -93,7 +108,11 @@ func (e *Enum) CanAssignTo(other types.Type) bool {
 // Function
 
 func (f *Func) Size() int {
-	return 4
+	return 8
+}
+
+func (f *Func) Align() int {
+	return 8
 }
 
 func (f *Func) WithRange(range_ core.Range) types.Type {

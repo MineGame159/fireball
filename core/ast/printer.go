@@ -198,7 +198,7 @@ func (p *printer) VisitCast(expr *Cast) {
 	p.AcceptExpr(expr.Expr)
 }
 
-func (p *printer) VisitSizeof(expr *Sizeof) {
+func (p *printer) VisitTypeCall(expr *TypeCall) {
 	p.print("sizeof %s", expr.Target)
 }
 

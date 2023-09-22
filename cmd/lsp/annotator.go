@@ -140,7 +140,7 @@ func (a *annotator) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(a)
 }
 
-func (a *annotator) VisitSizeof(expr *ast.Sizeof) {
+func (a *annotator) VisitTypeCall(expr *ast.TypeCall) {
 	expr.AcceptChildren(a)
 }
 

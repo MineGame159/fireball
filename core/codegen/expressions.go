@@ -439,11 +439,24 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type,
 	}
 }
 
-func (c *codegen) VisitSizeof(expr *ast.Sizeof) {
+func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
+	value := 0
+
+	switch expr.Name.Lexeme {
+	case "sizeof":
+		value = expr.Target.Size()
+
+	case "alignof":
+		value = expr.Target.Align()
+
+	default:
+		panic("codegen.VisitTypeCall() - Invalid name")
+	}
+
 	c.exprResult = exprValue{
 		v: c.function.Literal(
 			c.getType(expr.Result().Type),
-			llvm.Literal{Signed: int64(expr.Target.Size())},
+			llvm.Literal{Signed: int64(value)},
 		),
 	}
 }

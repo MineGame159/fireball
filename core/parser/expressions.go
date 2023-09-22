@@ -567,8 +567,8 @@ func (p *parser) primary() ast.Expr {
 		}
 
 		// Sizeof
-		if token.Lexeme == "sizeof" && p.match(scanner.LeftParen) {
-			return p.sizeof(token)
+		if (token.Lexeme == "sizeof" || token.Lexeme == "alignof") && p.match(scanner.LeftParen) {
+			return p.typeCall(token)
 		}
 
 		// abc
@@ -712,7 +712,7 @@ func (p *parser) arrayInitializer() ast.Expr {
 	return expr
 }
 
-func (p *parser) sizeof(token scanner.Token) ast.Expr {
+func (p *parser) typeCall(name scanner.Token) ast.Expr {
 	// Type
 	type_ := p.parseType()
 	if type_ == nil {
@@ -725,12 +725,12 @@ func (p *parser) sizeof(token scanner.Token) ast.Expr {
 	}
 
 	// Return
-	expr := &ast.Sizeof{
-		Token_: token,
+	expr := &ast.TypeCall{
+		Name:   name,
 		Target: type_,
 	}
 
-	expr.SetRangeToken(token, p.current)
+	expr.SetRangeToken(name, p.current)
 	expr.SetChildrenParent()
 
 	return expr

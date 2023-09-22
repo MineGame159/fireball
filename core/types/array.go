@@ -28,6 +28,10 @@ func (a *ArrayType) Size() int {
 	return int(a.Count) * a.Base.Size()
 }
 
+func (a *ArrayType) Align() int {
+	return a.Base.Align()
+}
+
 func (a *ArrayType) WithRange(range_ core.Range) Type {
 	return &ArrayType{
 		range_: range_,

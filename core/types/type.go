@@ -6,7 +6,9 @@ import (
 
 type Type interface {
 	Range() core.Range
+
 	Size() int
+	Align() int
 
 	WithRange(range_ core.Range) Type
 

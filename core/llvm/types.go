@@ -73,25 +73,21 @@ func (v *functionType) Size() int {
 }
 
 type Field struct {
-	Name string
-	Type Type
+	Name   string
+	Type   Type
+	Offset int
 }
 
 type structType struct {
 	name   string
+	size   int
 	fields []Field
 }
 
 func (v *structType) isType() {}
 
 func (v *structType) Size() int {
-	size := 0
-
-	for _, field := range v.fields {
-		size += field.Type.Size()
-	}
-
-	return size
+	return v.size
 }
 
 type aliasType struct {

@@ -279,14 +279,14 @@ func (m *Module) Function(name string, parameters []Type, variadic bool, returns
 	return t
 }
 
-func (m *Module) Struct(name string, fields []Field) Type {
+func (m *Module) Struct(name string, size int, fields []Field) Type {
 	t := &structType{
 		name:   name,
+		size:   size,
 		fields: fields,
 	}
 
 	elements := make([]MetadataField, len(fields))
-	offset := 0
 
 	for i, field := range fields {
 		elements[i] = MetadataField{Value: refMetadataValue(m.addMetadata(Metadata{
@@ -314,12 +314,10 @@ func (m *Module) Struct(name string, fields []Field) Type {
 				},
 				{
 					Name:  "offset",
-					Value: numberMetadataValue(offset),
+					Value: numberMetadataValue(field.Offset),
 				},
 			},
 		}))}
-
-		offset += field.Type.Size()
 	}
 
 	m.typeMetadata[t] = m.addMetadata(Metadata{
@@ -340,7 +338,7 @@ func (m *Module) Struct(name string, fields []Field) Type {
 			},
 			{
 				Name:  "size",
-				Value: numberMetadataValue(t.Size()),
+				Value: numberMetadataValue(size),
 			},
 			{
 				Name:  "flags",

@@ -300,12 +300,12 @@ var exprs = []item{
 		ast:   true,
 	},
 	{
-		name: "Sizeof",
+		name: "TypeCall",
 		fields: []field{
-			{name: "Token_", type_: "Token"},
+			{name: "Name", type_: "Token"},
 			{name: "Target", type_: "Type"},
 		},
-		token: "Token_",
+		token: "Name",
 		ast:   true,
 	},
 	{

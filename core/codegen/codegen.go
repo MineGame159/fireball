@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fireball/core/architecture"
 	"fireball/core/ast"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
@@ -318,16 +319,20 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 		llvmType = c.module.Function(getMangledName(v), parameters, v.IsVariadic(), returns)
 	} else if v, ok := type_.(*ast.Struct); ok {
 		// Struct
+		layout := architecture.CLayout{}
 		fields := make([]llvm.Field, len(v.Fields))
 
 		for i, field := range v.Fields {
+			offset, _ := layout.Add(field.Type)
+
 			fields[i] = llvm.Field{
-				Name: field.Name.Lexeme,
-				Type: c.getType(field.Type),
+				Name:   field.Name.Lexeme,
+				Type:   c.getType(field.Type),
+				Offset: offset * 8,
 			}
 		}
 
-		llvmType = c.module.Struct(v.Name.Lexeme, fields)
+		llvmType = c.module.Struct(v.Name.Lexeme, layout.Offset*8, fields)
 	} else if v, ok := type_.(*ast.Enum); ok {
 		// Enum
 		llvmType = c.module.Alias(v.Name.Lexeme, c.getType(v.Type))

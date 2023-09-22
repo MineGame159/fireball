@@ -24,6 +24,10 @@ func (p *PointerType) Size() int {
 	return 8
 }
 
+func (p *PointerType) Align() int {
+	return 8
+}
+
 func (p *PointerType) WithRange(range_ core.Range) Type {
 	return &PointerType{
 		range_:  range_,

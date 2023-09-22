@@ -47,6 +47,10 @@ func (p *PrimitiveType) Size() int {
 	}
 }
 
+func (p *PrimitiveType) Align() int {
+	return p.Size()
+}
+
 func (p *PrimitiveType) WithRange(range_ core.Range) Type {
 	return &PrimitiveType{
 		range_: range_,

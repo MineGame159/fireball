@@ -25,6 +25,10 @@ func (u *UnresolvedType) Size() int {
 	return 0
 }
 
+func (u *UnresolvedType) Align() int {
+	return 0
+}
+
 func (u *UnresolvedType) WithRange(range_ core.Range) Type {
 	return &UnresolvedType{
 		range_:     range_,
