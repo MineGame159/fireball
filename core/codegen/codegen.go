@@ -194,15 +194,19 @@ func (a *allocaFinder) AcceptStmt(stmt ast.Stmt) {
 }
 
 func (a *allocaFinder) AcceptExpr(expr ast.Expr) {
-	if call, ok := expr.(*ast.Call); ok && callNeedsTempVariable(call) {
-		a.c.allocas[call] = exprValue{
-			v:           a.c.block.Alloca(a.c.getType(call.Callee.Result().Function.Returns)),
-			addressable: true,
+	switch expr := expr.(type) {
+	case *ast.Call:
+		if callNeedsTempVariable(expr) {
+			a.c.allocas[expr] = exprValue{
+				v:           a.c.block.Alloca(a.c.getType(expr.Callee.Result().Function.Returns)),
+				addressable: true,
+			}
 		}
-	} else if member, ok := expr.(*ast.Member); ok {
-		if member.Result().Kind == ast.FunctionResultKind && !member.Value.Result().IsAddressable() {
-			a.c.allocas[member] = exprValue{
-				v:           a.c.block.Alloca(a.c.getType(member.Value.Result().Type)),
+
+	case *ast.Member:
+		if expr.Value.Result().Kind != ast.TypeResultKind && expr.Result().Kind == ast.FunctionResultKind && !expr.Value.Result().IsAddressable() {
+			a.c.allocas[expr] = exprValue{
+				v:           a.c.block.Alloca(a.c.getType(expr.Value.Result().Type)),
 				addressable: true,
 			}
 		}
