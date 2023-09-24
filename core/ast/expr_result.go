@@ -62,9 +62,3 @@ func (e *ExprResult) SetValue(type_ types.Type, flags ExprResultFlags) {
 	e.Flags = flags
 	e.Type = type_.WithRange(core.Range{})
 }
-
-func (e *ExprResult) SetValueRaw(type_ types.Type, flags ExprResultFlags) {
-	e.Kind = ValueResultKind
-	e.Flags = flags
-	e.Type = type_
-}

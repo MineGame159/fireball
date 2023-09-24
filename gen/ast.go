@@ -209,6 +209,7 @@ var exprs = []item{
 		fields: []field{
 			{name: "Token_", type_: "Token"},
 			{name: "New", type_: "bool"},
+			{name: "Target", type_: "Type"},
 			{name: "Fields", type_: "[]InitField"},
 		},
 		token: "Token_",
@@ -305,6 +306,7 @@ var exprs = []item{
 		name: "Cast",
 		fields: []field{
 			{name: "Token_", type_: "Token"},
+			{name: "Target", type_: "Type"},
 			{name: "Expr", type_: "Expr"},
 		},
 		token: "Token_",

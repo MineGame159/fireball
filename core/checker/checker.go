@@ -44,7 +44,7 @@ func Check(reporter utils.Reporter, resolver utils.Resolver, decls []ast.Decl) {
 		decls:    decls,
 	}
 
-	resolveTypes(c, decls)
+	reset(c, decls)
 
 	for _, decl := range decls {
 		c.AcceptDecl(decl)

@@ -94,7 +94,7 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 
 func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Value
-	struct_ := expr.GetStruct()
+	struct_ := expr.Target.(*ast.Struct)
 	type_ := c.getType(struct_)
 
 	result := c.function.LiteralRaw(type_, "zeroinitializer")

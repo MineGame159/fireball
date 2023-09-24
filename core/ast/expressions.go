@@ -213,6 +213,7 @@ type StructInitializer struct {
 
 	Token_ scanner.Token
 	New    bool
+	Target types.Type
 	Fields []InitField
 }
 
@@ -272,10 +273,14 @@ func (s *StructInitializer) AcceptTypes(visitor types.Visitor) {
 	if s.result.Type != nil {
 		visitor.VisitType(s.result.Type)
 	}
+	if s.Target != nil {
+		visitor.VisitType(s.Target)
+	}
 }
 
 func (s *StructInitializer) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&s.result.Type)
+	visitor.VisitType(&s.Target)
 }
 
 func (s *StructInitializer) Leaf() bool {
@@ -973,6 +978,7 @@ type Cast struct {
 	result ExprResult
 
 	Token_ scanner.Token
+	Target types.Type
 	Expr   Expr
 }
 
@@ -1030,10 +1036,14 @@ func (c *Cast) AcceptTypes(visitor types.Visitor) {
 	if c.result.Type != nil {
 		visitor.VisitType(c.result.Type)
 	}
+	if c.Target != nil {
+		visitor.VisitType(c.Target)
+	}
 }
 
 func (c *Cast) AcceptTypesPtr(visitor types.PtrVisitor) {
 	visitor.VisitType(&c.result.Type)
+	visitor.VisitType(&c.Target)
 }
 
 func (c *Cast) Leaf() bool {

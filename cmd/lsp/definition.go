@@ -124,16 +124,18 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 				}}
 			}
 		} else if initializer, ok := node.(*ast.StructInitializer); ok {
-			if t, path := file.Project.GetType(initializer.GetStruct().String()); t != nil {
-				for _, field := range initializer.Fields {
-					if core.TokenToRange(field.Name).Contains(pos) {
-						_, field := t.(*ast.Struct).GetField(field.Name.Lexeme)
+			if struct_, ok := initializer.Target.(*ast.Struct); ok {
+				if t, path := file.Project.GetType(struct_.String()); t != nil {
+					for _, field := range initializer.Fields {
+						if core.TokenToRange(field.Name).Contains(pos) {
+							_, field := t.(*ast.Struct).GetField(field.Name.Lexeme)
 
-						if field != nil {
-							return []protocol.Location{{
-								URI:   uri.New(filepath.Join(file.Project.Path, path)),
-								Range: convertRange(core.TokenToRange(field.Name)),
-							}}
+							if field != nil {
+								return []protocol.Location{{
+									URI:   uri.New(filepath.Join(file.Project.Path, path)),
+									Range: convertRange(core.TokenToRange(field.Name)),
+								}}
+							}
 						}
 					}
 				}

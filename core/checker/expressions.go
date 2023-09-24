@@ -103,8 +103,8 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Check struct
 	var struct_ *ast.Struct
 
-	if t, ok := expr.Result().Type.(*ast.Struct); ok {
-		struct_ = t
+	if s, ok := expr.Target.(*ast.Struct); ok {
+		struct_ = s
 	} else {
 		c.errorRange(expr.Result().Type.Range(), "Expected a struct.")
 		expr.Result().SetInvalid()
@@ -113,7 +113,9 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	}
 
 	if expr.New {
-		expr.Result().SetValueRaw(types.Pointer(struct_, struct_.Range()), 0)
+		expr.Result().SetValue(types.Pointer(struct_, core.Range{}), 0)
+	} else {
+		expr.Result().SetValue(struct_, 0)
 	}
 
 	// Check fields
@@ -624,23 +626,31 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 		return
 	}
 
-	if types.IsPrimitive(expr.Expr.Result().Type, types.Void) || types.IsPrimitive(expr.Result().Type, types.Void) {
+	if types.IsPrimitive(expr.Expr.Result().Type, types.Void) || types.IsPrimitive(expr.Target, types.Void) {
 		// void
 		c.errorRange(expr.Range(), "Cannot cast to or from type 'void'.")
 		expr.Result().SetInvalid()
+
+		return
 	} else if _, ok := expr.Expr.Result().Type.(*ast.Enum); ok {
 		// enum to non integer
-		if to, ok := expr.Result().Type.(*types.PrimitiveType); !ok || !types.IsInteger(to.Kind) {
+		if to, ok := expr.Target.(*types.PrimitiveType); !ok || !types.IsInteger(to.Kind) {
 			c.errorRange(expr.Range(), "Can only cast enums to integers, not '%s'.", to)
 			expr.Result().SetInvalid()
+
+			return
 		}
-	} else if _, ok := expr.Result().Type.(*ast.Enum); ok {
+	} else if _, ok := expr.Target.(*ast.Enum); ok {
 		// non integer to enum
 		if from, ok := expr.Expr.Result().Type.(*types.PrimitiveType); !ok || !types.IsInteger(from.Kind) {
 			c.errorRange(expr.Range(), "Can only cast to enums from integers, not '%s'.", from)
 			expr.Result().SetInvalid()
+
+			return
 		}
 	}
+
+	expr.Result().SetValue(expr.Target, 0)
 }
 
 func (c *checker) VisitTypeCall(expr *ast.TypeCall) {

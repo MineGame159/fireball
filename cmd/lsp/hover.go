@@ -47,15 +47,15 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 					range_ := core.TokenToRange(field.Name)
 
 					if range_.Contains(pos) {
-						_, f := i.GetStruct().GetField(field.Name.Lexeme)
-
-						if f != nil {
-							return &protocol.Hover{
-								Contents: protocol.MarkupContent{
-									Kind:  protocol.PlainText,
-									Value: f.Type.String(),
-								},
-								Range: convertRangePtr(range_),
+						if struct_, ok := i.Target.(*ast.Struct); ok {
+							if _, f := struct_.GetField(field.Name.Lexeme); f != nil {
+								return &protocol.Hover{
+									Contents: protocol.MarkupContent{
+										Kind:  protocol.PlainText,
+										Value: f.Type.String(),
+									},
+									Range: convertRangePtr(range_),
+								}
 							}
 						}
 					}

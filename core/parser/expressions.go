@@ -527,20 +527,20 @@ func (p *parser) finishCast(value ast.Expr) ast.Expr {
 	token := p.current
 
 	// Type
-	type_ := p.parseType()
-	if type_ == nil {
+	target := p.parseType()
+	if target == nil {
 		return nil
 	}
 
 	// Return
 	expr := &ast.Cast{
 		Token_: token,
+		Target: target,
 		Expr:   value,
 	}
 
 	expr.SetRangePos(value.Range().Start, core.TokenToPos(p.current, true))
 	expr.SetChildrenParent()
-	expr.Result().SetValueRaw(type_, 0)
 
 	return expr
 }
@@ -642,7 +642,7 @@ func (p *parser) primary() ast.Expr {
 	return nil
 }
 
-func (p *parser) structInitializer(new bool, token scanner.Token, type_ types.Type) ast.Expr {
+func (p *parser) structInitializer(new bool, token scanner.Token, target types.Type) ast.Expr {
 	// Fields
 	fields := make([]ast.InitField, 0, 4)
 
@@ -687,12 +687,12 @@ func (p *parser) structInitializer(new bool, token scanner.Token, type_ types.Ty
 	expr := &ast.StructInitializer{
 		Token_: token,
 		New:    new,
+		Target: target,
 		Fields: fields,
 	}
 
 	expr.SetRangeToken(token, p.current)
 	expr.SetChildrenParent()
-	expr.Result().SetValueRaw(type_, 0)
 
 	return expr
 }

@@ -6,6 +6,7 @@ import (
 	"fireball/core/checker"
 	"fireball/core/parser"
 	"fireball/core/scanner"
+	"fireball/core/typeresolver"
 	"fireball/core/types"
 	"fireball/core/utils"
 	"github.com/pelletier/go-toml/v2"
@@ -117,7 +118,10 @@ func (p *Project) LoadFiles() error {
 
 	for _, file := range p.Files {
 		file.CollectTypesAndFunctions()
-		file.ResolveTypes()
+	}
+
+	for _, file := range p.Files {
+		typeresolver.Resolve(file, p, file.Decls)
 
 		file.parseWaitGroup.Done()
 	}
