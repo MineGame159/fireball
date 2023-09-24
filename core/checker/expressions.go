@@ -106,7 +106,7 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	if s, ok := expr.Target.(*ast.Struct); ok {
 		struct_ = s
 	} else {
-		c.errorRange(expr.Result().Type.Range(), "Expected a struct.")
+		c.errorRange(expr.Target.Range(), "Expected a struct.")
 		expr.Result().SetInvalid()
 
 		return
