@@ -48,9 +48,12 @@ func (f *Function) PopScope() {
 }
 
 func (f *Function) Block(name string) *Block {
+	// TODO: If I use named blocks then LLVM for some reason reports that a terminator instruction is inside the middle
+	//       of a basic block even tho it works fine when the blocks are unnamed.
+
 	b := &Block{
 		module:       f.module,
-		name:         name,
+		name:         "",
 		instructions: make([]Value, 0, 8),
 	}
 

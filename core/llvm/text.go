@@ -162,7 +162,11 @@ func (w *textWriter) body(blocks []*Block) {
 	}
 
 	// Emit blocks and instructions
-	for _, block := range blocks {
+	for i, block := range blocks {
+		if i > 0 {
+			w.line()
+		}
+
 		w.fmt("%s:\n", w.value(block)[1:])
 
 		for _, inst := range block.instructions {
