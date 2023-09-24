@@ -116,6 +116,10 @@ func (a *annotator) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	expr.AcceptChildren(a)
 }
 
+func (a *annotator) VisitNewArray(expr *ast.NewArray) {
+	expr.AcceptChildren(a)
+}
+
 func (a *annotator) VisitUnary(expr *ast.Unary) {
 	expr.AcceptChildren(a)
 }

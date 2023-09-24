@@ -207,10 +207,11 @@ var exprs = []item{
 	{
 		name: "StructInitializer",
 		fields: []field{
-			{name: "Name", type_: "Token"},
+			{name: "Token_", type_: "Token"},
+			{name: "New", type_: "bool"},
 			{name: "Fields", type_: "[]InitField"},
 		},
-		token: "Name",
+		token: "Token_",
 		ast:   true,
 	},
 	{
@@ -226,6 +227,16 @@ var exprs = []item{
 		fields: []field{
 			{name: "Token_", type_: "Token"},
 			{name: "Values", type_: "[]Expr"},
+		},
+		token: "Token_",
+		ast:   true,
+	},
+	{
+		name: "NewArray",
+		fields: []field{
+			{name: "Token_", type_: "Token"},
+			{name: "Type_", type_: "Type"},
+			{name: "Count", type_: "Expr"},
 		},
 		token: "Token_",
 		ast:   true,

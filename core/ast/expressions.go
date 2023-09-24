@@ -12,6 +12,7 @@ type ExprVisitor interface {
 	VisitLiteral(expr *Literal)
 	VisitStructInitializer(expr *StructInitializer)
 	VisitArrayInitializer(expr *ArrayInitializer)
+	VisitNewArray(expr *NewArray)
 	VisitUnary(expr *Unary)
 	VisitBinary(expr *Binary)
 	VisitLogical(expr *Logical)
@@ -210,12 +211,13 @@ type StructInitializer struct {
 	parent Node
 	result ExprResult
 
-	Name   scanner.Token
+	Token_ scanner.Token
+	New    bool
 	Fields []InitField
 }
 
 func (s *StructInitializer) Token() scanner.Token {
-	return s.Name
+	return s.Token_
 }
 
 func (s *StructInitializer) Range() core.Range {
@@ -393,6 +395,100 @@ func (a *ArrayInitializer) SetChildrenParent() {
 		if a.Values[i_] != nil {
 			a.Values[i_].SetParent(a)
 		}
+	}
+}
+
+// NewArray
+
+type NewArray struct {
+	range_ core.Range
+	parent Node
+	result ExprResult
+
+	Token_ scanner.Token
+	Type_  types.Type
+	Count  Expr
+}
+
+func (n *NewArray) Token() scanner.Token {
+	return n.Token_
+}
+
+func (n *NewArray) Range() core.Range {
+	return n.range_
+}
+
+func (n *NewArray) SetRangeToken(start, end scanner.Token) {
+	n.range_ = core.Range{
+		Start: core.TokenToPos(start, false),
+		End:   core.TokenToPos(end, true),
+	}
+}
+
+func (n *NewArray) SetRangePos(start, end core.Pos) {
+	n.range_ = core.Range{
+		Start: start,
+		End:   end,
+	}
+}
+
+func (n *NewArray) SetRangeNode(start, end Node) {
+	n.range_ = core.Range{
+		Start: start.Range().Start,
+		End:   end.Range().End,
+	}
+}
+
+func (n *NewArray) Parent() Node {
+	return n.parent
+}
+
+func (n *NewArray) SetParent(parent Node) {
+	if n.parent != nil && parent != nil {
+		log.Fatalln("NewArray.SetParent() - Node already has a parent")
+	}
+	n.parent = parent
+}
+
+func (n *NewArray) Accept(visitor ExprVisitor) {
+	visitor.VisitNewArray(n)
+}
+
+func (n *NewArray) AcceptChildren(visitor Acceptor) {
+	if n.Count != nil {
+		visitor.AcceptExpr(n.Count)
+	}
+}
+
+func (n *NewArray) AcceptTypes(visitor types.Visitor) {
+	if n.result.Type != nil {
+		visitor.VisitType(n.result.Type)
+	}
+	if n.Type_ != nil {
+		visitor.VisitType(n.Type_)
+	}
+}
+
+func (n *NewArray) AcceptTypesPtr(visitor types.PtrVisitor) {
+	visitor.VisitType(&n.result.Type)
+	visitor.VisitType(&n.Type_)
+}
+
+func (n *NewArray) Leaf() bool {
+	return false
+}
+
+func (n *NewArray) String() string {
+	return n.Token().Lexeme
+}
+
+func (n *NewArray) Result() *ExprResult {
+	return &n.result
+}
+
+func (n *NewArray) SetChildrenParent() {
+	if n.Count != nil {
+		n.Count.SetParent(n)
 	}
 }
 

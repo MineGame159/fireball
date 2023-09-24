@@ -44,6 +44,8 @@ func Check(reporter utils.Reporter, resolver utils.Resolver, decls []ast.Decl) {
 		decls:    decls,
 	}
 
+	resolveTypes(c, decls)
+
 	for _, decl := range decls {
 		c.AcceptDecl(decl)
 	}
@@ -111,48 +113,18 @@ func (c *checker) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
 }
 
-// types.PtrVisitor
-
-func (c *checker) VisitType(type_ *types.Type) {
-	if v, ok := (*type_).(*types.UnresolvedType); ok {
-		if t, _ := c.resolver.GetType(v.Identifier.Lexeme); t != nil {
-			*type_ = t.WithRange(v.Range())
-		} else {
-			c.errorRange(v.Range(), "Unknown type '%s'.", v)
-			*type_ = types.Primitive(types.Void, v.Range())
-
-			if c.typeExpr != nil {
-				c.typeExpr.Result().SetInvalid()
-			}
-		}
-	}
-
-	if *type_ != nil {
-		(*type_).AcceptTypesPtr(c)
-	}
-}
-
 // ast.Acceptor
 
 func (c *checker) AcceptDecl(decl ast.Decl) {
 	decl.Accept(c)
-	decl.AcceptTypesPtr(c)
 }
 
 func (c *checker) AcceptStmt(stmt ast.Stmt) {
 	stmt.Accept(c)
-	stmt.AcceptTypesPtr(c)
 }
 
 func (c *checker) AcceptExpr(expr ast.Expr) {
 	expr.Accept(c)
-
-	prevTypeExpr := c.typeExpr
-	c.typeExpr = expr
-
-	expr.AcceptTypesPtr(c)
-
-	c.typeExpr = prevTypeExpr
 }
 
 // Diagnostics

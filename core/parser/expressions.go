@@ -4,6 +4,7 @@ import (
 	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
+	"fireball/core/types"
 )
 
 func (p *parser) expression() ast.Expr {
@@ -563,12 +564,34 @@ func (p *parser) primary() ast.Expr {
 
 		// Initializer
 		if p.match(scanner.LeftBrace) {
-			return p.structInitializer(token)
+			return p.structInitializer(false, token, types.Unresolved(token, core.TokenToRange(token)))
 		}
 
-		// Sizeof
+		// Sizeof / Alignof
 		if (token.Lexeme == "sizeof" || token.Lexeme == "alignof") && p.match(scanner.LeftParen) {
 			return p.typeCall(token)
+		}
+
+		// New
+		if token.Lexeme == "new" && p.check(scanner.Identifier) {
+			type_ := p.parseType()
+			if type_ == nil {
+				return nil
+			}
+
+			// Struct
+			if p.match(scanner.LeftBrace) {
+				return p.structInitializer(true, token, type_)
+			}
+
+			// Array
+			if p.match(scanner.LeftBracket) {
+				return p.newArray(token, type_)
+			}
+
+			// Error
+			p.error(p.next, "Expected either a '{' or '['.")
+			return nil
 		}
 
 		// abc
@@ -619,7 +642,7 @@ func (p *parser) primary() ast.Expr {
 	return nil
 }
 
-func (p *parser) structInitializer(name scanner.Token) ast.Expr {
+func (p *parser) structInitializer(new bool, token scanner.Token, type_ types.Type) ast.Expr {
 	// Fields
 	fields := make([]ast.InitField, 0, 4)
 
@@ -662,12 +685,14 @@ func (p *parser) structInitializer(name scanner.Token) ast.Expr {
 
 	// Return
 	expr := &ast.StructInitializer{
-		Name:   name,
+		Token_: token,
+		New:    new,
 		Fields: fields,
 	}
 
-	expr.SetRangeToken(name, p.current)
+	expr.SetRangeToken(token, p.current)
 	expr.SetChildrenParent()
+	expr.Result().SetValueRaw(type_, 0)
 
 	return expr
 }
@@ -704,6 +729,28 @@ func (p *parser) arrayInitializer() ast.Expr {
 	expr := &ast.ArrayInitializer{
 		Token_: token,
 		Values: values,
+	}
+
+	expr.SetRangeToken(token, p.current)
+	expr.SetChildrenParent()
+
+	return expr
+}
+
+func (p *parser) newArray(token scanner.Token, type_ types.Type) ast.Expr {
+	count := p.expression()
+	if count == nil {
+		return nil
+	}
+
+	if token := p.consume(scanner.RightBracket, "Expected ']' after array count."); token.IsError() {
+		return nil
+	}
+
+	expr := &ast.NewArray{
+		Token_: token,
+		Type_:  type_,
+		Count:  count,
 	}
 
 	expr.SetRangeToken(token, p.current)

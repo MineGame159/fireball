@@ -29,8 +29,17 @@ func main() {
 
     foo(&Vec2.new);
 
+    var vec = new Vec2 { x: 1, y: 1 };
+    vec.print();
+    free(vec);
+
     LibC.printf("\n");
-    LibC.printf("%f\n", sqrt(4.0));
+
+    var a = new f64[4];
+    a[2] = 4.0;
+
+    LibC.printf("%f\n", sqrt(a[2]));
+    free(a);
 }
 
 func foo(new (x i32, y i32) Vec2) {
@@ -41,3 +50,6 @@ func foo(new (x i32, y i32) Vec2) {
 }
 
 intrinsic func sqrt(a f64) f64
+
+extern func malloc(len u64) *void
+extern func free(ptr *void) void

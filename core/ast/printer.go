@@ -144,7 +144,7 @@ func (p *printer) VisitLiteral(expr *Literal) {
 }
 
 func (p *printer) VisitStructInitializer(expr *StructInitializer) {
-	p.print("%s {}", expr.Name)
+	p.print("%s {}", expr.Result().Type)
 	p.depth++
 
 	for _, field := range expr.Fields {
@@ -164,6 +164,11 @@ func (p *printer) VisitArrayInitializer(expr *ArrayInitializer) {
 	}
 
 	p.depth--
+}
+
+func (p *printer) VisitNewArray(expr *NewArray) {
+	p.print("new %s[]", expr.Type_)
+	p.AcceptExpr(expr.Count)
 }
 
 func (p *printer) VisitUnary(expr *Unary) {

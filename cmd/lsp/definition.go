@@ -124,7 +124,7 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 				}}
 			}
 		} else if initializer, ok := node.(*ast.StructInitializer); ok {
-			if t, path := file.Project.GetType(initializer.Result().Type.String()); t != nil {
+			if t, path := file.Project.GetType(initializer.GetStruct().String()); t != nil {
 				for _, field := range initializer.Fields {
 					if core.TokenToRange(field.Name).Contains(pos) {
 						_, field := t.(*ast.Struct).GetField(field.Name.Lexeme)

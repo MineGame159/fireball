@@ -47,6 +47,14 @@ func (e *Enum) GetCase(name string) *EnumCase {
 	return nil
 }
 
+func (s *StructInitializer) GetStruct() *Struct {
+	if p, ok := s.Result().Type.(*types.PointerType); ok {
+		return p.Pointee.(*Struct)
+	}
+
+	return s.Result().Type.(*Struct)
+}
+
 // Func
 
 func (f *Func) IsStatic() bool {

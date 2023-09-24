@@ -47,7 +47,7 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 					range_ := core.TokenToRange(field.Name)
 
 					if range_.Contains(pos) {
-						_, f := i.Result().Type.(*ast.Struct).GetField(field.Name.Lexeme)
+						_, f := i.GetStruct().GetField(field.Name.Lexeme)
 
 						if f != nil {
 							return &protocol.Hover{

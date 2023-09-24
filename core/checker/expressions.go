@@ -101,22 +101,20 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	expr.AcceptChildren(c)
 
 	// Check struct
-	var type_ *ast.Struct
+	var struct_ *ast.Struct
 
-	if t, _ := c.resolver.GetType(expr.Name.Lexeme); t != nil {
-		if s, ok := t.(*ast.Struct); ok {
-			type_ = s
-		}
-	}
-
-	if type_ == nil {
-		c.errorToken(expr.Name, "Unknown type '%s'.", expr.Name)
+	if t, ok := expr.Result().Type.(*ast.Struct); ok {
+		struct_ = t
+	} else {
+		c.errorRange(expr.Result().Type.Range(), "Expected a struct.")
 		expr.Result().SetInvalid()
 
 		return
 	}
 
-	expr.Result().SetValue(type_, 0)
+	if expr.New {
+		expr.Result().SetValueRaw(types.Pointer(struct_, struct_.Range()), 0)
+	}
 
 	// Check fields
 	assignedFields := utils.NewSet[string]()
@@ -128,9 +126,9 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 		}
 
 		// Check field
-		_, field := type_.GetField(initField.Name.Lexeme)
+		_, field := struct_.GetField(initField.Name.Lexeme)
 		if field == nil {
-			c.errorToken(initField.Name, "Field with the name '%s' doesn't exist on the struct '%s'.", initField.Name, expr.Name)
+			c.errorToken(initField.Name, "Field with the name '%s' doesn't exist on the struct '%s'.", initField.Name, struct_)
 			continue
 		}
 
@@ -147,6 +145,11 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 		if !initField.Value.Result().Type.CanAssignTo(field.Type) {
 			c.errorRange(initField.Value.Range(), "Expected a '%s' but got '%s'.", field.Type, initField.Value.Result().Type)
 		}
+	}
+
+	// Check malloc
+	if expr.New {
+		c.checkMalloc(expr)
 	}
 }
 
@@ -193,6 +196,28 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	} else {
 		expr.Result().SetInvalid()
 	}
+}
+
+func (c *checker) VisitNewArray(expr *ast.NewArray) {
+	expr.AcceptChildren(c)
+
+	c.checkMalloc(expr)
+
+	if expr.Count.Result().Kind != ast.ValueResultKind {
+		c.errorRange(expr.Count.Range(), "Invalid value.")
+		expr.Result().SetInvalid()
+
+		return
+	}
+
+	if !types.IsPrimitive(expr.Count.Result().Type, types.I32) {
+		c.errorRange(expr.Count.Range(), "Expected an 'i32' but got '%s'.", expr.Count.Result().Type)
+		expr.Result().SetInvalid()
+
+		return
+	}
+
+	expr.Result().SetValue(types.Pointer(expr.Type_, core.Range{}), 0)
 }
 
 func (c *checker) VisitUnary(expr *ast.Unary) {
@@ -850,4 +875,23 @@ func (c *checker) VisitMember(expr *ast.Member) {
 	// Invalid result
 	c.errorRange(expr.Value.Range(), "Invalid value.")
 	expr.Result().SetInvalid()
+}
+
+// Utils
+
+func (c *checker) checkMalloc(expr ast.Expr) {
+	function, _ := c.resolver.GetFunction("malloc")
+
+	if function == nil {
+		c.errorRange(expr.Range(), "Malloc function not found.")
+		return
+	}
+
+	if len(function.Params) != 1 || !types.IsPrimitive(function.Params[0].Type, types.U64) {
+		c.errorRange(expr.Range(), "Malloc parameter needs to be a u64.")
+	}
+
+	if _, ok := function.Returns.(*types.PointerType); !ok {
+		c.errorRange(expr.Range(), "Malloc needs to return a pointer.")
+	}
 }

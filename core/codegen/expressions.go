@@ -93,8 +93,9 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 }
 
 func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
-	struct_, _ := expr.Result().Type.(*ast.Struct)
-	type_ := c.getType(expr.Result().Type)
+	// Value
+	struct_ := expr.GetStruct()
+	type_ := c.getType(struct_)
 
 	result := c.function.LiteralRaw(type_, "zeroinitializer")
 
@@ -109,6 +110,25 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	}
 
 	c.exprResult = exprValue{v: result}
+
+	// Malloc
+	if expr.New {
+		mallocFunc, _ := c.resolver.GetFunction("malloc")
+		malloc := c.getFunction(mallocFunc)
+
+		pointer := c.block.Call(
+			malloc.v,
+			[]llvm.Value{c.function.Literal(
+				c.getType(mallocFunc.Params[0].Type),
+				llvm.Literal{Unsigned: uint64(struct_.Size())},
+			)},
+			c.getType(mallocFunc.Returns),
+		)
+
+		c.block.Store(pointer, result)
+
+		c.exprResult = exprValue{v: pointer}
+	}
 }
 
 func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
@@ -126,6 +146,38 @@ func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	}
 
 	c.exprResult = exprValue{v: result}
+}
+
+func (c *codegen) VisitNewArray(expr *ast.NewArray) {
+	count := c.loadExpr(expr.Count)
+
+	mallocFunc, _ := c.resolver.GetFunction("malloc")
+	malloc := c.getFunction(mallocFunc)
+
+	c.castPrimitiveToPrimitive(
+		count,
+		expr.Count.Result().Type,
+		mallocFunc.Params[0].Type,
+		expr.Count.Result().Type.(*types.PrimitiveType).Kind,
+		mallocFunc.Params[0].Type.(*types.PrimitiveType).Kind,
+		expr.Token(),
+	)
+	count = c.exprResult
+
+	pointer := c.block.Call(
+		malloc.v,
+		[]llvm.Value{c.block.Binary(
+			llvm.Mul,
+			c.function.Literal(
+				c.getType(mallocFunc.Params[0].Type),
+				llvm.Literal{Unsigned: uint64(expr.Type_.Size())},
+			),
+			count.v,
+		)},
+		c.getType(mallocFunc.Returns),
+	)
+
+	c.exprResult = exprValue{v: pointer}
 }
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
