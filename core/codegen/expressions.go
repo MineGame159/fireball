@@ -735,15 +735,15 @@ func (c *codegen) binary(op scanner.Token, left exprValue, right exprValue) expr
 	case scanner.GreaterEqual:
 		kind = llvm.Ge
 
-	case scanner.Pipe:
+	case scanner.Pipe, scanner.PipeEqual:
 		kind = llvm.Or
-	case scanner.Xor:
+	case scanner.Xor, scanner.XorEqual:
 		kind = llvm.Xor
-	case scanner.Ampersand:
+	case scanner.Ampersand, scanner.AmpersandEqual:
 		kind = llvm.And
-	case scanner.LessLess:
+	case scanner.LessLess, scanner.LessLessEqual:
 		kind = llvm.Shl
-	case scanner.GreaterGreater:
+	case scanner.GreaterGreater, scanner.GreaterGreaterEqual:
 		kind = llvm.Shr
 
 	default:

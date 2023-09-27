@@ -40,10 +40,15 @@ const (
 	GreaterEqual
 
 	Pipe
+	PipeEqual
 	Ampersand
+	AmpersandEqual
 	Xor
+	XorEqual
 	LessLess
+	LessLessEqual
 	GreaterGreater
+	GreaterGreaterEqual
 	FuncPtr
 
 	Nil
@@ -119,7 +124,7 @@ func IsComparison(kind TokenKind) bool {
 
 func IsArithmetic(kind TokenKind) bool {
 	switch kind {
-	case Plus, Minus, Star, Slash, Percentage:
+	case Plus, PlusEqual, Minus, MinusEqual, Star, StarEqual, Slash, SlashEqual, Percentage, PercentageEqual:
 		return true
 
 	default:
@@ -129,7 +134,7 @@ func IsArithmetic(kind TokenKind) bool {
 
 func IsBitwise(kind TokenKind) bool {
 	switch kind {
-	case Pipe, Xor, Ampersand, LessLess, GreaterGreater:
+	case Pipe, PipeEqual, Xor, XorEqual, Ampersand, AmpersandEqual, LessLess, LessLessEqual, GreaterGreater, GreaterGreaterEqual:
 		return true
 
 	default:

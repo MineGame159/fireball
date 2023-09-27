@@ -88,23 +88,35 @@ func (s *Scanner) Next() Token {
 		return s.matchToken('=', BangEqual, Bang)
 	case '<':
 		if s.match('<') {
-			return s.make(LessLess)
+			return s.matchToken('=', LessLessEqual, LessLess)
 		}
 
 		return s.matchToken('=', LessEqual, Less)
 	case '>':
 		if s.match('>') {
-			return s.make(GreaterGreater)
+			return s.matchToken('=', GreaterGreaterEqual, GreaterGreater)
 		}
 
 		return s.matchToken('=', GreaterEqual, Greater)
 
 	case '|':
+		if s.match('=') {
+			return s.make(PipeEqual)
+		}
+
 		return s.matchToken('|', Or, Pipe)
-	case '&':
-		return s.matchToken('&', And, Ampersand)
 	case '^':
+		if s.match('=') {
+			return s.make(XorEqual)
+		}
+
 		return s.make(Xor)
+	case '&':
+		if s.match('=') {
+			return s.make(AmpersandEqual)
+		}
+
+		return s.matchToken('&', And, Ampersand)
 
 	case '\'':
 		return s.character()

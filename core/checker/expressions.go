@@ -391,7 +391,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 			}
 		}
 
-		c.errorRange(expr.Range(), "Expected two number types.")
+		c.errorRange(expr.Range(), "Expected two equal number types.")
 		expr.Result().SetInvalid()
 	} else if scanner.IsEquality(expr.Op.Kind) {
 		// Equality
@@ -427,7 +427,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := leftType.(*types.PrimitiveType); ok {
 			if right, ok := rightType.(*types.PrimitiveType); ok {
 				if !types.IsNumber(left.Kind) || !types.IsNumber(right.Kind) || !left.Equals(right) {
-					c.errorRange(expr.Range(), "Expected two number types.")
+					c.errorRange(expr.Range(), "Expected two equal number types.")
 					expr.Result().SetInvalid()
 
 					return
@@ -447,7 +447,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 			}
 		}
 
-		c.errorRange(expr.Range(), "Expected two identical integer types.")
+		c.errorRange(expr.Range(), "Expected two equal integer types.")
 		expr.Result().SetInvalid()
 	} else {
 		// Error
@@ -585,22 +585,44 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 			return
 		}
 	} else {
-		// Arithmetic
-		valid := false
+		if scanner.IsArithmetic(expr.Op.Kind) {
+			// Arithmetic
+			valid := false
 
-		if assignee, ok := expr.Assignee.Result().Type.(*types.PrimitiveType); ok {
-			if value, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
-				if types.IsNumber(assignee.Kind) && types.IsNumber(value.Kind) && assignee.Equals(value) {
-					valid = true
+			if assignee, ok := expr.Assignee.Result().Type.(*types.PrimitiveType); ok {
+				if value, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
+					if types.IsNumber(assignee.Kind) && types.IsNumber(value.Kind) && assignee.Equals(value) {
+						valid = true
+					}
 				}
 			}
-		}
 
-		if !valid {
-			c.errorRange(expr.Value.Range(), "Expected two number types.")
-			expr.Result().SetInvalid()
+			if !valid {
+				c.errorRange(expr.Value.Range(), "Expected two equal number types.")
+				expr.Result().SetInvalid()
 
-			return
+				return
+			}
+		} else if scanner.IsBitwise(expr.Op.Kind) {
+			// Bitwise
+			valid := false
+
+			if left, ok := expr.Assignee.Result().Type.(*types.PrimitiveType); ok {
+				if right, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
+					if left.Equals(right) && types.IsInteger(left.Kind) {
+						valid = true
+					}
+				}
+			}
+
+			if !valid {
+				c.errorRange(expr.Value.Range(), "Expected two equal integer types.")
+				expr.Result().SetInvalid()
+
+				return
+			}
+		} else {
+			panic("checker.VisitAssignment() - Invalid operator")
 		}
 	}
 

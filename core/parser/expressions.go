@@ -18,8 +18,8 @@ func (p *parser) assignment() ast.Expr {
 		return nil
 	}
 
-	// = += -= *= /= %=
-	if p.match(scanner.Equal, scanner.PlusEqual, scanner.MinusEqual, scanner.StarEqual, scanner.SlashEqual, scanner.PercentageEqual) {
+	// = += -= *= /= %= |= ^= &= <<= >>=
+	if p.match(scanner.Equal, scanner.PlusEqual, scanner.MinusEqual, scanner.StarEqual, scanner.SlashEqual, scanner.PercentageEqual, scanner.PipeEqual, scanner.XorEqual, scanner.AmpersandEqual, scanner.LessLessEqual, scanner.GreaterGreaterEqual) {
 		op := p.current
 
 		// Cascade

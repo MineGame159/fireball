@@ -1,4 +1,4 @@
-struct Vec2 {
+/*struct Vec2 {
     x i32,
     y i32,
 }
@@ -52,4 +52,30 @@ func foo(new (x i32, y i32) Vec2) {
 intrinsic func sqrt(a f64) f64
 
 extern func malloc(len u64) *void
-extern func free(ptr *void) void
+extern func free(ptr *void) void*/
+
+struct Vec4 {
+    x f32,
+    y f32,
+    z f32,
+    w f32,
+}
+
+func add(a Vec4, b Vec4) Vec4 {
+    var v Vec4;
+
+    v.x = a.x + b.x;
+    v.y = a.y + b.y;
+    v.z = a.z + b.z;
+    v.w = a.w + b.w;
+
+    return v;
+}
+
+func main() {
+    var a Vec4;
+    var b Vec4;
+
+    var c = add(a, b);
+    LibC.printf("%d\n", c.x);
+}
