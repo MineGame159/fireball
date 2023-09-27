@@ -30,11 +30,12 @@ func (s *Struct) Align() int {
 
 func (s *Struct) WithRange(range_ core.Range) types.Type {
 	return &Struct{
-		range_: range_,
-		parent: s.parent,
-		Name:   s.Name,
-		Fields: s.Fields,
-		Type:   s.Type,
+		range_:       range_,
+		parent:       s.parent,
+		Name:         s.Name,
+		StaticFields: s.StaticFields,
+		Fields:       s.Fields,
+		Type:         s.Type,
 	}
 }
 

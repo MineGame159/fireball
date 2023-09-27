@@ -26,9 +26,10 @@ type Struct struct {
 	range_ core.Range
 	parent Node
 
-	Name   scanner.Token
-	Fields []Field
-	Type   types.Type
+	Name         scanner.Token
+	StaticFields []Field
+	Fields       []Field
+	Type         types.Type
 }
 
 func (s *Struct) Token() scanner.Token {
@@ -79,6 +80,11 @@ func (s *Struct) AcceptChildren(visitor Acceptor) {
 }
 
 func (s *Struct) AcceptTypes(visitor types.Visitor) {
+	for i_ := range s.StaticFields {
+		if s.StaticFields[i_].Type != nil {
+			visitor.VisitType(s.StaticFields[i_].Type)
+		}
+	}
 	for i_ := range s.Fields {
 		if s.Fields[i_].Type != nil {
 			visitor.VisitType(s.Fields[i_].Type)
@@ -90,6 +96,9 @@ func (s *Struct) AcceptTypes(visitor types.Visitor) {
 }
 
 func (s *Struct) AcceptTypesPtr(visitor types.PtrVisitor) {
+	for i_ := range s.StaticFields {
+		visitor.VisitType(&s.StaticFields[i_].Type)
+	}
 	for i_ := range s.Fields {
 		visitor.VisitType(&s.Fields[i_].Type)
 	}
@@ -110,8 +119,9 @@ func (s *Struct) SetChildrenParent() {
 // Field
 
 type Field struct {
-	Name scanner.Token
-	Type types.Type
+	Parent *Struct
+	Name   scanner.Token
+	Type   types.Type
 }
 
 // Impl

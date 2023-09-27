@@ -52,7 +52,20 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 					range_:         struct_.Range(),
 					selectionRange: core.TokenToRange(struct_.Name),
 					file:           file,
-				}, len(struct_.Fields)+methodCount[struct_])
+				}, len(struct_.StaticFields)+len(struct_.Fields)+methodCount[struct_])
+
+				for _, field := range struct_.StaticFields {
+					range_ := core.TokenToRange(field.Name)
+
+					symbols.addChild(id, symbol{
+						file:           file,
+						kind:           protocol.SymbolKindField,
+						name:           field.Name.Lexeme,
+						detail:         field.Type.String(),
+						range_:         range_,
+						selectionRange: range_,
+					})
+				}
 
 				for _, field := range struct_.Fields {
 					range_ := core.TokenToRange(field.Name)

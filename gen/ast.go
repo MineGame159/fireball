@@ -29,6 +29,7 @@ var decls = []item{
 		name: "Struct",
 		fields: []field{
 			{name: "Name", type_: "Token"},
+			{name: "StaticFields", type_: "[]Field"},
 			{name: "Fields", type_: "[]Field"},
 			{name: "Type", type_: "Type"},
 		},
@@ -38,6 +39,7 @@ var decls = []item{
 	{
 		name: "Field",
 		fields: []field{
+			{name: "Parent", type_: "*Struct"},
 			{name: "Name", type_: "Token"},
 			{name: "Type", type_: "Type"},
 		},

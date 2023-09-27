@@ -10,8 +10,23 @@ import (
 func (c *checker) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(c)
 
-	// Check fields
+	// Check static fields
 	fields := utils.NewSet[string]()
+
+	for _, field := range decl.StaticFields {
+		// Check name collision
+		if !fields.Add(field.Name.Lexeme) {
+			c.errorToken(field.Name, "Static field with the name '%s' already exists.", field.Name)
+		}
+
+		// Check void type
+		if types.IsPrimitive(field.Type, types.Void) {
+			c.errorToken(field.Name, "Static field cannot be of type 'void'.")
+		}
+	}
+
+	// Check fields
+	fields = utils.NewSet[string]()
 
 	for _, field := range decl.Fields {
 		// Check name collision

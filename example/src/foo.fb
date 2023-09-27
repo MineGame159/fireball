@@ -1,0 +1,12 @@
+struct Foo {
+    static bar i32,
+
+    a bool,
+    b i32,
+}
+
+impl Foo {
+    static func setBar(v i32) {
+        Foo.bar = v;
+    }
+}

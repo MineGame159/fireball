@@ -41,8 +41,10 @@ const (
 
 	Pipe
 	Ampersand
+	Xor
 	LessLess
 	GreaterGreater
+	FuncPtr
 
 	Nil
 	True
@@ -127,7 +129,7 @@ func IsArithmetic(kind TokenKind) bool {
 
 func IsBitwise(kind TokenKind) bool {
 	switch kind {
-	case Pipe, Ampersand, LessLess, GreaterGreater:
+	case Pipe, Xor, Ampersand, LessLess, GreaterGreater:
 		return true
 
 	default:

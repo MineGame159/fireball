@@ -17,17 +17,17 @@ impl Vec2 {
     }
 }
 
-struct Foo {
-    a bool,
-    b i32,
-}
-
 func main() {
     LibC.printf("Size: %d\n", sizeof(Foo));
     LibC.printf("Align: %d\n", alignof(Foo));
     LibC.printf("\n");
 
-    foo(&Vec2.new);
+    LibC.printf("Foo.bar: %d\n", Foo.bar);
+    Foo.setBar(5);
+    LibC.printf("Foo.bar: %d\n", Foo.bar);
+    LibC.printf("\n");
+
+    foo(=> Vec2.new);
 
     var vec = new Vec2 { x: 1, y: 1 };
     vec.print();

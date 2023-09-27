@@ -79,7 +79,11 @@ func (s *Scanner) Next() Token {
 		return s.matchToken('=', PercentageEqual, Percentage)
 
 	case '=':
-		return s.matchToken('=', EqualEqual, Equal)
+		if s.match('=') {
+			return s.make(EqualEqual)
+		}
+
+		return s.matchToken('>', FuncPtr, Equal)
 	case '!':
 		return s.matchToken('=', BangEqual, Bang)
 	case '<':
@@ -99,6 +103,8 @@ func (s *Scanner) Next() Token {
 		return s.matchToken('|', Or, Pipe)
 	case '&':
 		return s.matchToken('&', And, Ampersand)
+	case '^':
+		return s.make(Xor)
 
 	case '\'':
 		return s.character()

@@ -45,13 +45,13 @@ func (i *instruction) SetLocation(location Location) {
 	})
 }
 
-type variable struct {
+type variableMetadata struct {
 	instruction
 	pointer  Value
 	metadata int
 }
 
-type lifetime struct {
+type lifetimeMetadata struct {
 	instruction
 	pointer Value
 	start   bool

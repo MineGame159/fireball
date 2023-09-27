@@ -225,7 +225,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 				}
 			}
 
-		case scanner.Ampersand:
+		case scanner.Ampersand, scanner.FuncPtr:
 			c.exprResult = exprValue{
 				v:           value.v,
 				addressable: false,
@@ -601,9 +601,19 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	if expr.Value.Result().Kind == ast.TypeResultKind {
 		// Type
 
-		if _, ok := expr.Value.Result().Type.(*ast.Struct); ok {
+		if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
 			// Struct
-			c.exprResult = c.getFunction(expr.Result().Function)
+			switch expr.Result().Kind {
+			case ast.ValueResultKind:
+				_, field := v.GetStaticField(expr.Name.Lexeme)
+				c.exprResult = c.getStaticVariable(field)
+
+			case ast.FunctionResultKind:
+				c.exprResult = c.getFunction(expr.Result().Function)
+
+			default:
+				panic("codegen.VisitMember() - Type, Struct - Invalid result kind")
+			}
 		} else if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
 			// Enum
 			case_ := v.GetCase(expr.Name.Lexeme)
@@ -727,6 +737,8 @@ func (c *codegen) binary(op scanner.Token, left exprValue, right exprValue) expr
 
 	case scanner.Pipe:
 		kind = llvm.Or
+	case scanner.Xor:
+		kind = llvm.Xor
 	case scanner.Ampersand:
 		kind = llvm.And
 	case scanner.LessLess:

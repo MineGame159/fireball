@@ -4,6 +4,7 @@ import (
 	"fireball/core/utils"
 	"fmt"
 	"io"
+	"regexp"
 )
 
 type textWriter struct {
@@ -75,6 +76,20 @@ func WriteText(module *Module, writer io.Writer) {
 	}
 
 	if len(module.constants) > 0 {
+		w.line()
+	}
+
+	// Variables
+
+	for _, v := range module.variables {
+		if v.external {
+			w.fmt("%s = external global %s\n", w.value(v), w.type_(v.type_))
+		} else {
+			w.fmt("%s = global %s zeroinitializer\n", w.value(v), w.type_(v.type_))
+		}
+	}
+
+	if len(module.variables) > 0 {
 		w.line()
 	}
 
@@ -188,13 +203,13 @@ func (w *textWriter) instruction(i Value) bool {
 	terminal := false
 
 	switch inst := i.(type) {
-	case *variable:
+	case *variableMetadata:
 		w.intrinsics.Add("void @llvm.dbg.declare(metadata, metadata, metadata)")
 		w.fmt("call void @llvm.dbg.declare(metadata ptr %s, metadata !%d, metadata !DIExpression())", w.value(inst.pointer), inst.metadata)
 
 		location = inst.location
 
-	case *lifetime:
+	case *lifetimeMetadata:
 		if inst.start {
 			w.intrinsics.Add("void @llvm.lifetime.start(i64, ptr)")
 			w.fmt("call void @llvm.lifetime.start(i64 %d, ptr %s)", inst.pointer.Type().Size(), w.value(inst.pointer))
@@ -476,7 +491,7 @@ func (w *textWriter) value(value Value) string {
 			name = fmt.Sprintf("@%d", w.globalUnnamedCount)
 			w.globalUnnamedCount++
 		} else {
-			name = "@" + name
+			name = "@" + surroundName(name)
 
 			if count, ok := w.globalValueNamesCount[name]; ok {
 				name += fmt.Sprintf(".%d", count+1)
@@ -500,7 +515,7 @@ func (w *textWriter) value(value Value) string {
 			name = fmt.Sprintf("%%%d", w.localUnnamedCount)
 			w.localUnnamedCount++
 		} else {
-			name = "%" + name
+			name = "%" + surroundName(name)
 
 			if count, ok := w.localValueNamesCount[name]; ok {
 				name += fmt.Sprintf(".%d", count+1)
@@ -515,6 +530,16 @@ func (w *textWriter) value(value Value) string {
 	}
 
 	return value.Name()
+}
+
+var namePattern = regexp.MustCompile("^[-a-zA-Z$._][-a-zA-Z$._0-9]*$")
+
+func surroundName(name string) string {
+	if namePattern.MatchString(name) {
+		return name
+	}
+
+	return "\"" + name + "\""
 }
 
 // Debug

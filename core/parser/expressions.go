@@ -115,13 +115,47 @@ func (p *parser) logicalAnd() ast.Expr {
 
 func (p *parser) bitwiseOr() ast.Expr {
 	// Cascade
-	expr := p.bitwiseAnd()
+	expr := p.bitwiseXor()
 	if expr == nil {
 		return nil
 	}
 
 	// |
 	for p.match(scanner.Pipe) {
+		op := p.current
+
+		// Cascade
+		right := p.bitwiseXor()
+		if right == nil {
+			return nil
+		}
+
+		// Set
+		logical := &ast.Binary{
+			Left:  expr,
+			Op:    op,
+			Right: right,
+		}
+
+		logical.SetRangeNode(expr, right)
+		logical.SetChildrenParent()
+
+		expr = logical
+	}
+
+	// Return
+	return expr
+}
+
+func (p *parser) bitwiseXor() ast.Expr {
+	// Cascade
+	expr := p.bitwiseAnd()
+	if expr == nil {
+		return nil
+	}
+
+	// ^
+	for p.match(scanner.Xor) {
 		op := p.current
 
 		// Cascade
@@ -352,8 +386,8 @@ func (p *parser) factor() ast.Expr {
 }
 
 func (p *parser) unary() ast.Expr {
-	// ! - & * ++ --
-	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand, scanner.Star, scanner.PlusPlus, scanner.MinusMinus) {
+	// ! - & * ++ -- =>
+	if p.match(scanner.Bang, scanner.Minus, scanner.Ampersand, scanner.Star, scanner.PlusPlus, scanner.MinusMinus, scanner.FuncPtr) {
 		op := p.current
 
 		// Cascade

@@ -16,7 +16,8 @@ type codegen struct {
 
 	types []typePair
 
-	functions map[*ast.Func]llvm.Value
+	staticVariables map[*ast.Field]exprValue
+	functions       map[*ast.Func]llvm.Value
 
 	scopes    []scope
 	variables []variable
@@ -61,7 +62,8 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 		path:     path,
 		resolver: resolver,
 
-		functions: make(map[*ast.Func]llvm.Value),
+		staticVariables: make(map[*ast.Field]exprValue),
+		functions:       make(map[*ast.Func]llvm.Value),
 
 		module: llvm.NewModule(),
 	}
@@ -69,16 +71,23 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 	// File metadata
 	c.module.Source(path)
 
-	// Define and declare functions
+	// Find some declarations
 	for _, decl := range decls {
-		if impl, ok := decl.(*ast.Impl); ok {
-			for _, decl := range impl.Functions {
+		switch decl := decl.(type) {
+		case *ast.Struct:
+			for i := range decl.StaticFields {
+				c.createStaticVariable(&decl.StaticFields[i], false)
+			}
+
+		case *ast.Impl:
+			for _, decl := range decl.Functions {
 				if function, ok := decl.(*ast.Func); ok {
 					c.defineOrDeclare(function)
 				}
 			}
-		} else if function, ok := decl.(*ast.Func); ok {
-			c.defineOrDeclare(function)
+
+		case *ast.Func:
+			c.defineOrDeclare(decl)
 		}
 	}
 
@@ -135,6 +144,33 @@ func (c *codegen) load(value exprValue) exprValue {
 
 func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 	return c.load(c.acceptExpr(expr))
+}
+
+// Static variables
+
+func (c *codegen) getStaticVariable(field *ast.Field) exprValue {
+	// Get static variable already in this module
+	if value, ok := c.staticVariables[field]; ok {
+		return value
+	}
+
+	// Create static variable
+	return c.createStaticVariable(field, true)
+}
+
+func (c *codegen) createStaticVariable(field *ast.Field, external bool) exprValue {
+	ptr := types.PointerType{Pointee: field.Type}
+
+	llvmValue := c.module.Variable(external, c.getType(field.Type), c.getType(&ptr))
+	llvmValue.SetName(field.GetMangledName())
+
+	value := exprValue{
+		v:           llvmValue,
+		addressable: true,
+	}
+
+	c.staticVariables[field] = value
+	return value
 }
 
 // Functions

@@ -6,6 +6,18 @@ import (
 	"strings"
 )
 
+func (s *Struct) GetStaticField(name string) (int, *Field) {
+	for i := range s.StaticFields {
+		field := &s.StaticFields[i]
+
+		if field.Name.Lexeme == name {
+			return i, field
+		}
+	}
+
+	return 0, nil
+}
+
 func (s *Struct) GetField(name string) (int, *Field) {
 	for i := range s.Fields {
 		field := &s.Fields[i]
@@ -45,6 +57,10 @@ func (e *Enum) GetCase(name string) *EnumCase {
 	}
 
 	return nil
+}
+
+func (f *Field) GetMangledName() string {
+	return fmt.Sprintf("fb$%s::%s", f.Parent, f.Name)
 }
 
 // Func

@@ -73,9 +73,17 @@ func (p *parser) struct_() ast.Decl {
 	}
 
 	// Fields
+	staticFields := make([]ast.Field, 0)
 	fields := make([]ast.Field, 0, 4)
 
-	for p.canLoopAdvanced(scanner.RightBrace, scanner.Identifier) {
+	for p.canLoopAdvanced(scanner.RightBrace, scanner.Static, scanner.Identifier) {
+		// Static
+		static := false
+
+		if p.match(scanner.Static) {
+			static = true
+		}
+
 		// Name
 		name := p.consume(scanner.Identifier, "Expected field name.")
 
@@ -97,10 +105,16 @@ func (p *parser) struct_() ast.Decl {
 		}
 
 		// Add
-		fields = append(fields, ast.Field{
+		field := ast.Field{
 			Name: name,
 			Type: type_,
-		})
+		}
+
+		if static {
+			staticFields = append(staticFields, field)
+		} else {
+			fields = append(fields, field)
+		}
 
 		// Comma
 		if token := p.consume(scanner.Comma, "Expected ',' after field type."); token.IsError() {
@@ -122,12 +136,21 @@ func (p *parser) struct_() ast.Decl {
 
 	// Return
 	decl := &ast.Struct{
-		Name:   name,
-		Fields: fields,
+		Name:         name,
+		StaticFields: staticFields,
+		Fields:       fields,
 	}
 
 	decl.SetRangeToken(start, p.current)
 	decl.SetChildrenParent()
+
+	for i := range decl.StaticFields {
+		decl.StaticFields[i].Parent = decl
+	}
+
+	for i := range decl.Fields {
+		decl.Fields[i].Parent = decl
+	}
 
 	return decl
 }

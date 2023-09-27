@@ -270,15 +270,6 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		case scanner.Ampersand:
 			if result.IsAddressable() {
 				expr.Result().SetValue(types.Pointer(result.Type, core.Range{}), 0)
-			} else if result.Kind == ast.FunctionResultKind {
-				if result.Function.Method() != nil {
-					c.errorRange(expr.Value.Range(), "Cannot take address of a non-static method.")
-					expr.Result().SetInvalid()
-
-					return
-				}
-
-				expr.Result().SetValue(expr.Value.Result().Function, 0)
 			} else {
 				c.errorRange(expr.Value.Range(), "Cannot take address of this expression.")
 				expr.Result().SetInvalid()
@@ -315,6 +306,21 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 
 			expr.Result().SetValue(result.Type, 0)
+
+		case scanner.FuncPtr:
+			if result.Kind == ast.FunctionResultKind {
+				if result.Function.Method() != nil {
+					c.errorRange(expr.Value.Range(), "Cannot take address of a non-static method.")
+					expr.Result().SetInvalid()
+
+					return
+				}
+
+				expr.Result().SetValue(expr.Value.Result().Function, 0)
+			} else {
+				c.errorRange(expr.Value.Range(), "Cannot take address of this function.")
+				expr.Result().SetInvalid()
+			}
 
 		default:
 			panic("checker.VisitUnary() - Invalid unary prefix operator")
@@ -499,8 +505,8 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	expr.AcceptChildren(c)
 
-	// Function
-	if parent, ok := expr.Parent().(*ast.Call); ok && parent.Callee == expr {
+	// Function / function pointer
+	if parentWantsFunction(expr) {
 		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
 			expr.Result().SetFunction(f)
 			expr.Kind = ast.FunctionKind
@@ -537,16 +543,6 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		}
 
 		return
-	}
-
-	// Function pointer
-	if parent, ok := expr.Parent().(*ast.Unary); ok && parent.Op.Kind == scanner.Ampersand {
-		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
-			expr.Result().SetFunction(f)
-			expr.Kind = ast.FunctionKind
-
-			return
-		}
 	}
 
 	// Error
@@ -802,16 +798,32 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		// Struct
 		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.StructKind {
 			if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
-				function, _ := c.resolver.GetMethod(v, expr.Name.Lexeme, true)
+				// Check if parent expression wants a function
+				if parentWantsFunction(expr) {
+					function, _ := c.resolver.GetMethod(v, expr.Name.Lexeme, true)
 
-				if function == nil {
-					c.errorToken(expr.Name, "Struct '%s' does not contain static method with the name '%s'.", v, expr.Name)
+					if function == nil {
+						c.errorToken(expr.Name, "Struct '%s' does not contain static method with the name '%s'.", v, expr.Name)
+						expr.Result().SetInvalid()
+
+						return
+					}
+
+					expr.Result().SetFunction(function)
+					return
+				}
+
+				// Check static field
+				_, field := v.GetStaticField(expr.Name.Lexeme)
+
+				if field == nil {
+					c.errorToken(expr.Name, "Struct '%s' does not contain static field '%s'.", v, expr.Name)
 					expr.Result().SetInvalid()
 
 					return
 				}
 
-				expr.Result().SetFunction(function)
+				expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag)
 				return
 			}
 		}
@@ -854,8 +866,8 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			return
 		}
 
-		// Check if parent expression is a call expression
-		if call, ok := expr.Parent().(*ast.Call); ok && call.Callee == expr {
+		// Check if parent expression wants a function
+		if parentWantsFunction(expr) {
 			function, _ := c.resolver.GetMethod(s, expr.Name.Lexeme, false)
 
 			if function != nil {
@@ -888,6 +900,19 @@ func (c *checker) VisitMember(expr *ast.Member) {
 }
 
 // Utils
+
+func parentWantsFunction(expr ast.Expr) bool {
+	switch parent := expr.Parent().(type) {
+	case *ast.Call:
+		return parent.Callee == expr
+
+	case *ast.Unary:
+		return parent.Op.Kind == scanner.FuncPtr
+
+	default:
+		return false
+	}
+}
 
 func (c *checker) checkMalloc(expr ast.Expr) {
 	function, _ := c.resolver.GetFunction("malloc")

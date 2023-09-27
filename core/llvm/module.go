@@ -13,6 +13,8 @@ type Module struct {
 	constants    []*constant
 	constantType Type
 
+	variables []*variable
+
 	declares []*functionType
 	defines  []*Function
 
@@ -423,6 +425,43 @@ func (m *Module) Constant(data string) Value {
 
 	m.constants = append(m.constants, c)
 	return c
+}
+
+// Variables
+
+type variable struct {
+	type_ Type
+	ptr   Type
+
+	external bool
+	name     string
+}
+
+func (v *variable) Kind() ValueKind {
+	return GlobalValue
+}
+
+func (v *variable) Type() Type {
+	return v.ptr
+}
+
+func (v *variable) Name() string {
+	return v.name
+}
+
+func (v *variable) SetName(name string) {
+	v.name = name
+}
+
+func (m *Module) Variable(external bool, type_ Type, ptr Type) NameableValue {
+	v := &variable{
+		type_:    type_,
+		ptr:      ptr,
+		external: external,
+	}
+
+	m.variables = append(m.variables, v)
+	return v
 }
 
 // Metadata

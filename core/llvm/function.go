@@ -134,7 +134,7 @@ func (b *Block) Name() string {
 }
 
 func (b *Block) Variable(name string, pointer Value) Instruction {
-	i := &variable{
+	i := &variableMetadata{
 		instruction: instruction{
 			module:   b.module,
 			location: -1,
@@ -168,7 +168,7 @@ func (b *Block) Variable(name string, pointer Value) Instruction {
 }
 
 func (b *Block) Lifetime(pointer Value, start bool) Instruction {
-	i := &lifetime{
+	i := &lifetimeMetadata{
 		instruction: instruction{
 			module:   b.module,
 			location: -1,
