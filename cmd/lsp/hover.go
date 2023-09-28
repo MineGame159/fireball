@@ -77,6 +77,23 @@ func getHover(decls []ast.Decl, pos core.Pos) *protocol.Hover {
 						}
 					}
 				}
+			} else if t, ok := node.(*ast.TypeCall); ok {
+				// ast.TypeCall
+				value := 0
+
+				if t.Name.Lexeme == "sizeof" {
+					value = t.Target.Size()
+				} else {
+					value = t.Target.Align()
+				}
+
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.PlainText,
+						Value: strconv.Itoa(value),
+					},
+					Range: convertRangePtr(t.Range()),
+				}
 			}
 
 			// ast.Expr
