@@ -20,7 +20,8 @@ type Function struct {
 	parameters []NameableValue
 	blocks     []*Block
 
-	metadata int
+	alwaysInline bool
+	metadata     int
 }
 
 func (f *Function) Kind() ValueKind {
@@ -45,6 +46,10 @@ func (f *Function) PushScope() {
 
 func (f *Function) PopScope() {
 	f.module.scopes = f.module.scopes[:len(f.module.scopes)-1]
+}
+
+func (f *Function) SetAlwaysInline() {
+	f.alwaysInline = true
 }
 
 func (f *Function) Block(name string) *Block {

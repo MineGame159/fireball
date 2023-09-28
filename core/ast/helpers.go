@@ -3,6 +3,7 @@ package ast
 import (
 	"fireball/core/types"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -69,20 +70,37 @@ func (f *Func) IsStatic() bool {
 	return f.Flags&Static != 0
 }
 
-func (f *Func) IsExtern() bool {
-	return f.Flags&Extern != 0
-}
-
 func (f *Func) IsVariadic() bool {
 	return f.Flags&Variadic != 0
 }
 
-func (f *Func) IsIntrinsic() bool {
-	return f.Flags&Intrinsic != 0
+func (f *Func) GetAttribute(attribute any) bool {
+	value := reflect.ValueOf(attribute)
+	elem := value.Elem()
+	type_ := elem.Type()
+
+	for _, attr := range f.Attributes {
+		if reflect.TypeOf(attr) == type_ {
+			elem.Set(reflect.ValueOf(attr))
+			return true
+		}
+	}
+
+	return false
 }
 
 func (f *Func) HasBody() bool {
-	return !f.IsExtern() && !f.IsIntrinsic()
+	var extern types.ExternAttribute
+	if f.GetAttribute(&extern) {
+		return false
+	}
+
+	var intrinsic types.IntrinsicAttribute
+	if f.GetAttribute(&intrinsic) {
+		return false
+	}
+
+	return true
 }
 
 func (f *Func) Signature(paramNames bool) string {
@@ -121,11 +139,14 @@ func (f *Func) Method() *Struct {
 }
 
 func (f *Func) MangledName() string {
-	name := f.Name.Lexeme
-
-	if f.IsExtern() {
-		return name
+	// Extern
+	var extern types.ExternAttribute
+	if f.GetAttribute(&extern) {
+		return extern.Name
 	}
+
+	// Normal
+	name := f.Name.Lexeme
 
 	if struct_, ok := f.Parent().(*Impl); ok {
 		name = fmt.Sprintf("%s.%s", struct_, name)

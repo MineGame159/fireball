@@ -110,6 +110,13 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 		f := c.module.Define(t, function.MangledName()[3:])
 		c.functions[function] = f
 
+		// Inline
+		var inline types.InlineAttribute
+
+		if function.GetAttribute(&inline) {
+			f.SetAlwaysInline()
+		}
+
 		// Set parameter names
 		if this != nil {
 			f.GetParameter(0).SetName("this")
@@ -338,8 +345,10 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 		var parameters []llvm.Type
 		var returns llvm.Type
 
-		if v.IsIntrinsic() {
-			intrinsic := c.getIntrinsic(v)
+		var intrinsic types.IntrinsicAttribute
+
+		if v.GetAttribute(&intrinsic) {
+			intrinsic := c.getIntrinsic(v, intrinsic)
 
 			parameters = intrinsic[1:]
 			returns = intrinsic[0]
@@ -404,10 +413,10 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 	panic("codegen.getType() - Invalid type")
 }
 
-func (c *codegen) getIntrinsic(function *ast.Func) []llvm.Type {
+func (c *codegen) getIntrinsic(function *ast.Func, intrinsic types.IntrinsicAttribute) []llvm.Type {
 	param := c.getType(function.Params[0].Type)
 
-	switch function.Name.Lexeme {
+	switch intrinsic.Name {
 	case "abs":
 		if isFloating(function.Params[0].Type) {
 			return []llvm.Type{
@@ -465,8 +474,8 @@ func (c *codegen) getIntrinsic(function *ast.Func) []llvm.Type {
 	}
 }
 
-func (c *codegen) modifyIntrinsicArgs(function *ast.Func, args []llvm.Value) []llvm.Value {
-	switch function.Name.Lexeme {
+func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsic types.IntrinsicAttribute, args []llvm.Value) []llvm.Value {
+	switch intrinsic.Name {
 	case "abs":
 		if !isFloating(function.Returns) {
 			i1 := c.getPrimitiveType(types.Bool)
@@ -482,10 +491,12 @@ func (c *codegen) modifyIntrinsicArgs(function *ast.Func, args []llvm.Value) []l
 }
 
 func getMangledName(function *ast.Func) string {
-	if function.IsIntrinsic() {
+	var intrinsic types.IntrinsicAttribute
+
+	if function.GetAttribute(&intrinsic) {
 		name := ""
 
-		switch function.Name.Lexeme {
+		switch intrinsic.Name {
 		case "abs":
 			name = ternary(isFloating(function.Returns), "llvm.fabs", "llvm.abs")
 
@@ -496,7 +507,7 @@ func getMangledName(function *ast.Func) string {
 			name = ternary(isFloating(function.Returns), "llvm.maxnum", ternary(isSigned(function.Returns), "llvm.smax", "llvm.umax"))
 
 		case "sqrt", "pow", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "fma", "copysign", "floor", "ceil", "round":
-			name = "llvm." + function.Name.Lexeme
+			name = "llvm." + intrinsic.Name
 
 		case "memcpy", "memmove":
 			return "llvm.memcpy.p0.p0.i32"

@@ -118,13 +118,14 @@ func (f *Func) Align() int {
 
 func (f *Func) WithRange(range_ core.Range) types.Type {
 	return &Func{
-		range_:  range_,
-		parent:  f.parent,
-		Flags:   f.Flags,
-		Name:    f.Name,
-		Params:  f.Params,
-		Returns: f.Returns,
-		Body:    f.Body,
+		range_:     range_,
+		parent:     f.parent,
+		Attributes: f.Attributes,
+		Flags:      f.Flags,
+		Name:       f.Name,
+		Params:     f.Params,
+		Returns:    f.Returns,
+		Body:       f.Body,
 	}
 }
 

@@ -9,24 +9,41 @@ import (
 )
 
 func (p *parser) declaration() ast.Decl {
+	attributesStart := p.next
+	attributes := p.parseAttributes()
 	start := p.next
 
 	if p.match(scanner.Struct) {
+		if len(attributes) > 0 {
+			p.error(attributesStart, "Structs cannot have attributes.")
+		}
+
 		return p.struct_()
 	}
+
 	if p.match(scanner.Impl) {
+		if len(attributes) > 0 {
+			p.error(attributesStart, "Implementations cannot have attributes.")
+		}
+
 		return p.impl()
 	}
+
 	if p.match(scanner.Enum) {
+		if len(attributes) > 0 {
+			p.error(attributesStart, "Enums cannot have attributes.")
+		}
+
 		return p.enum()
 	}
+
 	if p.match(scanner.Func) {
-		return p.function(start, 0)
+		return p.function(start, attributes, 0)
 	}
 
-	if flags := p.functionFlags(); flags != 0 {
+	if p.match(scanner.Static) {
 		if p.match(scanner.Func) {
-			return p.function(start, flags)
+			return p.function(start, attributes, ast.Static)
 		}
 	}
 
@@ -35,24 +52,6 @@ func (p *parser) declaration() ast.Decl {
 	p.syncToDecl()
 
 	return nil
-}
-
-func (p *parser) functionFlags() ast.FuncFlags {
-	flags := ast.FuncFlags(0)
-
-	for {
-		if p.match(scanner.Static) {
-			flags |= ast.Static
-		} else if p.match(scanner.Extern) {
-			flags |= ast.Extern
-		} else if p.match(scanner.Intrinsic) {
-			flags |= ast.Intrinsic
-		} else {
-			break
-		}
-	}
-
-	return flags
 }
 
 func (p *parser) struct_() ast.Decl {
@@ -175,13 +174,21 @@ func (p *parser) impl() ast.Decl {
 	// Functions
 	functions := make([]ast.Decl, 0, 8)
 
-	for p.canLoopAdvanced(scanner.RightBrace, scanner.Static, scanner.Extern, scanner.Intrinsic, scanner.Func) {
+	for p.canLoopAdvanced(scanner.RightBrace, scanner.Hashtag, scanner.Static, scanner.Func) {
 		start := p.next
-		flags := p.functionFlags()
 
-		p.advance()
+		attributes := p.parseAttributes()
+		flags := ast.FuncFlags(0)
 
-		function := p.function(start, flags)
+		if p.match(scanner.Static) {
+			flags = ast.Static
+		}
+
+		if token := p.consume(scanner.Func, "Expected 'func' to start a function."); token.IsError() {
+			return nil
+		}
+
+		function := p.function(start, attributes, flags)
 		if function == nil {
 			p.syncToDecl()
 			return nil
@@ -322,7 +329,7 @@ func (p *parser) enum() ast.Decl {
 	return decl
 }
 
-func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
+func (p *parser) function(start scanner.Token, attributes []any, flags ast.FuncFlags) ast.Decl {
 	// Name
 	name := p.consume(scanner.Identifier, "Expected function name.")
 
@@ -385,10 +392,16 @@ func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 	}
 
 	// Body
-	var body []ast.Stmt
+	decl := &ast.Func{
+		Attributes: attributes,
+		Flags:      flags,
+		Name:       name,
+		Params:     params,
+		Returns:    returns,
+	}
 
-	if flags&ast.Extern == 0 && flags&ast.Intrinsic == 0 {
-		body = make([]ast.Stmt, 0, 8)
+	if decl.HasBody() {
+		decl.Body = make([]ast.Stmt, 0, 8)
 
 		if brace := p.consume(scanner.LeftBrace, "Expected '{' before function body."); brace.IsError() {
 			p.syncToDecl()
@@ -405,7 +418,7 @@ func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 				continue
 			}
 
-			body = append(body, stmt)
+			decl.Body = append(decl.Body, stmt)
 		}
 
 		if brace := p.consume(scanner.RightBrace, "Expected '}' after function body."); brace.IsError() {
@@ -414,18 +427,141 @@ func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 	}
 
 	// Return
-	decl := &ast.Func{
-		Flags:   flags,
-		Name:    name,
-		Params:  params,
-		Returns: returns,
-		Body:    body,
-	}
-
 	decl.SetRangeToken(start, p.current)
 	decl.SetChildrenParent()
 
 	return decl
+}
+
+// Attributes
+
+func (p *parser) parseAttributes() []any {
+	var attributes []any
+
+	if p.match(scanner.Hashtag) {
+		// [
+		if token := p.consume(scanner.LeftBracket, "Expected '[' before attributes."); token.IsError() {
+			p.syncToDecl()
+			return attributes
+		}
+
+		// Attributes
+		for {
+			// Comma
+			if len(attributes) > 0 {
+				if token := p.consume(scanner.Comma, "Expected ',' between attributes."); token.IsError() {
+					p.syncToDecl()
+					return attributes
+				}
+			}
+
+			// Name
+			name := p.consume(scanner.Identifier, "Expected attribute name.")
+			if name.IsError() {
+				p.syncToDecl()
+				return attributes
+			}
+
+			// Args
+			var args []string
+			argsError := false
+
+			if p.match(scanner.LeftParen) {
+				for {
+					// Comma
+					if len(args) > 0 {
+						argsError = true
+						p.syncTo(scanner.RightParen)
+
+						break
+					}
+
+					// Value
+					value := p.consume(scanner.String, "Expected attribute argument.")
+
+					if value.IsError() {
+						argsError = true
+						p.syncTo(scanner.RightParen)
+
+						break
+					}
+
+					args = append(args, value.Lexeme[1:len(value.Lexeme)-1])
+
+					// Loop
+					if !p.canLoopAdvanced(scanner.RightParen, scanner.Comma) {
+						break
+					}
+				}
+
+				// )
+				if token := p.consume(scanner.RightParen, "Expected ')' after attribute arguments."); token.IsError() {
+					p.syncToDecl()
+					return attributes
+				}
+			}
+
+			// Attribute
+			if !argsError {
+				attribute := p.parseAttribute(name, args)
+
+				if attribute == nil {
+					p.error(name, "Unknown attribute with name '%s'.", name)
+				} else {
+					attributes = append(attributes, attribute)
+				}
+			}
+
+			// Loop
+			if !p.canLoopAdvanced(scanner.RightBracket, scanner.Comma) {
+				break
+			}
+		}
+
+		// ]
+		if token := p.consume(scanner.RightBracket, "Expected ']' after attributes."); token.IsError() {
+			p.syncToDecl()
+			return attributes
+		}
+	}
+
+	return attributes
+}
+
+func (p *parser) parseAttribute(token scanner.Token, args []string) any {
+	switch token.Lexeme {
+	case "Extern":
+		name := ""
+
+		if len(args) == 1 {
+			name = args[0]
+		} else if len(args) > 1 {
+			p.error(token, "Extern attribute only has 1 optional parameter.")
+		}
+
+		return types.ExternAttribute{Name: name}
+
+	case "Intrinsic":
+		name := ""
+
+		if len(args) == 1 {
+			name = args[0]
+		} else if len(args) > 1 {
+			p.error(token, "Intrinsic attribute only has 1 optional parameter.")
+		}
+
+		return types.IntrinsicAttribute{Name: name}
+
+	case "Inline":
+		if len(args) != 0 {
+			p.error(token, "Inline attribute doesn't have any parameters.")
+		}
+
+		return types.InlineAttribute{}
+
+	default:
+		return nil
+	}
 }
 
 // Helpers
@@ -433,7 +569,7 @@ func (p *parser) function(start scanner.Token, flags ast.FuncFlags) ast.Decl {
 func (p *parser) syncBeforeFieldOrDecl() bool {
 	for !p.isAtEnd() {
 		switch p.next.Kind {
-		case scanner.Struct, scanner.Enum, scanner.Static, scanner.Extern, scanner.Intrinsic, scanner.Func:
+		case scanner.Struct, scanner.Enum, scanner.Static, scanner.Func:
 			return false
 
 		case scanner.Comma:

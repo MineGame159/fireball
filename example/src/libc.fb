@@ -1,8 +1,12 @@
 struct LibC {}
 
 impl LibC {
-    static extern func printf(format *u8, ...) void
+    #[Extern]
+    static func printf(format *u8, ...) void
 
-    static extern func malloc(size u64) *void
-    static extern func free(ptr *void) void
+    #[Extern]
+    static func malloc(size u64) *void
+
+    #[Extern]
+    static func free(ptr *void) void
 }

@@ -49,6 +49,9 @@
     },
     {
       "include": "#keyword"
+    },
+    {
+      "include": "#attribute"
     }
   ],
   "repository": {
@@ -117,8 +120,29 @@
       "name": "string.quoted.double.fb"
     },
     "keyword": {
-      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|static|extern|intrinsic|func|continue|break|return|struct|impl|enum|new)\\b",
+      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|static|func|continue|break|return|struct|impl|enum|new)\\b",
       "name": "keyword.fb"
+    },
+    "attribute": {
+      "begin": "#\\[",
+      "end": "]",
+      "captures": {
+        "0": {
+          "name": "keyword.fb"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#attribute-name"
+        }
+      ]
+    },
+    "attribute-name": {
+      "match": "[a-zA-Z_][a-zA-Z_0-9]*",
+      "name": "entity.name.type.class.fb"
     }
   }
 }

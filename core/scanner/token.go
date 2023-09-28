@@ -50,6 +50,7 @@ const (
 	GreaterGreater
 	GreaterGreaterEqual
 	FuncPtr
+	Hashtag
 
 	Nil
 	True
@@ -63,8 +64,6 @@ const (
 	For
 	As
 	Static
-	Extern
-	Intrinsic
 	Func
 	Continue
 	Break

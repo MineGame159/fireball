@@ -78,6 +78,7 @@ var decls = []item{
 	{
 		name: "Func",
 		fields: []field{
+			{name: "Attributes", type_: "[]any"},
 			{name: "Flags", type_: "FuncFlags"},
 			{name: "Name", type_: "Token"},
 			{name: "Params", type_: "[]Param"},
@@ -92,9 +93,7 @@ var decls = []item{
 		name: "FuncFlags",
 		cases: []string{
 			"Static",
-			"Extern",
 			"Variadic",
-			"Intrinsic",
 		},
 		bitField: true,
 	},

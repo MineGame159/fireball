@@ -114,7 +114,12 @@ func WriteText(module *Module, writer io.Writer) {
 			}
 		}
 
-		w.fmt(") !dbg !%d {\n", define.metadata)
+		if define.alwaysInline {
+			w.fmt(") alwaysinline !dbg !%d {\n", define.metadata)
+		} else {
+			w.fmt(") !dbg !%d {\n", define.metadata)
+		}
+
 		w.body(define.blocks)
 		w.raw("}\n\n")
 	}

@@ -118,6 +118,9 @@ func (s *Scanner) Next() Token {
 
 		return s.matchToken('&', And, Ampersand)
 
+	case '#':
+		return s.make(Hashtag)
+
 	case '\'':
 		return s.character()
 	case '"':
@@ -150,8 +153,6 @@ func (s *Scanner) identifierKind() TokenKind {
 				return s.checkKeyword(2, "se", Else)
 			case 'n':
 				return s.checkKeyword(2, "um", Enum)
-			case 'x':
-				return s.checkKeyword(2, "tern", Extern)
 			}
 		}
 	case 'f':
@@ -172,8 +173,6 @@ func (s *Scanner) identifierKind() TokenKind {
 				return If
 			case 'm':
 				return s.checkKeyword(2, "pl", Impl)
-			case 'n':
-				return s.checkKeyword(2, "trinsic", Intrinsic)
 			}
 		}
 	case 'n':

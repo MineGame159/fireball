@@ -75,23 +75,49 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 }
 
 func (c *checker) VisitFunc(decl *ast.Func) {
+	// Check attributes
+	for i, attribute := range decl.Attributes {
+		switch attribute := attribute.(type) {
+		case types.ExternAttribute:
+			if attribute.Name == "" {
+				decl.Attributes[i] = types.ExternAttribute{Name: decl.Name.Lexeme}
+			}
+
+		case types.IntrinsicAttribute:
+			if attribute.Name == "" {
+				decl.Attributes[i] = types.IntrinsicAttribute{Name: decl.Name.Lexeme}
+			}
+
+		case types.InlineAttribute:
+
+		default:
+			c.errorToken(decl.Name, "Invalid attribute for a function.")
+		}
+	}
+
 	// Check flags
 	_, isImpl := decl.Parent().(*ast.Impl)
 
-	if isImpl && decl.IsExtern() && !decl.IsStatic() {
+	var extern types.ExternAttribute
+	isExtern := decl.GetAttribute(&extern)
+
+	var intrinsic types.IntrinsicAttribute
+	isIntrinsic := decl.GetAttribute(&intrinsic)
+
+	if isImpl && isExtern && !decl.IsStatic() {
 		c.errorToken(decl.Name, "Non static methods can't be extern.")
 	}
-	if isImpl && decl.IsIntrinsic() && !decl.IsStatic() {
+	if isImpl && isIntrinsic && !decl.IsStatic() {
 		c.errorToken(decl.Name, "Non static methods can't be intrinsics.")
 	}
 
-	if decl.IsVariadic() && !decl.IsExtern() {
+	if decl.IsVariadic() && !isExtern {
 		c.errorToken(decl.Name, "Only extern functions can be variadic.")
 	}
 
 	// Intrinsic
-	if decl.IsIntrinsic() {
-		c.checkIntrinsic(decl)
+	if isIntrinsic {
+		c.checkIntrinsic(decl, intrinsic)
 		return
 	}
 
@@ -140,10 +166,10 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	}
 }
 
-func (c *checker) checkIntrinsic(decl *ast.Func) {
+func (c *checker) checkIntrinsic(decl *ast.Func, intrinsic types.IntrinsicAttribute) {
 	valid := false
 
-	switch decl.Name.Lexeme {
+	switch intrinsic.Name {
 	case "abs":
 		valid = isSimpleIntrinsic(decl, 1, signedPredicate|floatingPredicate)
 

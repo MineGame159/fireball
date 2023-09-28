@@ -303,11 +303,12 @@ type Func struct {
 	range_ core.Range
 	parent Node
 
-	Flags   FuncFlags
-	Name    scanner.Token
-	Params  []Param
-	Returns types.Type
-	Body    []Stmt
+	Attributes []any
+	Flags      FuncFlags
+	Name       scanner.Token
+	Params     []Param
+	Returns    types.Type
+	Body       []Stmt
 }
 
 func (f *Func) Token() scanner.Token {
@@ -397,10 +398,8 @@ func (f *Func) SetChildrenParent() {
 type FuncFlags uint8
 
 const (
-	Static    FuncFlags = 1 << 0
-	Extern    FuncFlags = 1 << 1
-	Variadic  FuncFlags = 1 << 2
-	Intrinsic FuncFlags = 1 << 3
+	Static   FuncFlags = 1 << 0
+	Variadic FuncFlags = 1 << 1
 )
 
 // Param

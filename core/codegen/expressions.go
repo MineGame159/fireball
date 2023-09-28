@@ -561,8 +561,10 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Intrinsic
-	if function.IsIntrinsic() {
-		args = c.modifyIntrinsicArgs(function, args)
+	var intrinsic types.IntrinsicAttribute
+
+	if function.GetAttribute(&intrinsic) {
+		args = c.modifyIntrinsicArgs(function, intrinsic, args)
 	}
 
 	// Call

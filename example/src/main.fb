@@ -1,4 +1,4 @@
-/*struct Vec2 {
+struct Vec2 {
     x i32,
     y i32,
 }
@@ -38,10 +38,11 @@ func main() {
     var a = new f64[4];
     a[2] = 4.0;
 
-    LibC.printf("%f\n", sqrt(a[2]));
+    LibC.printf("%f\n", mySqrt(a[2]));
     free(a);
 }
 
+#[Inline]
 func foo(new (x i32, y i32) Vec2) {
     var a = new(2, 9);
     var b = new(6, 2);
@@ -49,33 +50,11 @@ func foo(new (x i32, y i32) Vec2) {
     a.add(b).print();
 }
 
-intrinsic func sqrt(a f64) f64
+#[Intrinsic("sqrt")]
+func mySqrt(a f64) f64
 
-extern func malloc(len u64) *void
-extern func free(ptr *void) void*/
+#[Extern]
+func malloc(size u64) *void
 
-struct Vec4 {
-    x f32,
-    y f32,
-    z f32,
-    w f32,
-}
-
-func add(a Vec4, b Vec4) Vec4 {
-    var v Vec4;
-
-    v.x = a.x + b.x;
-    v.y = a.y + b.y;
-    v.z = a.z + b.z;
-    v.w = a.w + b.w;
-
-    return v;
-}
-
-func main() {
-    var a Vec4;
-    var b Vec4;
-
-    var c = add(a, b);
-    LibC.printf("%d\n", c.x);
-}
+#[Extern]
+func free(ptr *void) void

@@ -290,7 +290,7 @@ func (p *parser) isAtEnd() bool {
 // Error handling
 
 func (p *parser) syncToDecl() {
-	p.syncTo(scanner.Struct, scanner.Enum, scanner.Static, scanner.Extern, scanner.Intrinsic, scanner.Func)
+	p.syncTo(scanner.Struct, scanner.Enum, scanner.Static, scanner.Func)
 }
 
 func (p *parser) syncToStmt() bool {
@@ -300,7 +300,7 @@ func (p *parser) syncToStmt() bool {
 			p.advance()
 			return true
 
-		case scanner.Struct, scanner.Enum, scanner.Static, scanner.Extern, scanner.Intrinsic, scanner.Func, scanner.RightBrace:
+		case scanner.Struct, scanner.Enum, scanner.Static, scanner.Func, scanner.RightBrace:
 			return false
 
 		default:
