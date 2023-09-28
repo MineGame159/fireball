@@ -15,7 +15,7 @@ func (s *Struct) Size() int {
 		layout.Add(field.Type)
 	}
 
-	return layout.Offset
+	return layout.Size()
 }
 
 func (s *Struct) Align() int {

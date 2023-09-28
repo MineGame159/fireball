@@ -363,7 +363,7 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 		fields := make([]llvm.Field, len(v.Fields))
 
 		for i, field := range v.Fields {
-			offset, _ := layout.Add(field.Type)
+			offset := layout.Add(field.Type)
 
 			fields[i] = llvm.Field{
 				Name:   field.Name.Lexeme,
@@ -372,7 +372,7 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 			}
 		}
 
-		llvmType = c.module.Struct(v.Name.Lexeme, layout.Offset*8, fields)
+		llvmType = c.module.Struct(v.Name.Lexeme, layout.Size()*8, fields)
 	} else if v, ok := type_.(*ast.Enum); ok {
 		// Enum
 		llvmType = c.module.Alias(v.Name.Lexeme, c.getType(v.Type))

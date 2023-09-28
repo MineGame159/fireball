@@ -6,34 +6,35 @@ import (
 
 type Layout interface {
 	Add(type_ types.Type) (offset, size int)
+	Size() int
 }
 
 type CLayout struct {
 	biggestAlign int
-	Offset       int
+	offset       int
 }
 
-func (l *CLayout) Add(type_ types.Type) (offset, size int) {
-	size = type_.Size()
-	align := type_.Align()
+func (l *CLayout) Add(type_ types.Type) int {
+	l.biggestAlign = max(l.biggestAlign, type_.Align())
 
-	// Align member
-	l.biggestAlign = max(l.biggestAlign, align)
+	offset := align(l.offset, l.biggestAlign)
+	l.offset = offset + type_.Size()
 
-	offset = l.Offset
+	return offset
+}
 
-	if offset%align != 0 {
-		offset += align - (offset % align)
+func (l *CLayout) Size() int {
+	if l.offset == 0 {
+		return 0
 	}
 
-	l.Offset = offset + size
+	return align(l.offset, l.biggestAlign)
+}
 
-	// Calculate total size
-	size = l.Offset
-
-	if size%l.biggestAlign != 0 {
-		size += l.biggestAlign - (size % l.biggestAlign)
+func align(value, align int) int {
+	if value%align != 0 {
+		value += align - (value % align)
 	}
 
-	return offset, size
+	return value
 }
