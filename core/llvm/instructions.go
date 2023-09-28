@@ -131,17 +131,32 @@ type insertValue struct {
 type alloca struct {
 	instruction
 	type_ Type
+	align int
+}
+
+func (a *alloca) SetAlign(align int) {
+	a.align = align
 }
 
 type load struct {
 	instruction
 	pointer Value
+	align   int
+}
+
+func (l *load) SetAlign(align int) {
+	l.align = align
 }
 
 type store struct {
 	instruction
 	pointer Value
 	value   Value
+	align   int
+}
+
+func (s *store) SetAlign(align int) {
+	s.align = align
 }
 
 type getElementPtr struct {

@@ -282,7 +282,7 @@ func (b *Block) InsertValue(value, element Value, index int) InstructionValue {
 	return i
 }
 
-func (b *Block) Alloca(type_ Type) InstructionValue {
+func (b *Block) Alloca(type_ Type) AlignedInstructionValue {
 	i := &alloca{
 		instruction: instruction{
 			module:   b.module,
@@ -296,7 +296,7 @@ func (b *Block) Alloca(type_ Type) InstructionValue {
 	return i
 }
 
-func (b *Block) Load(pointer Value) InstructionValue {
+func (b *Block) Load(pointer Value) AlignedInstructionValue {
 	i := &load{
 		instruction: instruction{
 			module:   b.module,
@@ -310,7 +310,7 @@ func (b *Block) Load(pointer Value) InstructionValue {
 	return i
 }
 
-func (b *Block) Store(pointer Value, value Value) InstructionValue {
+func (b *Block) Store(pointer Value, value Value) AlignedInstruction {
 	i := &store{
 		instruction: instruction{
 			module:   b.module,

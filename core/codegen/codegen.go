@@ -131,10 +131,13 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 
 // IR
 
-func (c *codegen) load(value exprValue) exprValue {
+func (c *codegen) load(value exprValue, type_ types.Type) exprValue {
 	if value.addressable {
+		load := c.block.Load(value.v)
+		load.SetAlign(type_.Align())
+
 		return exprValue{
-			v:           c.block.Load(value.v),
+			v:           load,
 			addressable: false,
 		}
 	}
@@ -143,7 +146,7 @@ func (c *codegen) load(value exprValue) exprValue {
 }
 
 func (c *codegen) loadExpr(expr ast.Expr) exprValue {
-	return c.load(c.acceptExpr(expr))
+	return c.load(c.acceptExpr(expr), expr.Result().Type)
 }
 
 // Static variables
@@ -219,6 +222,7 @@ func (a *allocaFinder) AcceptStmt(stmt ast.Stmt) {
 	if variable, ok := stmt.(*ast.Variable); ok {
 		pointer := a.c.block.Alloca(a.c.getType(variable.Type))
 		pointer.SetName(variable.Name.Lexeme + ".var")
+		pointer.SetAlign(variable.Type.Align())
 
 		a.c.allocas[variable] = exprValue{
 			v:           pointer,
@@ -233,16 +237,26 @@ func (a *allocaFinder) AcceptExpr(expr ast.Expr) {
 	switch expr := expr.(type) {
 	case *ast.Call:
 		if callNeedsTempVariable(expr) {
+			returns := expr.Callee.Result().Function.Returns
+
+			pointer := a.c.block.Alloca(a.c.getType(returns))
+			pointer.SetAlign(returns.Align())
+
 			a.c.allocas[expr] = exprValue{
-				v:           a.c.block.Alloca(a.c.getType(expr.Callee.Result().Function.Returns)),
+				v:           pointer,
 				addressable: true,
 			}
 		}
 
 	case *ast.Member:
 		if expr.Value.Result().Kind != ast.TypeResultKind && expr.Result().Kind == ast.FunctionResultKind && !expr.Value.Result().IsAddressable() {
+			type_ := expr.Value.Result().Type
+
+			pointer := a.c.block.Alloca(a.c.getType(type_))
+			pointer.SetAlign(type_.Align())
+
 			a.c.allocas[expr] = exprValue{
-				v:           a.c.block.Alloca(a.c.getType(expr.Value.Result().Type)),
+				v:           pointer,
 				addressable: true,
 			}
 		}

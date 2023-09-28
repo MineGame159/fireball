@@ -24,7 +24,18 @@ type Instruction interface {
 	SetLocation(location Location)
 }
 
+type AlignedInstruction interface {
+	Instruction
+
+	SetAlign(align int)
+}
+
 type InstructionValue interface {
 	NameableValue
 	Instruction
+}
+
+type AlignedInstructionValue interface {
+	InstructionValue
+	AlignedInstruction
 }

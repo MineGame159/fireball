@@ -28,7 +28,10 @@ func (c *codegen) VisitVariable(stmt *ast.Variable) {
 	// Initializer
 	if stmt.Initializer != nil {
 		initializer := c.loadExpr(stmt.Initializer)
-		c.block.Store(pointer.v, initializer.v).SetLocation(stmt.Name)
+
+		store := c.block.Store(pointer.v, initializer.v)
+		store.SetAlign(stmt.Type.Align())
+		store.SetLocation(stmt.Name)
 	}
 }
 

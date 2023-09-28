@@ -309,15 +309,30 @@ func (w *textWriter) instruction(i Value) bool {
 		location = inst.location
 
 	case *alloca:
-		w.fmt("alloca %s", w.type_(inst.type_))
+		if inst.align != 0 {
+			w.fmt("alloca %s, align %d", w.type_(inst.type_), inst.align)
+		} else {
+			w.fmt("alloca %s", w.type_(inst.type_))
+		}
+
 		location = inst.location
 
 	case *load:
-		w.fmt("load %s, ptr %s", w.type_(inst.Type()), w.value(inst.pointer))
+		if inst.align != 0 {
+			w.fmt("load %s, ptr %s, align %d", w.type_(inst.Type()), w.value(inst.pointer), inst.align)
+		} else {
+			w.fmt("load %s, ptr %s", w.type_(inst.Type()), w.value(inst.pointer))
+		}
+
 		location = inst.location
 
 	case *store:
-		w.fmt("store %s %s, ptr %s", w.type_(inst.value.Type()), w.value(inst.value), w.value(inst.pointer))
+		if inst.align != 0 {
+			w.fmt("store %s %s, ptr %s, align %d", w.type_(inst.value.Type()), w.value(inst.value), w.value(inst.pointer), inst.align)
+		} else {
+			w.fmt("store %s %s, ptr %s", w.type_(inst.value.Type()), w.value(inst.value), w.value(inst.pointer))
+		}
+
 		location = inst.location
 
 	case *getElementPtr:

@@ -55,8 +55,11 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 
 		pointer := c.block.Alloca(c.getType(param.Type))
 		pointer.SetName(param.Name.Lexeme + ".var")
+		pointer.SetAlign(param.Type.Align())
 
-		c.block.Store(pointer, function.GetParameter(index))
+		store := c.block.Store(pointer, function.GetParameter(index))
+		store.SetAlign(param.Type.Align())
+
 		c.addVariable(param.Name, exprValue{v: pointer})
 	}
 

@@ -125,7 +125,8 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 			c.getType(mallocFunc.Returns),
 		)
 
-		c.block.Store(pointer, result)
+		store := c.block.Store(pointer, result)
+		store.SetAlign(struct_.Align())
 
 		c.exprResult = exprValue{v: pointer}
 	}
@@ -196,7 +197,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 					c.getType(&t),
 					llvm.Literal{Signed: 1},
 				),
-				c.load(value).v,
+				c.load(value, expr.Value.Result().Type).v,
 			)
 
 			r.SetLocation(expr.Token())
@@ -204,7 +205,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 		case scanner.Minus:
 			if v, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
-				value := c.load(value)
+				value := c.load(value, expr.Value.Result().Type)
 
 				if types.IsFloating(v.Kind) {
 					// floating
@@ -234,10 +235,13 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			return
 
 		case scanner.Star:
-			result = c.load(value).v
+			result = c.load(value, expr.Value.Result().Type).v
 
 			if _, ok := expr.Parent().(*ast.Assignment); !ok {
-				result = c.block.Load(result)
+				load := c.block.Load(result)
+				load.SetAlign(expr.Result().Type.Align())
+
+				result = load
 			}
 
 		case scanner.PlusPlus, scanner.MinusMinus:
@@ -252,9 +256,13 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 						Floating: 1,
 					},
 				)},
+				expr.Value.Result().Type,
 			)
 
-			c.block.Store(value.v, newValue.v).SetLocation(expr.Token())
+			store := c.block.Store(value.v, newValue.v)
+			store.SetAlign(expr.Value.Result().Type.Align())
+			store.SetLocation(expr.Token())
+
 			result = newValue.v
 
 		default:
@@ -264,7 +272,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		// Postfix
 		switch expr.Op.Kind {
 		case scanner.PlusPlus, scanner.MinusMinus:
-			prevValue := c.load(value)
+			prevValue := c.load(value, expr.Value.Result().Type)
 
 			newValue := c.binary(
 				expr.Op,
@@ -277,9 +285,13 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 						Floating: 1,
 					},
 				)},
+				expr.Value.Result().Type,
 			)
 
-			c.block.Store(value.v, newValue.v).SetLocation(expr.Token())
+			store := c.block.Store(value.v, newValue.v)
+			store.SetAlign(expr.Value.Result().Type.Align())
+			store.SetLocation(expr.Token())
+
 			result = prevValue.v
 
 		default:
@@ -294,7 +306,7 @@ func (c *codegen) VisitBinary(expr *ast.Binary) {
 	left := c.acceptExpr(expr.Left)
 	right := c.acceptExpr(expr.Right)
 
-	c.exprResult = c.binary(expr.Op, left, right)
+	c.exprResult = c.binary(expr.Op, left, right, expr.Left.Result().Type)
 }
 
 func (c *codegen) VisitLogical(expr *ast.Logical) {
@@ -376,13 +388,16 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	if expr.Op.Kind != scanner.Equal {
 		value = c.binary(
 			expr.Op,
-			c.load(assignee),
+			c.load(assignee, expr.Assignee.Result().Type),
 			value,
+			expr.Assignee.Result().Type,
 		)
 	}
 
 	// Store
-	c.block.Store(assignee.v, value.v).SetLocation(expr.Token())
+	store := c.block.Store(assignee.v, value.v)
+	store.SetAlign(expr.Result().Type.Align())
+	store.SetLocation(expr.Token())
 
 	c.exprResult = assignee
 }
@@ -432,7 +447,7 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type,
 		return
 	}
 
-	value = c.load(value)
+	value = c.load(value, from)
 
 	if (types.IsInteger(fromKind) || types.IsFloating(fromKind)) && toKind == types.Bool {
 		// integer / floating to bool
@@ -521,7 +536,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	if f, ok := expr.Callee.Result().Type.(*ast.Func); ok && function == nil {
 		function = f
-		callee = c.load(callee)
+		callee = c.load(callee, expr.Callee.Result().Type)
 	}
 
 	// Load arguments
@@ -561,7 +576,9 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
 	if callNeedsTempVariable(expr) {
 		pointer := c.allocas[expr]
-		c.block.Store(pointer.v, c.exprResult.v)
+
+		store := c.block.Store(pointer.v, c.exprResult.v)
+		store.SetAlign(function.Returns.Align())
 
 		c.exprResult = pointer
 	}
@@ -571,10 +588,11 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	value := c.acceptExpr(expr.Value)
 	index := c.loadExpr(expr.Index)
 
-	if _, ok := expr.Value.Result().Type.(*types.PointerType); ok {
-		value = exprValue{
-			v: c.block.Load(value.v),
-		}
+	if pointer, ok := expr.Value.Result().Type.(*types.PointerType); ok {
+		load := c.block.Load(value.v)
+		load.SetAlign(pointer.Pointee.Align())
+
+		value = exprValue{v: load}
 	}
 
 	t := types.PointerType{Pointee: expr.Result().Type}
@@ -639,8 +657,11 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			if v, ok := v.Pointee.(*ast.Struct); ok {
 				s = v
 
+				load := c.block.Load(value.v)
+				load.SetAlign(v.Align())
+
 				value = exprValue{
-					v:           c.block.Load(value.v),
+					v:           load,
 					addressable: true,
 				}
 			}
@@ -654,7 +675,9 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 		if expr.Result().Kind == ast.FunctionResultKind {
 			if !value.addressable {
 				pointer := c.allocas[expr]
-				c.block.Store(pointer.v, value.v)
+
+				store := c.block.Store(pointer.v, value.v)
+				store.SetAlign(expr.Result().Function.Returns.Align())
 
 				value = pointer
 			}
@@ -703,9 +726,9 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 // Utils
 
-func (c *codegen) binary(op scanner.Token, left exprValue, right exprValue) exprValue {
-	left = c.load(left)
-	right = c.load(right)
+func (c *codegen) binary(op scanner.Token, left exprValue, right exprValue, type_ types.Type) exprValue {
+	left = c.load(left, type_)
+	right = c.load(right, type_)
 
 	var kind llvm.BinaryKind
 
