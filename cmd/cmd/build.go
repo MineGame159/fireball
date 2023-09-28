@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -36,6 +37,7 @@ func buildCmd(_ *cobra.Command, _ []string) {
 	buildProject()
 }
 
+//goland:noinspection GoBoolExpressions
 func buildProject() string {
 	start := time.Now()
 
@@ -103,15 +105,18 @@ func buildProject() string {
 	// Compile
 	c := build.Compiler{
 		OptimizationLevel: min(max(int(opt), 0), 3),
-		Crt:               true,
 	}
 
 	for _, irPath := range irPaths {
 		c.AddInput(irPath)
 	}
 
-	c.AddLibrary("m")
-	c.AddLibrary("c")
+	if runtime.GOOS == "darwin" {
+		c.AddLibrary("System")
+	} else {
+		c.AddLibrary("m")
+		c.AddLibrary("c")
+	}
 
 	output := filepath.Join(project.Path, "build", project.Config.Name)
 	err = c.Compile(output)

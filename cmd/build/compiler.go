@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
 type Compiler struct {
 	OptimizationLevel int
-	Crt               bool
 
 	inputs    []string
 	libraries []string
@@ -101,13 +101,23 @@ func (c *Compiler) compileIr(input string) error {
 	return execute(cmd)
 }
 
+//goland:noinspection GoBoolExpressions
 func (c *Compiler) linkExecutable(inputs []string, output string) error {
 	// Create command
-	cmd := exec.Command("ld.lld", "-dynamic-linker", "/lib64/ld-linux-x86-64.so.2", "-L/usr/lib")
+	cmd := exec.Command(getLinker(), "-L/usr/lib")
 
-	if c.Crt {
+	switch runtime.GOOS {
+	case "linux":
+		cmd.Args = append(cmd.Args, "-dynamic-linker")
+		cmd.Args = append(cmd.Args, "/lib64/ld-linux-x86-64.so.2")
+
 		cmd.Args = append(cmd.Args, "/usr/lib/crt1.o")
 		cmd.Args = append(cmd.Args, "/usr/lib/crti.o")
+
+	case "darwin":
+		cmd.Args = append(cmd.Args, "-dynamic")
+		cmd.Args = append(cmd.Args, "-syslibroot")
+		cmd.Args = append(cmd.Args, "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk")
 	}
 
 	for _, library := range c.libraries {
@@ -118,7 +128,7 @@ func (c *Compiler) linkExecutable(inputs []string, output string) error {
 		cmd.Args = append(cmd.Args, withExtension(input, "o"))
 	}
 
-	if c.Crt {
+	if runtime.GOOS == "linux" {
 		cmd.Args = append(cmd.Args, "/usr/lib/crtn.o")
 	}
 
@@ -130,16 +140,29 @@ func (c *Compiler) linkExecutable(inputs []string, output string) error {
 }
 
 func execute(cmd *exec.Cmd) error {
-	out := bytes.Buffer{}
-	cmd.Stderr = &out
+	stderr := bytes.Buffer{}
+	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 
 	if !cmd.ProcessState.Success() {
-		return errors.New(out.String())
+		return errors.New(stderr.String())
 	}
 
 	return err
+}
+
+func getLinker() string {
+	switch runtime.GOOS {
+	case "linux":
+		return "ld.lld"
+
+	case "darwin":
+		return "ld"
+
+	default:
+		panic("Unknown operating system: " + runtime.GOOS)
+	}
 }
 
 func withExtension(path, extension string) string {
