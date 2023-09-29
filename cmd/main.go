@@ -17,6 +17,7 @@ func main() {
 	root.AddCommand(
 		cmd.GetBuildCmd(),
 		cmd.GetRunCmd(),
+		cmd.GetInitCommand(),
 		lsp.GetCmd(),
 	)
 
