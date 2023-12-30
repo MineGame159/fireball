@@ -6,7 +6,6 @@ import (
 	"fireball/core/scanner"
 	"fireball/core/types"
 	"fireball/core/utils"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -88,6 +87,9 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 	case scanner.String:
 		kind = types.U8
 		pointer = true
+
+	default:
+		panic("checker.VisitLiteral() - Not implemented")
 	}
 
 	expr.Result().SetValue(types.Primitive(kind, core.Range{}), 0)
@@ -451,7 +453,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		expr.Result().SetInvalid()
 	} else {
 		// Error
-		log.Fatalln("checker.VisitBinary() - Invalid operator kind")
+		panic("checker.VisitBinary() - Invalid operator kind")
 	}
 }
 

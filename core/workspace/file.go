@@ -3,9 +3,9 @@ package workspace
 import (
 	"fireball/core"
 	"fireball/core/ast"
+	"fireball/core/ast/cst2ast"
 	"fireball/core/checker"
-	"fireball/core/parser"
-	"fireball/core/scanner"
+	"fireball/core/cst"
 	"fireball/core/typeresolver"
 	"fireball/core/types"
 	"fireball/core/utils"
@@ -18,7 +18,9 @@ type File struct {
 	Project *Project
 	Path    string
 
-	Text  string
+	Text string
+
+	Cst   cst.Node
 	Decls []ast.Decl
 
 	Types     map[string]types.Type
@@ -44,7 +46,8 @@ func (f *File) SetText(text string, parse bool) {
 		}
 
 		// Parse
-		f.Decls = parser.Parse(f, scanner.NewScanner(text))
+		f.Cst = cst.Parse(f, text)
+		f.Decls = cst2ast.Convert(f, f.Cst)
 
 		f.CollectTypesAndFunctions()
 		typeresolver.Resolve(f, f.Project, f.Decls)

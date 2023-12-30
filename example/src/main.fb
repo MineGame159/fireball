@@ -43,7 +43,7 @@ func main() {
 }
 
 #[Inline]
-func foo(new (x i32, y i32) Vec2) {
+func foo(new fn (x i32, y i32) Vec2) {
     var a = new(2, 9);
     var b = new(6, 2);
 

@@ -51,6 +51,13 @@ func (s *Scanner) Next() Token {
 		return s.make(RightBracket)
 
 	case '.':
+		if s.peek() == '.' && s.peekNext() == '.' {
+			s.advance()
+			s.advance()
+
+			return s.make(DotDotDot)
+		}
+
 		return s.make(Dot)
 	case ',':
 		return s.make(Comma)
@@ -160,6 +167,8 @@ func (s *Scanner) identifierKind() TokenKind {
 			switch s.text[s.startI+1] {
 			case 'a':
 				return s.checkKeyword(2, "lse", False)
+			case 'n':
+				return Fn
 			case 'o':
 				return s.checkKeyword(2, "r", For)
 			case 'u':
@@ -409,19 +418,19 @@ func (s *Scanner) make(kind TokenKind) Token {
 	lexeme := s.text[s.startI:s.currentI]
 
 	return Token{
-		Kind:   kind,
-		Lexeme: lexeme,
-		line:   s.line,
-		column: s.column - len(lexeme),
+		Kind:    kind,
+		Lexeme:  lexeme,
+		Line_:   s.line,
+		Column_: s.column - len(lexeme),
 	}
 }
 
 func (s *Scanner) error(msg string) Token {
 	return Token{
-		Kind:   Error,
-		Lexeme: msg,
-		line:   s.line,
-		column: s.column,
+		Kind:    Error,
+		Lexeme:  msg,
+		Line_:   s.line,
+		Column_: s.column,
 	}
 }
 

@@ -1,6 +1,8 @@
 package core
 
-import "fireball/core/scanner"
+import (
+	"fireball/core/scanner"
+)
 
 type Range struct {
 	Start Pos

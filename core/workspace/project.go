@@ -3,9 +3,9 @@ package workspace
 import (
 	"errors"
 	"fireball/core/ast"
+	"fireball/core/ast/cst2ast"
 	"fireball/core/checker"
-	"fireball/core/parser"
-	"fireball/core/scanner"
+	"fireball/core/cst"
 	"fireball/core/typeresolver"
 	"fireball/core/types"
 	"fireball/core/utils"
@@ -111,9 +111,8 @@ func (p *Project) LoadFiles() error {
 	}
 
 	for _, file := range p.Files {
-		decls := parser.Parse(file, scanner.NewScanner(file.Text))
-
-		file.Decls = decls
+		file.Cst = cst.Parse(file, file.Text)
+		file.Decls = cst2ast.Convert(file, file.Cst)
 	}
 
 	for _, file := range p.Files {
