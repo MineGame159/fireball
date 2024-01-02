@@ -4,7 +4,6 @@ import (
 	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/fuckoff"
-	"fireball/core/scanner"
 	"github.com/MineGame159/protocol"
 	"strconv"
 	"strings"
@@ -110,26 +109,6 @@ func getHoverToken(resolver fuckoff.Resolver, token *ast.Token) *protocol.Hover 
 	}
 
 	return nil
-}
-
-func parentWantsFunction(node ast.Node) bool {
-	if call, ok := node.Parent().(*ast.Call); ok {
-		return call.Callee == node
-	}
-
-	if unary, ok := node.Parent().(*ast.Unary); ok {
-		return unary.Prefix && unary.Operator.Token().Kind == scanner.FuncPtr
-	}
-
-	return false
-}
-
-func asThroughPointer[T ast.Type](type_ ast.Type) (T, bool) {
-	if pointer, ok := ast.As[*ast.Pointer](type_); ok {
-		return ast.As[T](pointer.Pointee)
-	}
-
-	return ast.As[T](type_)
 }
 
 func newHover(node ast.Node, text string) *protocol.Hover {

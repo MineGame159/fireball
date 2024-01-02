@@ -11,12 +11,14 @@ type File struct {
 	cst    cst.Node
 	parent Node
 
+	Path  string
 	Decls []Decl
 }
 
-func NewFile(node cst.Node, decls []Decl) *File {
+func NewFile(node cst.Node, path string, decls []Decl) *File {
 	f := &File{
 		cst:   node,
+		Path:  path,
 		Decls: decls,
 	}
 

@@ -9,6 +9,7 @@ import (
 	"fireball/core/utils"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sync"
 )
 
@@ -32,6 +33,10 @@ type File struct {
 	diagnostics []utils.Diagnostic
 }
 
+func (f *File) AbsolutePath() string {
+	return filepath.Join(f.Project.Path, f.Path)
+}
+
 func (f *File) SetText(text string, parse bool) {
 	f.Text = text
 
@@ -45,7 +50,7 @@ func (f *File) SetText(text string, parse bool) {
 
 		// Parse
 		f.Cst = cst.Parse(f, text)
-		f.Ast = cst2ast.Convert(f, f.Cst)
+		f.Ast = cst2ast.Convert(f, f.AbsolutePath(), f.Cst)
 
 		f.CollectTypesAndFunctions()
 		typeresolver.Resolve(f, f.Project, f.Ast)

@@ -11,7 +11,7 @@ type converter struct {
 	reporter utils.Reporter
 }
 
-func Convert(reporter utils.Reporter, node cst.Node) *ast.File {
+func Convert(reporter utils.Reporter, path string, node cst.Node) *ast.File {
 	c := converter{
 		reporter: reporter,
 	}
@@ -22,7 +22,7 @@ func Convert(reporter utils.Reporter, node cst.Node) *ast.File {
 		decls = append(decls, c.convertDecl(child))
 	}
 
-	return ast.NewFile(node, decls)
+	return ast.NewFile(node, path, decls)
 }
 
 func (c *converter) convertToken(node cst.Node) *ast.Token {

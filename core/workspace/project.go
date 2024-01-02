@@ -111,7 +111,7 @@ func (p *Project) LoadFiles() error {
 
 	for _, file := range p.Files {
 		file.Cst = cst.Parse(file, file.Text)
-		file.Ast = cst2ast.Convert(file, file.Cst)
+		file.Ast = cst2ast.Convert(file, file.AbsolutePath(), file.Cst)
 	}
 
 	for _, file := range p.Files {

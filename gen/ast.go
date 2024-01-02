@@ -221,6 +221,7 @@ var other = Group{
 	nodes: []Node{
 		node(
 			"File",
+			field("path", type_("string")),
 			field("decls", array("Decl")),
 		),
 		node(

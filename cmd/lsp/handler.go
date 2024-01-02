@@ -422,7 +422,7 @@ func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParam
 	}
 
 	// Get declaration
-	return getDefinition(file, pos), nil
+	return getDefinition(file.Project, file.Ast, pos), nil
 }
 
 // Utils

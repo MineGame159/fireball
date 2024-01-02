@@ -3,147 +3,103 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/workspace"
+	"fireball/core/fuckoff"
 	"github.com/MineGame159/protocol"
 	"go.lsp.dev/uri"
-	"path/filepath"
 )
 
-func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
-	for _, decl := range file.Ast.Decls {
-		// Get leaf
-		node := ast.GetLeaf(decl, pos)
-		if node == nil {
-			continue
+func getDefinition(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) []protocol.Location {
+	// Get node under cursor
+	node = ast.GetLeaf(node, pos)
+
+	// Get definition based on the leaf node
+	switch node := node.(type) {
+	case *ast.Identifier:
+		return getDefinitionIdentifier(node)
+
+	case *ast.Resolvable:
+		return newDefinition(node.Resolved())
+
+	case *ast.Token:
+		return getDefinitionToken(resolver, node)
+	}
+
+	return nil
+}
+
+func getDefinitionIdentifier(identifier *ast.Identifier) []protocol.Location {
+	switch identifier.Kind {
+	case ast.StructKind, ast.EnumKind:
+		return newDefinition(identifier.Result().Type)
+
+	case ast.FunctionKind:
+		return newDefinition(identifier.Result().Function)
+
+	case ast.ParameterKind:
+		function := ast.GetParent[*ast.Func](identifier)
+		if function == nil {
+			return nil
 		}
 
-		if identifier, ok := node.(*ast.Identifier); ok {
-			// ast.Identifier
-			name := identifier.String()
+		for _, param := range function.Params {
+			if param.Name.String() == identifier.String() {
+				return newDefinition(param)
+			}
+		}
 
-			switch identifier.Kind {
-			case ast.FunctionKind:
-				type_, path := file.Project.GetFunction(name)
-				if type_ == nil {
-					return nil
+	case ast.VariableKind:
+		function := ast.GetParent[*ast.Func](identifier)
+		if function == nil {
+			return nil
+		}
+
+		resolver := variableResolver{target: identifier}
+		resolver.VisitNode(function)
+
+		if resolver.variable != nil {
+			return newDefinition(resolver.variable)
+		}
+	}
+
+	return nil
+}
+
+func getDefinitionToken(resolver fuckoff.Resolver, token *ast.Token) []protocol.Location {
+	// Get definition based on the token's parent
+	switch parent := token.Parent().(type) {
+	case *ast.Member:
+		if s, ok := asThroughPointer[*ast.Struct](parent.Value.Result().Type); ok {
+			if parentWantsFunction(parent) {
+				method, _ := resolver.GetMethod(s, token.String(), false)
+				if method == nil {
+					method, _ = resolver.GetMethod(s, token.String(), true)
 				}
 
-				if type_.Cst() != nil {
-					return []protocol.Location{{
-						URI:   uri.New(filepath.Join(file.Project.Path, path)),
-						Range: convertRange(type_.Cst().Range),
-					}}
+				if method != nil {
+					return newDefinition(method)
+				}
+			} else {
+				_, field := s.GetField(token.String())
+				if field == nil {
+					_, field = s.GetStaticField(token.String())
 				}
 
-			case ast.StructKind, ast.EnumKind:
-				type_, path := file.Project.GetType(name)
-				if type_ == nil {
-					return nil
-				}
-
-				if type_.Cst() != nil {
-					return []protocol.Location{{
-						URI:   uri.New(filepath.Join(file.Project.Path, path)),
-						Range: convertRange(type_.Cst().Range),
-					}}
-				}
-
-			case ast.ParameterKind:
-				if function, ok := decl.(*ast.Func); ok {
-					for _, param := range function.Params {
-						if param.Name.String() == name && param.Name.Cst() != nil {
-							return []protocol.Location{{
-								URI:   uri.New(filepath.Join(file.Project.Path, file.Path)),
-								Range: convertRange(param.Name.Cst().Range),
-							}}
-						}
-					}
-				}
-
-			case ast.VariableKind:
-				resolver := variableResolver{
-					name:   name,
-					target: node,
-				}
-
-				resolver.VisitNode(decl)
-
-				if resolver.variable != nil && resolver.variable.Cst() != nil {
-					return []protocol.Location{{
-						URI:   uri.New(filepath.Join(file.Project.Path, file.Path)),
-						Range: convertRange(resolver.variable.Cst().Range),
-					}}
+				if field != nil {
+					return newDefinition(field)
 				}
 			}
-		} else if member, ok := node.(*ast.Member); ok {
-			type_ := member.Value.Result().Type
+		} else if e, ok := ast.As[*ast.Enum](parent.Value.Result().Type); ok {
+			case_ := e.GetCase(token.String())
 
-			if pointer, ok := ast.As[*ast.Pointer](type_); ok {
-				type_ = pointer.Pointee
+			if case_ != nil {
+				return newDefinition(case_)
 			}
+		}
 
-			switch member.Result().Kind {
-			case ast.ValueResultKind:
-				switch type_.(type) {
-				case *ast.Struct:
-					if t, path := file.Project.GetType(type_.String()); t != nil {
-						_, field := t.(*ast.Struct).GetField(member.Name.String())
-
-						if field != nil && field.Name.Cst() != nil {
-							return []protocol.Location{{
-								URI:   uri.New(filepath.Join(file.Project.Path, path)),
-								Range: convertRange(field.Name.Cst().Range),
-							}}
-						}
-					}
-
-				case *ast.Enum:
-					if t, path := file.Project.GetType(type_.String()); t != nil {
-						case_ := t.(*ast.Enum).GetCase(member.Name.String())
-
-						if case_ != nil && case_.Name.Cst() != nil {
-							return []protocol.Location{{
-								URI:   uri.New(filepath.Join(file.Project.Path, path)),
-								Range: convertRange(case_.Name.Cst().Range),
-							}}
-						}
-					}
-				}
-
-			case ast.FunctionResultKind:
-				function, path := file.Project.GetMethod(type_, member.Name.String(), false)
-
-				if function == nil {
-					function, path = file.Project.GetMethod(type_, member.Name.String(), true)
-
-					if function == nil {
-						return nil
-					}
-				}
-
-				if function.Cst() != nil {
-					return []protocol.Location{{
-						URI:   uri.New(filepath.Join(file.Project.Path, path)),
-						Range: convertRange(function.Cst().Range),
-					}}
-				}
-			}
-		} else if initializer, ok := node.(*ast.StructInitializer); ok {
-			if struct_, ok := initializer.Type.(*ast.Struct); ok {
-				if t, path := file.Project.GetType(struct_.String()); t != nil {
-					for _, field := range initializer.Fields {
-						if field.Name.Cst() != nil && field.Name.Cst().Range.Contains(pos) {
-							_, field := t.(*ast.Struct).GetField(field.Name.String())
-
-							if field != nil && field.Name.Cst() != nil {
-								return []protocol.Location{{
-									URI:   uri.New(filepath.Join(file.Project.Path, path)),
-									Range: convertRange(field.Name.Cst().Range),
-								}}
-							}
-						}
-					}
-				}
+	case *ast.InitField:
+		if s, ok := ast.As[*ast.Struct](parent.Parent().(*ast.StructInitializer).Type); ok {
+			if _, field := s.GetField(token.String()); field != nil {
+				return newDefinition(field)
 			}
 		}
 	}
@@ -151,83 +107,18 @@ func getDefinition(file *workspace.File, pos core.Pos) []protocol.Location {
 	return nil
 }
 
-type scope struct {
-	variableI     int
-	variableCount int
-}
-
-type variableResolver struct {
-	name   string
-	target ast.Node
-
-	scopes    []scope
-	variables []*ast.Var
-
-	done     bool
-	variable *ast.Var
-}
-
-func (v *variableResolver) VisitNode(node ast.Node) {
-	// Propagate
-	if v.done {
-		return
+func newDefinition(node ast.Node) []protocol.Location {
+	if node == nil || node.Cst() == nil {
+		return nil
 	}
 
-	// Check target
-	if node == v.target {
-		v.done = true
-		v.checkScope()
-		return
+	file := ast.GetParent[*ast.File](node)
+	if file == nil {
+		return nil
 	}
 
-	// Check node
-	pop := false
-
-	if _, ok := node.(*ast.Func); ok {
-		v.pushScope()
-		pop = true
-	} else if _, ok := node.(*ast.For); ok {
-		v.pushScope()
-		pop = true
-	} else if _, ok := node.(*ast.Block); ok {
-		v.pushScope()
-		pop = true
-	} else if variable, ok := node.(*ast.Var); ok {
-		v.scopes[len(v.scopes)-1].variableCount++
-		v.variables = append(v.variables, variable)
-	}
-
-	// Propagate or visit children
-	if v.done {
-		return
-	}
-
-	node.AcceptChildren(v)
-
-	if pop {
-		v.popScope()
-	}
-}
-
-func (v *variableResolver) checkScope() {
-	for i := len(v.variables) - 1; i >= 0; i-- {
-		variable := v.variables[i]
-
-		if variable.Name.String() == v.name {
-			v.variable = variable
-			break
-		}
-	}
-}
-
-func (v *variableResolver) pushScope() {
-	v.scopes = append(v.scopes, scope{
-		variableI:     len(v.variables),
-		variableCount: 0,
-	})
-}
-
-func (v *variableResolver) popScope() {
-	v.variables = v.variables[:v.scopes[len(v.scopes)-1].variableI]
-	v.scopes = v.scopes[:len(v.scopes)-1]
+	return []protocol.Location{{
+		URI:   uri.New(file.Path),
+		Range: convertRange(node.Cst().Range),
+	}}
 }

@@ -22,7 +22,7 @@ type Visitor interface {
 	VisitNode(node Node)
 }
 
-// GetLeaf
+// GetLeaf()
 
 func GetLeaf(node Node, pos core.Pos) Node {
 	g := get{
@@ -60,4 +60,19 @@ func (g *get) VisitNode(node Node) {
 			return
 		}
 	}
+}
+
+// GetParent()
+
+func GetParent[T Node](node Node) T {
+	for node != nil {
+		if n, ok := node.(T); ok {
+			return n
+		}
+
+		node = node.Parent()
+	}
+
+	var empty T
+	return empty
 }
