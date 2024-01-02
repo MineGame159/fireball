@@ -64,7 +64,7 @@ var canStartStructFieldExpr = []scanner.TokenKind{scanner.Identifier}
 
 func parsePrefixExprPratt(p *parser) Node {
 	switch p.peek() {
-	case scanner.True, scanner.False, scanner.Number, scanner.String:
+	case scanner.True, scanner.False, scanner.Number, scanner.Hex, scanner.Binary, scanner.Character, scanner.String:
 		return p.advanceGetLeaf()
 
 	case scanner.Identifier:

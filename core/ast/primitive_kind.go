@@ -2,7 +2,7 @@ package ast
 
 import "math"
 
-type PrimitiveKind = uint8
+type PrimitiveKind uint8
 
 const (
 	Void PrimitiveKind = iota
@@ -122,4 +122,38 @@ func GetRangeTrunc(kind PrimitiveKind) (min, max int64) {
 	default:
 		return 0, 0
 	}
+}
+
+func (p PrimitiveKind) String() string {
+	switch p {
+	case Void:
+		return "void"
+	case Bool:
+		return "bool"
+
+	case U8:
+		return "u8"
+	case U16:
+		return "u16"
+	case U32:
+		return "u32"
+	case U64:
+		return "u64"
+
+	case I8:
+		return "i8"
+	case I16:
+		return "i16"
+	case I32:
+		return "i32"
+	case I64:
+		return "i64"
+
+	case F32:
+		return "f32"
+	case F64:
+		return "f64"
+	}
+
+	panic("ast.PrimitiveKind.String() - Not implemented")
 }

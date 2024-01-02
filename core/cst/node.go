@@ -79,6 +79,7 @@ const (
 	AllocateArrayExprNode
 	BoolExprNode
 	NumberExprNode
+	CharacterExprNode
 	StringExprNode
 
 	AttributesNode
@@ -96,8 +97,10 @@ func NodeKindFromToken(token scanner.Token) NodeKind {
 
 	case scanner.True, scanner.False:
 		return BoolExprNode
-	case scanner.Number:
+	case scanner.Number, scanner.Hex, scanner.Binary:
 		return NumberExprNode
+	case scanner.Character:
+		return CharacterExprNode
 	case scanner.String:
 		return StringExprNode
 
@@ -196,6 +199,8 @@ func (n NodeKind) String() string {
 		return "Bool"
 	case NumberExprNode:
 		return "Number"
+	case CharacterExprNode:
+		return "Character"
 	case StringExprNode:
 		return "String"
 

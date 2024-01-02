@@ -145,7 +145,7 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 		}
 
 		if !initField.Value.Result().Type.CanAssignTo(field.Type) {
-			c.error(initField.Value, "Expected a '%s' but got '%s'", field.Type, initField.Value.Result().Type)
+			c.error(initField.Value, "Expected a '%s' but got '%s'", ast.PrintType(field.Type), ast.PrintType(initField.Value.Result().Type))
 		}
 	}
 
@@ -187,7 +187,7 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 			type_ = value.Result().Type
 		} else {
 			if !value.Result().Type.CanAssignTo(type_) {
-				c.error(value, "Expected a '%s' but got '%s'", type_, value.Result().Type)
+				c.error(value, "Expected a '%s' but got '%s'", ast.PrintType(type_), ast.PrintType(value.Result().Type))
 				ok = false
 			}
 		}
@@ -213,7 +213,7 @@ func (c *checker) VisitAllocateArray(expr *ast.AllocateArray) {
 	}
 
 	if !ast.IsPrimitive(expr.Count.Result().Type, ast.I32) {
-		c.error(expr.Count, "Expected an 'i32' but got '%s'", expr.Count.Result().Type)
+		c.error(expr.Count, "Expected an 'i32' but got '%s'", ast.PrintType(expr.Count.Result().Type))
 		expr.Result().SetInvalid()
 
 		return
@@ -244,7 +244,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 
 			if !ast.IsPrimitive(result.Type, ast.Bool) {
-				c.error(expr.Value, "Expected a 'bool' but got a '%s'", result.Type)
+				c.error(expr.Value, "Expected a 'bool' but got a '%s'", ast.PrintType(result.Type))
 			}
 
 			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
@@ -264,7 +264,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 				}
 			}
 
-			c.error(expr.Value, "Expected either a floating pointer number or signed integer but got a '%s'", result.Type)
+			c.error(expr.Value, "Expected either a floating pointer number or signed integer but got a '%s'", ast.PrintType(result.Type))
 			expr.Result().SetInvalid()
 
 		case scanner.Ampersand:
@@ -286,7 +286,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			if p, ok := ast.As[*ast.Pointer](result.Type); ok {
 				expr.Result().SetValue(p.Pointee, ast.AssignableFlag)
 			} else {
-				c.error(expr.Value, "Can only dereference pointer types, not '%s'", result.Type)
+				c.error(expr.Value, "Can only dereference pointer types, not '%s'", ast.PrintType(result.Type))
 				expr.Result().SetInvalid()
 			}
 
@@ -299,7 +299,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 
 			if type_, ok := ast.As[*ast.Primitive](result.Type); !ok || (!ast.IsInteger(type_.Kind) && !ast.IsFloating(type_.Kind)) {
-				c.error(expr.Value, "Cannot increment or decrement '%s'", result.Type)
+				c.error(expr.Value, "Cannot increment or decrement '%s'", ast.PrintType(result.Type))
 				expr.Result().SetInvalid()
 
 				return
@@ -337,7 +337,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 
 			if type_, ok := ast.As[*ast.Primitive](result.Type); !ok || (!ast.IsInteger(type_.Kind) && !ast.IsFloating(type_.Kind)) {
-				c.error(expr.Value, "Cannot increment or decrement '%s'", result.Type)
+				c.error(expr.Value, "Cannot increment or decrement '%s'", ast.PrintType(result.Type))
 				expr.Result().SetInvalid()
 
 				return
@@ -417,7 +417,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		}
 
 		if !valid {
-			c.error(expr, "Cannot check equality for '%s' and '%s'", leftType, rightType)
+			c.error(expr, "Cannot check equality for '%s' and '%s'", ast.PrintType(leftType), ast.PrintType(rightType))
 			expr.Result().SetInvalid()
 		} else {
 			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
@@ -484,12 +484,12 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 	ok = true
 
 	if !ast.IsPrimitive(expr.Left.Result().Type, ast.Bool) {
-		c.error(expr.Left, "Expected a 'bool' but got a '%s'", expr.Left.Result().Type)
+		c.error(expr.Left, "Expected a 'bool' but got a '%s'", ast.PrintType(expr.Left.Result().Type))
 		ok = false
 	}
 
 	if !ast.IsPrimitive(expr.Right.Result().Type, ast.Bool) {
-		c.error(expr.Right, "Expected a 'bool' but got a '%s'", expr.Right.Result().Type)
+		c.error(expr.Right, "Expected a 'bool' but got a '%s'", ast.PrintType(expr.Right.Result().Type))
 		ok = false
 	}
 
@@ -579,7 +579,7 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	if expr.Operator.Token().Kind == scanner.Equal {
 		// Equal
 		if !expr.Value.Result().Type.CanAssignTo(expr.Assignee.Result().Type) {
-			c.error(expr.Value, "Expected a '%s' but got '%s'", expr.Assignee.Result().Type, expr.Value.Result().Type)
+			c.error(expr.Value, "Expected a '%s' but got '%s'", ast.PrintType(expr.Assignee.Result().Type), ast.PrintType(expr.Value.Result().Type))
 			expr.Result().SetInvalid()
 
 			return
@@ -653,7 +653,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	} else if _, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
 		// enum to non integer
 		if to, ok := ast.As[*ast.Primitive](expr.Target); !ok || !ast.IsInteger(to.Kind) {
-			c.error(expr, "Can only cast enums to integers, not '%s'", to)
+			c.error(expr, "Can only cast enums to integers, not '%s'", ast.PrintType(to))
 			expr.Result().SetInvalid()
 
 			return
@@ -661,7 +661,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	} else if _, ok := ast.As[*ast.Enum](expr.Target); ok {
 		// non integer to enum
 		if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); !ok || !ast.IsInteger(from.Kind) {
-			c.error(expr, "Can only cast to enums from integers, not '%s'", from)
+			c.error(expr, "Can only cast to enums from integers, not '%s'", ast.PrintType(from))
 			expr.Result().SetInvalid()
 
 			return

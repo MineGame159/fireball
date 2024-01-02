@@ -83,14 +83,14 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 	// Check type
 	if decl.Type != nil {
 		if v, ok := ast.As[*ast.Primitive](decl.Type); !ok || !ast.IsInteger(v.Kind) {
-			c.error(decl.Type, "Invalid type '%s', can only be a signed or unsigned integer", decl.Type)
+			c.error(decl.Type, "Invalid type '%s', can only be a signed or unsigned integer", ast.PrintType(decl.Type))
 		} else {
 			// Check if all cases fit inside the type
 			min_, max_ := ast.GetRangeTrunc(v.Kind)
 
 			for _, case_ := range decl.Cases {
 				if case_.ActualValue < min_ || case_.ActualValue > max_ {
-					c.error(case_.Name, "Value '%d' does not fit inside the range of '%s'", case_.Value, decl.Type)
+					c.error(case_.Name, "Value '%d' does not fit inside the range of '%s'", case_.Value, ast.PrintType(decl.Type))
 				}
 			}
 		}
@@ -184,7 +184,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		}
 
 		if !valid {
-			c.error(decl.Name, "Function needs to return a '%s' value", decl.Returns)
+			c.error(decl.Name, "Function needs to return a '%s' value", ast.PrintType(decl.Returns))
 		}
 	}
 }

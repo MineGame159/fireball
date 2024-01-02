@@ -285,7 +285,7 @@ func PrintType(type_ Type) string {
 }
 
 func (t *typePrinter) VisitPrimitive(type_ *Primitive) {
-	t.str += type_.String()
+	t.str += type_.Kind.String()
 }
 
 func (t *typePrinter) VisitPointer(type_ *Pointer) {

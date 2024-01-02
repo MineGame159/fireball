@@ -37,7 +37,7 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 				}
 			} else {
 				if stmt.Value != nil && !stmt.Value.Result().Type.CanAssignTo(stmt.Type) {
-					c.error(stmt.Value, "Initializer with type '%s' cannot be assigned to a variable with type '%s'", stmt.Value.Result().Type, stmt.Type)
+					c.error(stmt.Value, "Initializer with type '%s' cannot be assigned to a variable with type '%s'", ast.PrintType(stmt.Value.Result().Type), ast.PrintType(stmt.Type))
 				}
 			}
 		}
@@ -68,7 +68,7 @@ func (c *checker) VisitIf(stmt *ast.If) {
 		c.error(stmt.Condition, "Invalid value")
 	} else {
 		if !ast.IsPrimitive(stmt.Condition.Result().Type, ast.Bool) {
-			c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'", stmt.Condition.Result().Type)
+			c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'", ast.PrintType(stmt.Condition.Result().Type))
 		}
 	}
 }
@@ -89,7 +89,7 @@ func (c *checker) VisitFor(stmt *ast.For) {
 			c.error(stmt.Condition, "Invalid value")
 		} else {
 			if stmt.Condition != nil && !ast.IsPrimitive(stmt.Condition.Result().Type, ast.Bool) {
-				c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'", stmt.Condition.Result().Type)
+				c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'", ast.PrintType(stmt.Condition.Result().Type))
 			}
 		}
 	}
@@ -116,7 +116,7 @@ func (c *checker) VisitReturn(stmt *ast.Return) {
 	}
 
 	if !type_.CanAssignTo(c.function.Returns) {
-		c.error(errorNode, "Cannot return type '%s' from a function with return type '%s'", type_, c.function.Returns)
+		c.error(errorNode, "Cannot return type '%s' from a function with return type '%s'", ast.PrintType(type_), ast.PrintType(c.function.Returns))
 	}
 }
 
