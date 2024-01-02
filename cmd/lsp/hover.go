@@ -3,144 +3,145 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
+	"fireball/core/fuckoff"
+	"fireball/core/scanner"
 	"github.com/MineGame159/protocol"
 	"strconv"
 	"strings"
 )
 
-func getHover(node ast.Node, pos core.Pos) *protocol.Hover {
+func getHover(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *protocol.Hover {
 	// Get node under cursor
 	node = ast.GetLeaf(node, pos)
-
-	if t, ok := node.(*ast.Token); ok {
-		node = t.Parent()
+	if node == nil || node.Cst() == nil {
+		return nil
 	}
 
-	if expr, ok := node.(ast.Expr); ok && expr.Result().Kind != ast.InvalidResultKind {
-		if l, ok := node.(*ast.Literal); ok {
-			// ast.Literal
-			text := ""
+	// Switch based on the leaf node
+	switch node := node.(type) {
+	case *ast.Identifier:
+		return newHover(node, ast.PrintTypeOptions(node.Result().Type, ast.TypePrintOptions{ParamNames: true}))
 
-			if strings.HasPrefix(l.String(), "0x") || strings.HasPrefix(l.String(), "0X") {
-				v, err := strconv.ParseUint(l.String()[2:], 16, 64)
-				if err == nil {
-					text = strconv.FormatUint(v, 10)
-				}
-			} else if strings.HasPrefix(l.String(), "0b") || strings.HasPrefix(l.String(), "0B") {
-				v, err := strconv.ParseUint(l.String()[2:], 2, 64)
-				if err == nil {
-					text = strconv.FormatUint(v, 10)
-				}
+	case *ast.Literal:
+		if strings.HasPrefix(node.String(), "0x") || strings.HasPrefix(node.String(), "0X") {
+			v, err := strconv.ParseUint(node.String()[2:], 16, 64)
+			if err == nil {
+				return newHover(node, strconv.FormatUint(v, 10))
 			}
-
-			if text != "" && l.Cst() != nil {
-				return &protocol.Hover{
-					Contents: protocol.MarkupContent{
-						Kind:  protocol.PlainText,
-						Value: text,
-					},
-					Range: convertRangePtr(l.Cst().Range),
-				}
+		} else if strings.HasPrefix(node.String(), "0b") || strings.HasPrefix(node.String(), "0B") {
+			v, err := strconv.ParseUint(node.String()[2:], 2, 64)
+			if err == nil {
+				return newHover(node, strconv.FormatUint(v, 10))
 			}
+		}
 
-			return nil
-		} else if i, ok := node.(*ast.StructInitializer); ok {
-			// ast.Initializer
-			for _, field := range i.Fields {
-				if field.Cst() != nil && field.Name.Cst().Range.Contains(pos) {
-					if struct_, ok := ast.As[*ast.Struct](i.Type); ok {
-						if _, f := struct_.GetField(field.Name.String()); f != nil {
-							return &protocol.Hover{
-								Contents: protocol.MarkupContent{
-									Kind:  protocol.PlainText,
-									Value: ast.PrintType(f.Type),
-								},
-								Range: convertRangePtr(field.Name.Cst().Range),
-							}
-						}
-					}
+	case *ast.Token:
+		return getHoverToken(resolver, node)
+	}
+
+	return nil
+}
+
+func getHoverToken(resolver fuckoff.Resolver, token *ast.Token) *protocol.Hover {
+	// Switch based on the token's parent node
+	switch parent := token.Parent().(type) {
+	case *ast.Field:
+		return newHover(token, ast.PrintType(parent.Type))
+
+	case *ast.EnumCase:
+		return newHover(token, strconv.FormatInt(parent.ActualValue, 10))
+
+	case *ast.Param:
+		return newHover(token, ast.PrintType(parent.Type))
+
+	case *ast.Var:
+		return newHover(token, ast.PrintType(parent.ActualType))
+
+	case *ast.Member:
+		if s, ok := asThroughPointer[*ast.Struct](parent.Value.Result().Type); ok {
+			if parentWantsFunction(parent) {
+				method, _ := resolver.GetMethod(s, token.String(), false)
+				if method == nil {
+					method, _ = resolver.GetMethod(s, token.String(), true)
 				}
-			}
-		} else if m, ok := node.(*ast.Member); ok {
-			// ast.Member that is an enum
-			if i, ok := m.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
-				if e, ok := ast.As[*ast.Enum](m.Result().Type); ok {
-					case_ := e.GetCase(m.Name.String())
 
-					if case_ != nil && m.Name.Cst() != nil {
-						return &protocol.Hover{
-							Contents: protocol.MarkupContent{
-								Kind:  protocol.PlainText,
-								Value: strconv.FormatInt(case_.ActualValue, 10),
-							},
-							Range: convertRangePtr(m.Name.Cst().Range),
-						}
-					}
+				if method != nil {
+					return newHover(token, method.Signature(true))
 				}
-			}
-		} else if t, ok := node.(*ast.TypeCall); ok {
-			// ast.TypeCall
-			value := uint32(0)
-
-			if t.Callee.String() == "sizeof" {
-				value = t.Arg.Size()
 			} else {
-				value = t.Arg.Align()
-			}
+				_, field := s.GetField(token.String())
+				if field == nil {
+					_, field = s.GetStaticField(token.String())
+				}
 
-			if t.Callee.Cst() != nil {
-				return &protocol.Hover{
-					Contents: protocol.MarkupContent{
-						Kind:  protocol.PlainText,
-						Value: strconv.FormatUint(uint64(value), 10),
-					},
-					Range: convertRangePtr(t.Callee.Cst().Range),
+				if field != nil {
+					return newHover(token, ast.PrintType(field.Type))
 				}
 			}
-		}
+		} else if e, ok := ast.As[*ast.Enum](parent.Value.Result().Type); ok {
+			case_ := e.GetCase(token.String())
 
-		// ast.Expr
-		text := ast.PrintType(expr.Result().Type.Resolved())
-
-		// Ignore literal expressions
-		if _, ok := expr.(*ast.Literal); ok {
-			text = ""
-		}
-
-		// Return
-		if text != "" && expr.Cst() != nil {
-			return &protocol.Hover{
-				Contents: protocol.MarkupContent{
-					Kind:  protocol.PlainText,
-					Value: text,
-				},
-				Range: convertRangePtr(expr.Cst().Range),
+			if case_ != nil {
+				return newHover(token, strconv.FormatInt(case_.ActualValue, 10))
 			}
 		}
-	} else if variable, ok := node.(*ast.Var); ok && variable.Name.Cst() != nil {
-		// ast.Var
-		return &protocol.Hover{
-			Contents: protocol.MarkupContent{
-				Kind:  protocol.PlainText,
-				Value: ast.PrintType(variable.ActualType),
-			},
-			Range: convertRangePtr(variable.Name.Cst().Range),
-		}
-	} else if enum, ok := node.(*ast.Enum); ok {
-		// ast.Enum
 
-		for _, case_ := range enum.Cases {
-			if case_.Name.Cst() != nil && case_.Name.Cst().Range.Contains(pos) {
-				return &protocol.Hover{
-					Contents: protocol.MarkupContent{
-						Kind:  protocol.PlainText,
-						Value: strconv.FormatInt(case_.ActualValue, 10),
-					},
-					Range: convertRangePtr(case_.Name.Cst().Range),
-				}
+	case *ast.TypeCall:
+		if parent.Callee == nil || parent.Arg == nil {
+			return nil
+		}
+
+		value := uint32(0)
+
+		if parent.Callee.String() == "sizeof" {
+			value = parent.Arg.Size()
+		} else {
+			value = parent.Arg.Align()
+		}
+
+		return newHover(token, strconv.FormatUint(uint64(value), 10))
+
+	case *ast.InitField:
+		if s, ok := ast.As[*ast.Struct](parent.Parent().(*ast.StructInitializer).Type); ok {
+			if _, field := s.GetField(token.String()); field != nil {
+				return newHover(token, ast.PrintType(field.Type))
 			}
 		}
 	}
 
 	return nil
+}
+
+func parentWantsFunction(node ast.Node) bool {
+	if call, ok := node.Parent().(*ast.Call); ok {
+		return call.Callee == node
+	}
+
+	if unary, ok := node.Parent().(*ast.Unary); ok {
+		return unary.Prefix && unary.Operator.Token().Kind == scanner.FuncPtr
+	}
+
+	return false
+}
+
+func asThroughPointer[T ast.Type](type_ ast.Type) (T, bool) {
+	if pointer, ok := ast.As[*ast.Pointer](type_); ok {
+		return ast.As[T](pointer.Pointee)
+	}
+
+	return ast.As[T](type_)
+}
+
+func newHover(node ast.Node, text string) *protocol.Hover {
+	if text == "" {
+		return nil
+	}
+
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{
+			Kind:  protocol.PlainText,
+			Value: text,
+		},
+		Range: convertRangePtr(node.Cst().Range),
+	}
 }

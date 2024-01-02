@@ -381,7 +381,7 @@ func (h *handler) Hover(_ context.Context, params *protocol.HoverParams) (result
 	}
 
 	// Get hover
-	return getHover(file.Ast, pos), nil
+	return getHover(file.Project, file.Ast, pos), nil
 }
 
 func (h *handler) Symbols(_ context.Context, _ *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {

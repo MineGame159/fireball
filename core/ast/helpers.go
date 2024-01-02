@@ -114,14 +114,14 @@ func (f *Func) Signature(paramNames bool) string {
 			signature.WriteRune(' ')
 		}
 
-		signature.WriteString(param.Type.String())
+		signature.WriteString(PrintType(param.Type))
 	}
 
 	signature.WriteRune(')')
 
 	if !IsPrimitive(f.Returns, Void) {
 		signature.WriteRune(' ')
-		signature.WriteString(f.Returns.String())
+		signature.WriteString(PrintType(f.Returns))
 	}
 
 	return signature.String()

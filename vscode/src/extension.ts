@@ -9,7 +9,7 @@ import {
 } from "vscode-languageclient/node";
 import {ChildProcess, exec} from "child_process";
 
-const DEV = true;
+const DEV = false;
 
 let process: ChildProcess;
 let client: LanguageClient;

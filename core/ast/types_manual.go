@@ -273,15 +273,24 @@ func (f *Func) AcceptType(visitor TypeVisitor) {
 
 // Printer
 
-type typePrinter struct {
-	str string
+type TypePrintOptions struct {
+	ParamNames bool
 }
 
-func PrintType(type_ Type) string {
-	t := typePrinter{}
+type typePrinter struct {
+	options TypePrintOptions
+	str     string
+}
+
+func PrintTypeOptions(type_ Type, options TypePrintOptions) string {
+	t := typePrinter{options: options}
 	t.VisitNode(type_)
 
 	return t.str
+}
+
+func PrintType(type_ Type) string {
+	return PrintTypeOptions(type_, TypePrintOptions{})
 }
 
 func (t *typePrinter) VisitPrimitive(type_ *Primitive) {
@@ -311,7 +320,7 @@ func (t *typePrinter) VisitEnum(type_ *Enum) {
 }
 
 func (t *typePrinter) VisitFunc(type_ *Func) {
-	t.str += type_.Signature(false)
+	t.str += type_.Signature(t.options.ParamNames)
 }
 
 func (t *typePrinter) VisitNode(node Node) {

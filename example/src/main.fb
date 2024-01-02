@@ -17,10 +17,17 @@ impl Vec2 {
     }
 }
 
+enum Animal {
+    Dog,
+    Cat,
+}
+
 func main() {
     LibC.printf("Size: %d\n", sizeof(Foo));
     LibC.printf("Align: %d\n", alignof(Foo));
     LibC.printf("\n");
+
+    var animal = Animal.Dog;
 
     LibC.printf("Foo.bar: %d\n", Foo.bar);
     Foo.setBar(5);
