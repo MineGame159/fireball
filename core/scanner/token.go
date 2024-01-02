@@ -1,9 +1,13 @@
 package scanner
 
+import "fireball/core"
+
 type TokenKind uint8
 
 const (
-	LeftParen TokenKind = iota
+	Error TokenKind = iota
+
+	LeftParen
 	RightParen
 	LeftBrace
 	RightBrace
@@ -81,9 +85,13 @@ const (
 	String
 	Identifier
 
-	Error
 	Eof
 )
+
+var LogicalOperators = []TokenKind{
+	And,
+	Or,
+}
 
 var AssignmentOperators = []TokenKind{
 	Equal,
@@ -105,25 +113,30 @@ var AssignmentOperators = []TokenKind{
 type Token struct {
 	Kind   TokenKind
 	Lexeme string
-
-	Line_   int
-	Column_ int
 }
 
 func (t Token) IsError() bool {
 	return t.Kind == Error
 }
 
-func (t Token) Line() int {
-	return t.Line_
-}
-
-func (t Token) Column() int {
-	return t.Column_
-}
-
 func (t Token) String() string {
 	return t.Lexeme
+}
+
+type PositionedToken struct {
+	Token
+
+	Pos core.Pos
+}
+
+func (p PositionedToken) Range() core.Range {
+	return core.Range{
+		Start: p.Pos,
+		End: core.Pos{
+			Line:   p.Pos.Line,
+			Column: p.Pos.Column + uint16(len(p.Lexeme)),
+		},
+	}
 }
 
 func IsKeyword(kind TokenKind) bool {

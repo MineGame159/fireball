@@ -1,16 +1,14 @@
 package checker
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
-	"fireball/core/types"
 	"fireball/core/utils"
 	"strconv"
 	"strings"
 )
 
-func (c *checker) VisitGroup(expr *ast.Group) {
+func (c *checker) VisitParen(expr *ast.Paren) {
 	expr.AcceptChildren(c)
 
 	*expr.Result() = *expr.Expr.Result()
@@ -20,82 +18,82 @@ func (c *checker) VisitGroup(expr *ast.Group) {
 func (c *checker) VisitLiteral(expr *ast.Literal) {
 	expr.AcceptChildren(c)
 
-	var kind types.PrimitiveKind
+	var kind ast.PrimitiveKind
 	pointer := false
 
-	switch expr.Value.Kind {
+	switch expr.Token().Kind {
 	case scanner.Nil:
-		kind = types.Void
+		kind = ast.Void
 		pointer = true
 
 	case scanner.True, scanner.False:
-		kind = types.Bool
+		kind = ast.Bool
 
 	case scanner.Number:
-		raw := expr.Value.Lexeme
+		raw := expr.String()
 		last := raw[len(raw)-1]
 
 		if last == 'f' || last == 'F' {
 			_, err := strconv.ParseFloat(raw[:len(raw)-1], 32)
 			if err != nil {
-				c.errorToken(expr.Value, "Invalid float.")
+				c.error(expr, "Invalid float")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			kind = types.F32
+			kind = ast.F32
 		} else if strings.ContainsRune(raw, '.') {
 			_, err := strconv.ParseFloat(raw, 64)
 			if err != nil {
-				c.errorToken(expr.Value, "Invalid double.")
+				c.error(expr, "Invalid double")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			kind = types.F64
+			kind = ast.F64
 		} else {
-			kind = types.I32
+			kind = ast.I32
 		}
 
 	case scanner.Hex:
-		_, err := strconv.ParseUint(expr.Value.Lexeme[2:], 16, 64)
+		_, err := strconv.ParseUint(expr.String()[2:], 16, 64)
 		if err != nil {
-			c.errorToken(expr.Value, "Invalid hex integer.")
+			c.error(expr, "Invalid hex integer")
 			expr.Result().SetInvalid()
 
 			return
 		}
 
-		kind = types.U32
+		kind = ast.U32
 
 	case scanner.Binary:
-		_, err := strconv.ParseUint(expr.Value.Lexeme[2:], 2, 64)
+		_, err := strconv.ParseUint(expr.String()[2:], 2, 64)
 		if err != nil {
-			c.errorToken(expr.Value, "Invalid binary integer.")
+			c.error(expr, "Invalid binary integer")
 			expr.Result().SetInvalid()
 
 			return
 		}
 
-		kind = types.U32
+		kind = ast.U32
 
 	case scanner.Character:
-		kind = types.U8
+		kind = ast.U8
 
 	case scanner.String:
-		kind = types.U8
+		kind = ast.U8
 		pointer = true
 
 	default:
 		panic("checker.VisitLiteral() - Not implemented")
 	}
 
-	expr.Result().SetValue(types.Primitive(kind, core.Range{}), 0)
+	expr.Result().SetValue(&ast.Primitive{Kind: kind}, 0)
 
 	if pointer {
-		expr.Result().SetValue(types.Pointer(expr.Result().Type, core.Range{}), 0)
+		expr.Result().SetValue(&ast.Pointer{Pointee: expr.Result().Type}, 0)
 	}
 }
 
@@ -105,17 +103,17 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Check struct
 	var struct_ *ast.Struct
 
-	if s, ok := expr.Target.(*ast.Struct); ok {
+	if s, ok := ast.As[*ast.Struct](expr.Type); ok {
 		struct_ = s
 	} else {
-		c.errorRange(expr.Target.Range(), "Expected a struct.")
+		c.error(expr.Type, "Expected a struct")
 		expr.Result().SetInvalid()
 
 		return
 	}
 
 	if expr.New {
-		expr.Result().SetValue(types.Pointer(struct_, core.Range{}), 0)
+		expr.Result().SetValue(&ast.Pointer{Pointee: struct_}, 0)
 	} else {
 		expr.Result().SetValue(struct_, 0)
 	}
@@ -125,14 +123,14 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 
 	for _, initField := range expr.Fields {
 		// Check name collision
-		if !assignedFields.Add(initField.Name.Lexeme) {
-			c.errorToken(initField.Name, "Field with the name '%s' was already assigned.", initField.Name)
+		if !assignedFields.Add(initField.Name.String()) {
+			c.error(initField.Name, "Field with the name '%s' was already assigned", initField.Name)
 		}
 
 		// Check field
-		_, field := struct_.GetField(initField.Name.Lexeme)
+		_, field := struct_.GetField(initField.Name.String())
 		if field == nil {
-			c.errorToken(initField.Name, "Field with the name '%s' doesn't exist on the struct '%s'.", initField.Name, struct_)
+			c.error(initField.Name, "Field with the name '%s' doesn't exist on the struct '%s'", initField.Name, struct_)
 			continue
 		}
 
@@ -142,12 +140,12 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 		}
 
 		if initField.Value.Result().Kind != ast.ValueResultKind {
-			c.errorRange(initField.Value.Range(), "Cannot assign this value to a field with type '%s'.", field.Type)
+			c.error(initField.Value, "Cannot assign this value to a field with type '%s'", field.Type)
 			continue
 		}
 
 		if !initField.Value.Result().Type.CanAssignTo(field.Type) {
-			c.errorRange(initField.Value.Range(), "Expected a '%s' but got '%s'.", field.Type, initField.Value.Result().Type)
+			c.error(initField.Value, "Expected a '%s' but got '%s'", field.Type, initField.Value.Result().Type)
 		}
 	}
 
@@ -162,7 +160,7 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 
 	// Check empty
 	if len(expr.Values) == 0 {
-		c.errorRange(expr.Range(), "Array initializers need to have at least one value.")
+		c.error(expr, "Array initializers need to have at least one value")
 		expr.Result().SetInvalid()
 
 		return
@@ -170,7 +168,7 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 
 	// Check values
 	ok := true
-	var type_ types.Type
+	var type_ ast.Type
 
 	for _, value := range expr.Values {
 		if value.Result().Kind == ast.InvalidResultKind {
@@ -179,7 +177,7 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 		}
 
 		if value.Result().Kind != ast.ValueResultKind {
-			c.errorRange(value.Range(), "Invalid value.")
+			c.error(value, "Invalid value")
 			ok = false
 
 			continue
@@ -189,39 +187,39 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 			type_ = value.Result().Type
 		} else {
 			if !value.Result().Type.CanAssignTo(type_) {
-				c.errorRange(value.Range(), "Expected a '%s' but got '%s'.", type_, value.Result().Type)
+				c.error(value, "Expected a '%s' but got '%s'", type_, value.Result().Type)
 				ok = false
 			}
 		}
 	}
 
 	if ok {
-		expr.Result().SetValue(types.Array(uint32(len(expr.Values)), type_, core.Range{}), 0)
+		expr.Result().SetValue(&ast.Array{Base: type_, Count: uint32(len(expr.Values))}, 0)
 	} else {
 		expr.Result().SetInvalid()
 	}
 }
 
-func (c *checker) VisitNewArray(expr *ast.NewArray) {
+func (c *checker) VisitAllocateArray(expr *ast.AllocateArray) {
 	expr.AcceptChildren(c)
 
 	c.checkMalloc(expr)
 
 	if expr.Count.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Count.Range(), "Invalid value.")
+		c.error(expr.Count, "Invalid value")
 		expr.Result().SetInvalid()
 
 		return
 	}
 
-	if !types.IsPrimitive(expr.Count.Result().Type, types.I32) {
-		c.errorRange(expr.Count.Range(), "Expected an 'i32' but got '%s'.", expr.Count.Result().Type)
+	if !ast.IsPrimitive(expr.Count.Result().Type, ast.I32) {
+		c.error(expr.Count, "Expected an 'i32' but got '%s'", expr.Count.Result().Type)
 		expr.Result().SetInvalid()
 
 		return
 	}
 
-	expr.Result().SetValue(types.Pointer(expr.Type_, core.Range{}), 0)
+	expr.Result().SetValue(&ast.Pointer{Pointee: expr.Type}, 0)
 }
 
 func (c *checker) VisitUnary(expr *ast.Unary) {
@@ -236,72 +234,72 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 
 	if expr.Prefix {
 		// Prefix
-		switch expr.Op.Kind {
+		switch expr.Operator.Token().Kind {
 		case scanner.Bang:
 			if result.Kind != ast.ValueResultKind {
-				c.errorRange(expr.Value.Range(), "Cannot negate this value.")
+				c.error(expr.Value, "Cannot negate this value")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			if !types.IsPrimitive(result.Type, types.Bool) {
-				c.errorRange(expr.Value.Range(), "Expected a 'bool' but got a '%s'.", result.Type)
+			if !ast.IsPrimitive(result.Type, ast.Bool) {
+				c.error(expr.Value, "Expected a 'bool' but got a '%s'", result.Type)
 			}
 
-			expr.Result().SetValue(types.Primitive(types.Bool, core.Range{}), 0)
+			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
 
 		case scanner.Minus:
 			if result.Kind != ast.ValueResultKind {
-				c.errorRange(expr.Value.Range(), "Cannot negate this value.")
+				c.error(expr.Value, "Cannot negate this value")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			if v, ok := result.Type.(*types.PrimitiveType); ok {
-				if types.IsFloating(v.Kind) || types.IsSigned(v.Kind) {
+			if v, ok := ast.As[*ast.Primitive](result.Type); ok {
+				if ast.IsFloating(v.Kind) || ast.IsSigned(v.Kind) {
 					expr.Result().SetValue(result.Type, 0)
 					return
 				}
 			}
 
-			c.errorRange(expr.Value.Range(), "Expected either a floating pointer number or signed integer but got a '%s'.", result.Type)
+			c.error(expr.Value, "Expected either a floating pointer number or signed integer but got a '%s'", result.Type)
 			expr.Result().SetInvalid()
 
 		case scanner.Ampersand:
 			if result.IsAddressable() {
-				expr.Result().SetValue(types.Pointer(result.Type, core.Range{}), 0)
+				expr.Result().SetValue(&ast.Pointer{Pointee: result.Type}, 0)
 			} else {
-				c.errorRange(expr.Value.Range(), "Cannot take address of this expression.")
+				c.error(expr.Value, "Cannot take address of this expression")
 				expr.Result().SetInvalid()
 			}
 
 		case scanner.Star:
 			if result.Kind != ast.ValueResultKind {
-				c.errorRange(expr.Value.Range(), "Cannot dereference this value.")
+				c.error(expr.Value, "Cannot dereference this value")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			if p, ok := result.Type.(*types.PointerType); ok {
+			if p, ok := ast.As[*ast.Pointer](result.Type); ok {
 				expr.Result().SetValue(p.Pointee, ast.AssignableFlag)
 			} else {
-				c.errorRange(expr.Value.Range(), "Can only dereference pointer types, not '%s'.", result.Type)
+				c.error(expr.Value, "Can only dereference pointer types, not '%s'", result.Type)
 				expr.Result().SetInvalid()
 			}
 
 		case scanner.PlusPlus, scanner.MinusMinus:
 			if !result.IsAddressable() {
-				c.errorRange(expr.Value.Range(), "Invalid value.")
+				c.error(expr.Value, "Invalid value")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			if type_, ok := result.Type.(*types.PrimitiveType); !ok || (!types.IsInteger(type_.Kind) && !types.IsFloating(type_.Kind)) {
-				c.errorRange(expr.Value.Range(), "Cannot increment or decrement '%s'.", result.Type)
+			if type_, ok := ast.As[*ast.Primitive](result.Type); !ok || (!ast.IsInteger(type_.Kind) && !ast.IsFloating(type_.Kind)) {
+				c.error(expr.Value, "Cannot increment or decrement '%s'", result.Type)
 				expr.Result().SetInvalid()
 
 				return
@@ -312,7 +310,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		case scanner.FuncPtr:
 			if result.Kind == ast.FunctionResultKind {
 				if result.Function.Method() != nil {
-					c.errorRange(expr.Value.Range(), "Cannot take address of a non-static method.")
+					c.error(expr.Value, "Cannot take address of a non-static method")
 					expr.Result().SetInvalid()
 
 					return
@@ -320,7 +318,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 
 				expr.Result().SetValue(expr.Value.Result().Function, 0)
 			} else {
-				c.errorRange(expr.Value.Range(), "Cannot take address of this function.")
+				c.error(expr.Value, "Cannot take address of this function")
 				expr.Result().SetInvalid()
 			}
 
@@ -329,17 +327,17 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		}
 	} else {
 		// Postfix
-		switch expr.Op.Kind {
+		switch expr.Operator.Token().Kind {
 		case scanner.PlusPlus, scanner.MinusMinus:
 			if !result.IsAddressable() {
-				c.errorRange(expr.Value.Range(), "Invalid value.")
+				c.error(expr.Value, "Invalid value")
 				expr.Result().SetInvalid()
 
 				return
 			}
 
-			if type_, ok := result.Type.(*types.PrimitiveType); !ok || (!types.IsInteger(type_.Kind) && !types.IsFloating(type_.Kind)) {
-				c.errorRange(expr.Value.Range(), "Cannot increment or decrement '%s'.", result.Type)
+			if type_, ok := ast.As[*ast.Primitive](result.Type); !ok || (!ast.IsInteger(type_.Kind) && !ast.IsFloating(type_.Kind)) {
+				c.error(expr.Value, "Cannot increment or decrement '%s'", result.Type)
 				expr.Result().SetInvalid()
 
 				return
@@ -364,12 +362,12 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 	ok := true
 
 	if expr.Left.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Left.Range(), "Invalid value.")
+		c.error(expr.Left, "Invalid value")
 		ok = false
 	}
 
 	if expr.Right.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Right.Range(), "Invalid value")
+		c.error(expr.Right, "Invalid value")
 		ok = false
 	}
 
@@ -382,54 +380,54 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 	rightType := expr.Right.Result().Type
 
 	// Check based on the operator
-	if scanner.IsArithmetic(expr.Op.Kind) {
+	if scanner.IsArithmetic(expr.Operator.Token().Kind) {
 		// Arithmetic
-		if left, ok := leftType.(*types.PrimitiveType); ok {
-			if right, ok := rightType.(*types.PrimitiveType); ok {
-				if types.IsNumber(left.Kind) && types.IsNumber(right.Kind) && left.Equals(right) {
+		if left, ok := ast.As[*ast.Primitive](leftType); ok {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if ast.IsNumber(left.Kind) && ast.IsNumber(right.Kind) && left.Equals(right) {
 					expr.Result().SetValue(leftType, 0)
 					return
 				}
 			}
 		}
 
-		c.errorRange(expr.Range(), "Expected two equal number types.")
+		c.error(expr, "Expected two equal number types")
 		expr.Result().SetInvalid()
-	} else if scanner.IsEquality(expr.Op.Kind) {
+	} else if scanner.IsEquality(expr.Operator.Token().Kind) {
 		// Equality
 		valid := false
 
 		if leftType.Equals(rightType) {
 			// left type == right type
 			valid = true
-		} else if left, ok := leftType.(*types.PrimitiveType); ok {
+		} else if left, ok := ast.As[*ast.Primitive](leftType); ok {
 			// integer == integer || floating == floating
-			if right, ok := rightType.(*types.PrimitiveType); ok {
-				if (types.IsInteger(left.Kind) && types.IsInteger(right.Kind)) || (types.IsFloating(left.Kind) && types.IsFloating(right.Kind)) {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if (ast.IsInteger(left.Kind) && ast.IsInteger(right.Kind)) || (ast.IsFloating(left.Kind) && ast.IsFloating(right.Kind)) {
 					valid = true
 				}
 			}
-		} else if left, ok := leftType.(*types.PointerType); ok {
-			if right, ok := rightType.(*types.PointerType); ok {
+		} else if left, ok := ast.As[*ast.Pointer](leftType); ok {
+			if right, ok := ast.As[*ast.Pointer](rightType); ok {
 				// *void == *? || *? == *void
-				if types.IsPrimitive(left.Pointee, types.Void) || types.IsPrimitive(right.Pointee, types.Void) {
+				if ast.IsPrimitive(left.Pointee, ast.Void) || ast.IsPrimitive(right.Pointee, ast.Void) {
 					valid = true
 				}
 			}
 		}
 
 		if !valid {
-			c.errorRange(expr.Range(), "Cannot check equality for '%s' and '%s'.", leftType, rightType)
+			c.error(expr, "Cannot check equality for '%s' and '%s'", leftType, rightType)
 			expr.Result().SetInvalid()
 		} else {
-			expr.Result().SetValue(types.Primitive(types.Bool, core.Range{}), 0)
+			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
 		}
-	} else if scanner.IsComparison(expr.Op.Kind) {
+	} else if scanner.IsComparison(expr.Operator.Token().Kind) {
 		// Comparison
-		if left, ok := leftType.(*types.PrimitiveType); ok {
-			if right, ok := rightType.(*types.PrimitiveType); ok {
-				if !types.IsNumber(left.Kind) || !types.IsNumber(right.Kind) || !left.Equals(right) {
-					c.errorRange(expr.Range(), "Expected two equal number types.")
+		if left, ok := ast.As[*ast.Primitive](leftType); ok {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if !ast.IsNumber(left.Kind) || !ast.IsNumber(right.Kind) || !left.Equals(right) {
+					c.error(expr, "Expected two equal number types")
 					expr.Result().SetInvalid()
 
 					return
@@ -437,19 +435,19 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 			}
 		}
 
-		expr.Result().SetValue(types.Primitive(types.Bool, core.Range{}), 0)
-	} else if scanner.IsBitwise(expr.Op.Kind) {
+		expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
+	} else if scanner.IsBitwise(expr.Operator.Token().Kind) {
 		// Bitwise
-		if left, ok := leftType.(*types.PrimitiveType); ok {
-			if right, ok := rightType.(*types.PrimitiveType); ok {
-				if left.Equals(right) && types.IsInteger(left.Kind) {
+		if left, ok := ast.As[*ast.Primitive](leftType); ok {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if left.Equals(right) && ast.IsInteger(left.Kind) {
 					expr.Result().SetValue(leftType, 0)
 					return
 				}
 			}
 		}
 
-		c.errorRange(expr.Range(), "Expected two equal integer types.")
+		c.error(expr, "Expected two equal integer types")
 		expr.Result().SetInvalid()
 	} else {
 		// Error
@@ -468,12 +466,12 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 	ok := true
 
 	if expr.Left.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Left.Range(), "Invalid value.")
+		c.error(expr.Left, "Invalid value")
 		ok = false
 	}
 
 	if expr.Right.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Right.Range(), "Invalid value")
+		c.error(expr.Right, "Invalid value")
 		ok = false
 	}
 
@@ -485,13 +483,13 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 	// Check bool types
 	ok = true
 
-	if !types.IsPrimitive(expr.Left.Result().Type, types.Bool) {
-		c.errorRange(expr.Left.Range(), "Expected a 'bool' but got a '%s'.", expr.Left.Result().Type)
+	if !ast.IsPrimitive(expr.Left.Result().Type, ast.Bool) {
+		c.error(expr.Left, "Expected a 'bool' but got a '%s'", expr.Left.Result().Type)
 		ok = false
 	}
 
-	if !types.IsPrimitive(expr.Right.Result().Type, types.Bool) {
-		c.errorRange(expr.Right.Range(), "Expected a 'bool' but got a '%s'.", expr.Right.Result().Type)
+	if !ast.IsPrimitive(expr.Right.Result().Type, ast.Bool) {
+		c.error(expr.Right, "Expected a 'bool' but got a '%s'", expr.Right.Result().Type)
 		ok = false
 	}
 
@@ -501,7 +499,7 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 	}
 
 	// Set type
-	expr.Result().SetValue(types.Primitive(types.Bool, core.Range{}), 0)
+	expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
 }
 
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
@@ -509,7 +507,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 
 	// Function / function pointer
 	if parentWantsFunction(expr) {
-		if f, _ := c.resolver.GetFunction(expr.Identifier.Lexeme); f != nil {
+		if f, _ := c.resolver.GetFunction(expr.String()); f != nil {
 			expr.Result().SetFunction(f)
 			expr.Kind = ast.FunctionKind
 
@@ -518,8 +516,8 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Type
-	if t, _ := c.resolver.GetType(expr.Identifier.Lexeme); t != nil {
-		expr.Result().SetType(t.WithRange(core.Range{}))
+	if t, _ := c.resolver.GetType(expr.String()); t != nil {
+		expr.Result().SetType(t)
 
 		if _, ok := t.(*ast.Enum); ok {
 			expr.Kind = ast.EnumKind
@@ -533,7 +531,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Variable
-	if variable := c.getVariable(expr.Identifier); variable != nil {
+	if variable := c.getVariable(expr); variable != nil {
 		variable.used = true
 
 		expr.Result().SetValue(variable.type_, ast.AssignableFlag|ast.AddressableFlag)
@@ -548,7 +546,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Error
-	c.errorToken(expr.Identifier, "Unknown identifier.")
+	c.error(expr, "Unknown identifier")
 	expr.Result().SetInvalid()
 }
 
@@ -563,12 +561,12 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	ok := true
 
 	if !expr.Assignee.Result().IsAssignable() {
-		c.errorRange(expr.Assignee.Range(), "Cannot assign to this value.")
+		c.error(expr.Assignee, "Cannot assign to this value")
 		ok = false
 	}
 
 	if expr.Value.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Value.Range(), "Invalid value.")
+		c.error(expr.Value, "Invalid value")
 		ok = false
 	}
 
@@ -578,47 +576,47 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	}
 
 	// Check type
-	if expr.Op.Kind == scanner.Equal {
+	if expr.Operator.Token().Kind == scanner.Equal {
 		// Equal
 		if !expr.Value.Result().Type.CanAssignTo(expr.Assignee.Result().Type) {
-			c.errorRange(expr.Value.Range(), "Expected a '%s' but got '%s'.", expr.Assignee.Result().Type, expr.Value.Result().Type)
+			c.error(expr.Value, "Expected a '%s' but got '%s'", expr.Assignee.Result().Type, expr.Value.Result().Type)
 			expr.Result().SetInvalid()
 
 			return
 		}
 	} else {
-		if scanner.IsArithmetic(expr.Op.Kind) {
+		if scanner.IsArithmetic(expr.Operator.Token().Kind) {
 			// Arithmetic
 			valid := false
 
-			if assignee, ok := expr.Assignee.Result().Type.(*types.PrimitiveType); ok {
-				if value, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
-					if types.IsNumber(assignee.Kind) && types.IsNumber(value.Kind) && assignee.Equals(value) {
+			if assignee, ok := ast.As[*ast.Primitive](expr.Assignee.Result().Type); ok {
+				if value, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
+					if ast.IsNumber(assignee.Kind) && ast.IsNumber(value.Kind) && assignee.Equals(value) {
 						valid = true
 					}
 				}
 			}
 
 			if !valid {
-				c.errorRange(expr.Value.Range(), "Expected two equal number types.")
+				c.error(expr.Value, "Expected two equal number types")
 				expr.Result().SetInvalid()
 
 				return
 			}
-		} else if scanner.IsBitwise(expr.Op.Kind) {
+		} else if scanner.IsBitwise(expr.Operator.Token().Kind) {
 			// Bitwise
 			valid := false
 
-			if left, ok := expr.Assignee.Result().Type.(*types.PrimitiveType); ok {
-				if right, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
-					if left.Equals(right) && types.IsInteger(left.Kind) {
+			if left, ok := ast.As[*ast.Primitive](expr.Assignee.Result().Type); ok {
+				if right, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
+					if left.Equals(right) && ast.IsInteger(left.Kind) {
 						valid = true
 					}
 				}
 			}
 
 			if !valid {
-				c.errorRange(expr.Value.Range(), "Expected two equal integer types.")
+				c.error(expr.Value, "Expected two equal integer types")
 				expr.Result().SetInvalid()
 
 				return
@@ -635,35 +633,35 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 func (c *checker) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(c)
 
-	if expr.Expr.Result().Kind == ast.InvalidResultKind {
+	if expr.Value.Result().Kind == ast.InvalidResultKind {
 		return // // Do not cascade errors
 	}
 
-	if expr.Expr.Result().Kind != ast.ValueResultKind {
-		c.errorRange(expr.Expr.Range(), "Cannot cast this value.")
+	if expr.Value.Result().Kind != ast.ValueResultKind {
+		c.error(expr.Value, "Cannot cast this value")
 		expr.Result().SetInvalid()
 
 		return
 	}
 
-	if types.IsPrimitive(expr.Expr.Result().Type, types.Void) || types.IsPrimitive(expr.Target, types.Void) {
+	if ast.IsPrimitive(expr.Value.Result().Type, ast.Void) || ast.IsPrimitive(expr.Target, ast.Void) {
 		// void
-		c.errorRange(expr.Range(), "Cannot cast to or from type 'void'.")
+		c.error(expr, "Cannot cast to or from type 'void'")
 		expr.Result().SetInvalid()
 
 		return
-	} else if _, ok := expr.Expr.Result().Type.(*ast.Enum); ok {
+	} else if _, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
 		// enum to non integer
-		if to, ok := expr.Target.(*types.PrimitiveType); !ok || !types.IsInteger(to.Kind) {
-			c.errorRange(expr.Range(), "Can only cast enums to integers, not '%s'.", to)
+		if to, ok := ast.As[*ast.Primitive](expr.Target); !ok || !ast.IsInteger(to.Kind) {
+			c.error(expr, "Can only cast enums to integers, not '%s'", to)
 			expr.Result().SetInvalid()
 
 			return
 		}
-	} else if _, ok := expr.Target.(*ast.Enum); ok {
+	} else if _, ok := ast.As[*ast.Enum](expr.Target); ok {
 		// non integer to enum
-		if from, ok := expr.Expr.Result().Type.(*types.PrimitiveType); !ok || !types.IsInteger(from.Kind) {
-			c.errorRange(expr.Range(), "Can only cast to enums from integers, not '%s'.", from)
+		if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); !ok || !ast.IsInteger(from.Kind) {
+			c.error(expr, "Can only cast to enums from integers, not '%s'", from)
 			expr.Result().SetInvalid()
 
 			return
@@ -676,7 +674,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 func (c *checker) VisitTypeCall(expr *ast.TypeCall) {
 	expr.AcceptChildren(c)
 
-	expr.Result().SetValue(types.Primitive(types.I32, core.Range{}), 0)
+	expr.Result().SetValue(&ast.Primitive{Kind: ast.I32}, 0)
 }
 
 func (c *checker) VisitCall(expr *ast.Call) {
@@ -691,7 +689,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 	var function *ast.Func
 
 	if v, ok_ := expr.Callee.Result().Type.(*ast.Func); !ok_ {
-		c.errorRange(expr.Callee.Range(), "Cannot call this value.")
+		c.error(expr.Callee, "Cannot call this value")
 		ok = false
 	} else {
 		function = v
@@ -699,7 +697,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 
 	for _, arg := range expr.Args {
 		if arg.Result().Kind != ast.InvalidResultKind && arg.Result().Kind != ast.ValueResultKind {
-			c.errorRange(arg.Range(), "Invalid value.")
+			c.error(arg, "Invalid value")
 			ok = false
 		}
 	}
@@ -716,12 +714,12 @@ func (c *checker) VisitCall(expr *ast.Call) {
 	//     Check argument count
 	if function.IsVariadic() {
 		if len(expr.Args) < len(function.Params) {
-			c.errorRange(expr.Range(), "Got '%d' arguments but function takes at least '%d'.", len(expr.Args), len(function.Params))
+			c.error(expr, "Got '%d' arguments but function takes at least '%d'", len(expr.Args), len(function.Params))
 			ok = false
 		}
 	} else {
 		if len(function.Params) != len(expr.Args) {
-			c.errorRange(expr.Range(), "Got '%d' arguments but function only takes '%d'.", len(expr.Args), len(function.Params))
+			c.error(expr, "Got '%d' arguments but function only takes '%d'", len(expr.Args), len(function.Params))
 			ok = false
 		}
 	}
@@ -736,7 +734,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 		}
 
 		if !arg.Result().Type.CanAssignTo(param.Type) {
-			c.errorRange(arg.Range(), "Argument with type '%s' cannot be assigned to a parameter with type '%s'.", arg.Result().Type, param.Type)
+			c.error(arg, "Argument with type '%s' cannot be assigned to a parameter with type '%s'", arg.Result().Type, param.Type)
 			ok = false
 		}
 	}
@@ -759,21 +757,21 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 
 	// Check value
 	ok := true
-	var base types.Type
+	var base ast.Type
 
 	if expr.Value.Result().Kind == ast.ValueResultKind {
-		if v, ok := expr.Value.Result().Type.(*types.ArrayType); ok {
+		if v, ok := ast.As[*ast.Array](expr.Value.Result().Type); ok {
 			base = v.Base
-		} else if v, ok := expr.Value.Result().Type.(*types.PointerType); ok {
+		} else if v, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
 			base = v.Pointee
 		}
 
 		if base == nil {
-			c.errorRange(expr.Value.Range(), "Can only index into array and pointer types, not '%s'.", expr.Value.Result().Type)
+			c.error(expr.Value, "Can only index into array and pointer types, not '%s'", expr.Value.Result().Type)
 			ok = false
 		}
 	} else {
-		c.errorRange(expr.Value.Range(), "Invalid value.")
+		c.error(expr.Value, "Invalid value")
 		ok = false
 	}
 
@@ -781,24 +779,24 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	if expr.Index.Result().Kind == ast.ValueResultKind {
 		ok2 := false
 
-		if v, ok := expr.Index.Result().Type.(*types.PrimitiveType); ok {
-			if types.IsInteger(v.Kind) {
+		if v, ok := ast.As[*ast.Primitive](expr.Index.Result().Type); ok {
+			if ast.IsInteger(v.Kind) {
 				ok2 = true
 			}
 		}
 
 		if !ok2 {
-			c.errorRange(expr.Index.Range(), "Can only index using integer types, not '%s'.", expr.Index.Result().Type)
+			c.error(expr.Index, "Can only index using integer types, not '%s'", expr.Index.Result().Type)
 			ok = false
 		}
 	} else {
-		c.errorRange(expr.Index.Range(), "Invalid value.")
+		c.error(expr.Index, "Invalid value")
 		ok = false
 	}
 
 	// Check if value is not an array initializer
 	if _, ok := expr.Value.(*ast.ArrayInitializer); ok {
-		c.errorRange(expr.Value.Range(), "Cannot index into a temporary array created directly from an array initializer.")
+		c.error(expr.Value, "Cannot index into a temporary array created directly from an array initializer")
 		ok = false
 	}
 
@@ -824,10 +822,10 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
 				// Check if parent expression wants a function
 				if parentWantsFunction(expr) {
-					function, _ := c.resolver.GetMethod(v, expr.Name.Lexeme, true)
+					function, _ := c.resolver.GetMethod(v, expr.Name.String(), true)
 
 					if function == nil {
-						c.errorToken(expr.Name, "Struct '%s' does not contain static method with the name '%s'.", v, expr.Name)
+						c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", v, expr.Name)
 						expr.Result().SetInvalid()
 
 						return
@@ -838,10 +836,10 @@ func (c *checker) VisitMember(expr *ast.Member) {
 				}
 
 				// Check static field
-				_, field := v.GetStaticField(expr.Name.Lexeme)
+				_, field := v.GetStaticField(expr.Name.String())
 
 				if field == nil {
-					c.errorToken(expr.Name, "Struct '%s' does not contain static field '%s'.", v, expr.Name)
+					c.error(expr.Name, "Struct '%s' does not contain static field '%s'", v, expr.Name)
 					expr.Result().SetInvalid()
 
 					return
@@ -855,8 +853,8 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		// Enum
 		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 			if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
-				if case_ := v.GetCase(expr.Name.Lexeme); case_ == nil {
-					c.errorToken(expr.Name, "Enum '%s' does not contain case '%s'.", v, expr.Name)
+				if case_ := v.GetCase(expr.Name.String()); case_ == nil {
+					c.error(expr.Name, "Enum '%s' does not contain case '%s'", v, expr.Name)
 				}
 
 				expr.Result().SetValue(v, 0)
@@ -864,7 +862,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			}
 		}
 
-		c.errorToken(expr.Name, "Invalid member.")
+		c.error(expr.Name, "Invalid member")
 		expr.Result().SetInvalid()
 
 		return
@@ -877,14 +875,14 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 		if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
 			s = v
-		} else if v, ok := expr.Value.Result().Type.(*types.PointerType); ok {
-			if v, ok := v.Pointee.(*ast.Struct); ok {
+		} else if v, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
+			if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
 				s = v
 			}
 		}
 
 		if s == nil {
-			c.errorRange(expr.Value.Range(), "Only structs and pointers to structs can have members, not '%s'.", expr.Value.Result().Type)
+			c.error(expr.Value, "Only structs and pointers to structs can have members, not '%s'", expr.Value.Result().Type)
 			expr.Result().SetInvalid()
 
 			return
@@ -892,12 +890,12 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 		// Check if parent expression wants a function
 		if parentWantsFunction(expr) {
-			function, _ := c.resolver.GetMethod(s, expr.Name.Lexeme, false)
+			function, _ := c.resolver.GetMethod(s, expr.Name.String(), false)
 
 			if function != nil {
 				expr.Result().SetFunction(function)
 			} else {
-				c.errorToken(expr.Name, "Struct '%s' does not contain method '%s'.", s, expr.Name)
+				c.error(expr.Name, "Struct '%s' does not contain method '%s'", s, expr.Name)
 				expr.Result().SetInvalid()
 			}
 
@@ -905,10 +903,10 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		}
 
 		// Check field
-		_, field := s.GetField(expr.Name.Lexeme)
+		_, field := s.GetField(expr.Name.String())
 
 		if field == nil {
-			c.errorToken(expr.Name, "Struct '%s' does not contain field '%s'.", s, expr.Name)
+			c.error(expr.Name, "Struct '%s' does not contain field '%s'.", s, expr.Name)
 			expr.Result().SetInvalid()
 
 			return
@@ -919,7 +917,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 	}
 
 	// Invalid result
-	c.errorRange(expr.Value.Range(), "Invalid value.")
+	c.error(expr.Value, "Invalid value")
 	expr.Result().SetInvalid()
 }
 
@@ -931,7 +929,7 @@ func parentWantsFunction(expr ast.Expr) bool {
 		return parent.Callee == expr
 
 	case *ast.Unary:
-		return parent.Op.Kind == scanner.FuncPtr
+		return parent.Operator.Token().Kind == scanner.FuncPtr
 
 	default:
 		return false
@@ -942,15 +940,15 @@ func (c *checker) checkMalloc(expr ast.Expr) {
 	function, _ := c.resolver.GetFunction("malloc")
 
 	if function == nil {
-		c.errorRange(expr.Range(), "Malloc function not found.")
+		c.error(expr, "Malloc function not found")
 		return
 	}
 
-	if len(function.Params) != 1 || !types.IsPrimitive(function.Params[0].Type, types.U64) {
-		c.errorRange(expr.Range(), "Malloc parameter needs to be a u64.")
+	if len(function.Params) != 1 || !ast.IsPrimitive(function.Params[0].Type, ast.U64) {
+		c.error(expr, "Malloc parameter needs to be a u64")
 	}
 
-	if _, ok := function.Returns.(*types.PointerType); !ok {
-		c.errorRange(expr.Range(), "Malloc needs to return a pointer.")
+	if _, ok := ast.As[*ast.Pointer](function.Returns); !ok {
+		c.error(expr, "Malloc needs to return a pointer")
 	}
 }

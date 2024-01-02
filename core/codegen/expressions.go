@@ -2,15 +2,15 @@ package codegen
 
 import (
 	"fireball/core/ast"
+	"fireball/core/cst"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
-	"fireball/core/types"
 	"log"
 	"strconv"
 	"strings"
 )
 
-func (c *codegen) VisitGroup(expr *ast.Group) {
+func (c *codegen) VisitParen(expr *ast.Paren) {
 	c.acceptExpr(expr.Expr)
 }
 
@@ -19,15 +19,15 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	var value llvm.Value
 	type_ := c.getType(expr.Result().Type)
 
-	switch expr.Value.Kind {
+	switch expr.Token().Kind {
 	case scanner.Nil:
 		value = c.function.LiteralRaw(type_, "null")
 
 	case scanner.True, scanner.False:
-		value = c.function.LiteralRaw(type_, expr.Value.Lexeme)
+		value = c.function.LiteralRaw(type_, expr.String())
 
 	case scanner.Number:
-		raw := expr.Value.Lexeme
+		raw := expr.String()
 		last := raw[len(raw)-1]
 
 		if last == 'f' || last == 'F' {
@@ -37,9 +37,9 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 			v, _ := strconv.ParseFloat(raw, 64)
 			value = c.function.Literal(type_, llvm.Literal{Floating: v})
 		} else {
-			t := expr.Result().Type.(*types.PrimitiveType)
+			t, _ := ast.As[*ast.Primitive](expr.Result().Type)
 
-			if types.IsSigned(t.Kind) {
+			if ast.IsSigned(t.Kind) {
 				v, _ := strconv.ParseInt(raw, 10, 64)
 				value = c.function.Literal(type_, llvm.Literal{Signed: v})
 			} else {
@@ -49,15 +49,15 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 		}
 
 	case scanner.Hex:
-		v, _ := strconv.ParseUint(expr.Value.Lexeme[2:], 16, 64)
+		v, _ := strconv.ParseUint(expr.String()[2:], 16, 64)
 		value = c.function.Literal(type_, llvm.Literal{Unsigned: v})
 
 	case scanner.Binary:
-		v, _ := strconv.ParseUint(expr.Value.Lexeme[2:], 2, 64)
+		v, _ := strconv.ParseUint(expr.String()[2:], 2, 64)
 		value = c.function.Literal(type_, llvm.Literal{Unsigned: v})
 
 	case scanner.Character:
-		char := expr.Value.Lexeme[1 : len(expr.Value.Lexeme)-1]
+		char := expr.String()[1 : len(expr.String())-1]
 		var number uint8
 
 		switch char {
@@ -80,7 +80,7 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 		value = c.function.Literal(type_, llvm.Literal{Unsigned: uint64(number)})
 
 	case scanner.String:
-		value = c.module.Constant(expr.Value.Lexeme[1 : len(expr.Value.Lexeme)-1])
+		value = c.module.Constant(expr.String()[1 : len(expr.String())-1])
 
 	default:
 		panic("codegen.VisitLiteral() - Invalid literal kind")
@@ -94,17 +94,17 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 
 func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Value
-	struct_ := expr.Target.(*ast.Struct)
+	struct_, _ := ast.As[*ast.Struct](expr.Type)
 	type_ := c.getType(struct_)
 
 	result := c.function.LiteralRaw(type_, "zeroinitializer")
 
 	for _, field := range expr.Fields {
 		element := c.loadExpr(field.Value)
-		i, _ := struct_.GetField(field.Name.Lexeme)
+		i, _ := struct_.GetField(field.Name.String())
 
 		r := c.block.InsertValue(result, element.v, i)
-		r.SetLocation(field.Name)
+		r.SetLocation(field.Name.Cst())
 
 		result = r
 	}
@@ -141,7 +141,7 @@ func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 		element := c.loadExpr(valueExpr)
 
 		r := c.block.InsertValue(result, element.v, i)
-		r.SetLocation(valueExpr.Token())
+		r.SetLocation(valueExpr.Cst())
 
 		result = r
 	}
@@ -149,19 +149,22 @@ func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	c.exprResult = exprValue{v: result}
 }
 
-func (c *codegen) VisitNewArray(expr *ast.NewArray) {
+func (c *codegen) VisitAllocateArray(expr *ast.AllocateArray) {
 	count := c.loadExpr(expr.Count)
 
 	mallocFunc, _ := c.resolver.GetFunction("malloc")
 	malloc := c.getFunction(mallocFunc)
 
+	a, _ := ast.As[*ast.Primitive](expr.Count.Result().Type)
+	b, _ := ast.As[*ast.Primitive](mallocFunc.Params[0].Type)
+
 	c.castPrimitiveToPrimitive(
 		count,
 		expr.Count.Result().Type,
 		mallocFunc.Params[0].Type,
-		expr.Count.Result().Type.(*types.PrimitiveType).Kind,
-		mallocFunc.Params[0].Type.(*types.PrimitiveType).Kind,
-		expr.Token(),
+		a.Kind,
+		b.Kind,
+		expr.Cst(),
 	)
 	count = c.exprResult
 
@@ -171,7 +174,7 @@ func (c *codegen) VisitNewArray(expr *ast.NewArray) {
 			llvm.Mul,
 			c.function.Literal(
 				c.getType(mallocFunc.Params[0].Type),
-				llvm.Literal{Unsigned: uint64(expr.Type_.Size())},
+				llvm.Literal{Unsigned: uint64(expr.Type.Size())},
 			),
 			count.v,
 		)},
@@ -187,9 +190,9 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 	if expr.Prefix {
 		// Prefix
-		switch expr.Op.Kind {
+		switch expr.Operator.Token().Kind {
 		case scanner.Bang:
-			t := types.PrimitiveType{Kind: types.Bool}
+			t := ast.Primitive{Kind: ast.Bool}
 
 			r := c.block.Binary(
 				llvm.Xor,
@@ -200,14 +203,14 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 				c.load(value, expr.Value.Result().Type).v,
 			)
 
-			r.SetLocation(expr.Token())
+			r.SetLocation(expr.Cst())
 			result = r
 
 		case scanner.Minus:
-			if v, ok := expr.Value.Result().Type.(*types.PrimitiveType); ok {
+			if v, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
 				value := c.load(value, expr.Value.Result().Type)
 
-				if types.IsFloating(v.Kind) {
+				if ast.IsFloating(v.Kind) {
 					// floating
 					result = c.block.FNeg(value.v)
 				} else {
@@ -221,7 +224,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 						value.v,
 					)
 
-					r.SetLocation(expr.Token())
+					r.SetLocation(expr.Cst())
 					result = r
 				}
 			}
@@ -246,7 +249,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 		case scanner.PlusPlus, scanner.MinusMinus:
 			newValue := c.binary(
-				expr.Op,
+				expr.Operator,
 				value,
 				exprValue{v: c.function.Literal(
 					c.getType(expr.Value.Result().Type),
@@ -261,7 +264,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 			store := c.block.Store(value.v, newValue.v)
 			store.SetAlign(expr.Value.Result().Type.Align())
-			store.SetLocation(expr.Token())
+			store.SetLocation(expr.Cst())
 
 			result = newValue.v
 
@@ -270,12 +273,12 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		}
 	} else {
 		// Postfix
-		switch expr.Op.Kind {
+		switch expr.Operator.Token().Kind {
 		case scanner.PlusPlus, scanner.MinusMinus:
 			prevValue := c.load(value, expr.Value.Result().Type)
 
 			newValue := c.binary(
-				expr.Op,
+				expr.Operator,
 				prevValue,
 				exprValue{v: c.function.Literal(
 					c.getType(expr.Value.Result().Type),
@@ -290,7 +293,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 			store := c.block.Store(value.v, newValue.v)
 			store.SetAlign(expr.Value.Result().Type.Align())
-			store.SetLocation(expr.Token())
+			store.SetLocation(expr.Cst())
 
 			result = prevValue.v
 
@@ -306,31 +309,31 @@ func (c *codegen) VisitBinary(expr *ast.Binary) {
 	left := c.acceptExpr(expr.Left)
 	right := c.acceptExpr(expr.Right)
 
-	c.exprResult = c.binary(expr.Op, left, right, expr.Left.Result().Type)
+	c.exprResult = c.binary(expr.Operator, left, right, expr.Left.Result().Type)
 }
 
 func (c *codegen) VisitLogical(expr *ast.Logical) {
 	left := c.loadExpr(expr.Left)
 	right := c.loadExpr(expr.Right)
 
-	switch expr.Op.Kind {
+	switch expr.Operator.Token().Kind {
 	case scanner.Or:
 		false_ := c.function.Block("or.false")
 		end := c.function.Block("or.end")
 
 		// Start
 		startBlock := c.block
-		c.block.Br(left.v, end, false_).SetLocation(expr.Token())
+		c.block.Br(left.v, end, false_).SetLocation(expr.Cst())
 
 		// False
 		c.beginBlock(false_)
-		c.block.Br(nil, end, nil).SetLocation(expr.Token())
+		c.block.Br(nil, end, nil).SetLocation(expr.Cst())
 
 		// End
 		c.beginBlock(end)
 
 		result := c.block.Phi(c.function.LiteralRaw(c.getType(expr.Result().Type), "true"), startBlock, right.v, false_)
-		result.SetLocation(expr.Token())
+		result.SetLocation(expr.Cst())
 
 		c.exprResult = exprValue{v: result}
 
@@ -340,17 +343,17 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 
 		// Start
 		startBlock := c.block
-		c.block.Br(left.v, true_, end).SetLocation(expr.Token())
+		c.block.Br(left.v, true_, end).SetLocation(expr.Cst())
 
 		// True
 		c.beginBlock(true_)
-		c.block.Br(nil, end, nil).SetLocation(expr.Token())
+		c.block.Br(nil, end, nil).SetLocation(expr.Cst())
 
 		// End
 		c.beginBlock(end)
 
 		result := c.block.Phi(c.function.LiteralRaw(c.getType(expr.Result().Type), "false"), startBlock, right.v, true_)
-		result.SetLocation(expr.Token())
+		result.SetLocation(expr.Cst())
 
 		c.exprResult = exprValue{v: result}
 
@@ -369,7 +372,7 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 		return
 
 	case ast.VariableKind, ast.ParameterKind:
-		if v := c.getVariable(expr.Identifier); v != nil {
+		if v := c.getVariable(expr.Name); v != nil {
 			c.exprResult = v.value
 			return
 		}
@@ -385,9 +388,9 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	// Value
 	value := c.loadExpr(expr.Value)
 
-	if expr.Op.Kind != scanner.Equal {
+	if expr.Operator.Token().Kind != scanner.Equal {
 		value = c.binary(
-			expr.Op,
+			expr.Operator,
 			c.load(assignee, expr.Assignee.Result().Type),
 			value,
 			expr.Assignee.Result().Type,
@@ -397,40 +400,44 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	// Store
 	store := c.block.Store(assignee.v, value.v)
 	store.SetAlign(expr.Result().Type.Align())
-	store.SetLocation(expr.Token())
+	store.SetLocation(expr.Cst())
 
 	c.exprResult = assignee
 }
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
-	value := c.acceptExpr(expr.Expr)
+	value := c.acceptExpr(expr.Value)
 
-	if from, ok := expr.Expr.Result().Type.(*types.PrimitiveType); ok {
-		if to, ok := expr.Result().Type.(*types.PrimitiveType); ok {
+	if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
+		if to, ok := ast.As[*ast.Primitive](expr.Result().Type); ok {
 			// primitive to primitive
-			c.castPrimitiveToPrimitive(value, from, to, from.Kind, to.Kind, expr.Token())
+			c.castPrimitiveToPrimitive(value, from, to, from.Kind, to.Kind, expr.Cst())
 			return
 		}
 	}
 
-	if from, ok := expr.Expr.Result().Type.(*ast.Enum); ok {
-		if to, ok := expr.Result().Type.(*types.PrimitiveType); ok {
+	if from, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
+		if to, ok := ast.As[*ast.Primitive](expr.Result().Type); ok {
 			// enum to integer
-			c.castPrimitiveToPrimitive(value, from, to, from.Type.(*types.PrimitiveType).Kind, to.Kind, expr.Token())
+			fromT, _ := ast.As[*ast.Primitive](from.Type)
+
+			c.castPrimitiveToPrimitive(value, from, to, fromT.Kind, to.Kind, expr.Cst())
 			return
 		}
 	}
 
-	if from, ok := expr.Expr.Result().Type.(*types.PrimitiveType); ok {
+	if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
 		if to, ok := expr.Result().Type.(*ast.Enum); ok {
 			// integer to enum
-			c.castPrimitiveToPrimitive(value, from, to, from.Kind, to.Type.(*types.PrimitiveType).Kind, expr.Token())
+			toT, _ := ast.As[*ast.Primitive](to.Type)
+
+			c.castPrimitiveToPrimitive(value, from, to, from.Kind, toT.Kind, expr.Cst())
 			return
 		}
 	}
 
-	if _, ok := expr.Expr.Result().Type.(*types.PointerType); ok {
-		if _, ok := expr.Result().Type.(*types.PointerType); ok {
+	if _, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
+		if _, ok := ast.As[*ast.Pointer](expr.Result().Type); ok {
 			// pointer to pointer
 			c.exprResult = value
 			return
@@ -441,15 +448,15 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	panic("codegen.VisitCast() - Invalid cast")
 }
 
-func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type, fromKind, toKind types.PrimitiveKind, location llvm.Location) {
-	if fromKind == toKind || (types.EqualsPrimitiveCategory(fromKind, toKind) && types.GetBitSize(fromKind) == types.GetBitSize(toKind)) {
+func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to ast.Type, fromKind, toKind ast.PrimitiveKind, location *cst.Node) {
+	if fromKind == toKind || (ast.EqualsPrimitiveCategory(fromKind, toKind) && ast.GetBitSize(fromKind) == ast.GetBitSize(toKind)) {
 		c.exprResult = value
 		return
 	}
 
 	value = c.load(value, from)
 
-	if (types.IsInteger(fromKind) || types.IsFloating(fromKind)) && toKind == types.Bool {
+	if (ast.IsInteger(fromKind) || ast.IsFloating(fromKind)) && toKind == ast.Bool {
 		// integer / floating to bool
 		result := c.block.Binary(
 			llvm.Ne,
@@ -467,30 +474,30 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type,
 	} else {
 		var kind llvm.CastKind
 
-		if (types.IsInteger(fromKind) || fromKind == types.Bool) && types.IsInteger(toKind) {
+		if (ast.IsInteger(fromKind) || fromKind == ast.Bool) && ast.IsInteger(toKind) {
 			// integer / bool to integer
 			if from.Size() > to.Size() {
 				kind = llvm.Trunc
 			} else {
 				kind = llvm.ZExt
 			}
-		} else if types.IsFloating(fromKind) && types.IsFloating(toKind) {
+		} else if ast.IsFloating(fromKind) && ast.IsFloating(toKind) {
 			// floating to floating
 			if from.Size() > to.Size() {
 				kind = llvm.FpTrunc
 			} else {
 				kind = llvm.FpExt
 			}
-		} else if (types.IsInteger(fromKind) || fromKind == types.Bool) && types.IsFloating(toKind) {
+		} else if (ast.IsInteger(fromKind) || fromKind == ast.Bool) && ast.IsFloating(toKind) {
 			// integer / bool to floating
-			if types.IsSigned(fromKind) {
+			if ast.IsSigned(fromKind) {
 				kind = llvm.SiToFp
 			} else {
 				kind = llvm.UiToFp
 			}
-		} else if types.IsFloating(fromKind) && types.IsInteger(toKind) {
+		} else if ast.IsFloating(fromKind) && ast.IsInteger(toKind) {
 			// floating to integer
-			if types.IsSigned(toKind) {
+			if ast.IsSigned(toKind) {
 				kind = llvm.FpToSi
 			} else {
 				kind = llvm.FpToUi
@@ -507,14 +514,14 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to types.Type,
 }
 
 func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
-	value := 0
+	value := uint32(0)
 
-	switch expr.Name.Lexeme {
+	switch expr.Callee.String() {
 	case "sizeof":
-		value = expr.Target.Size()
+		value = expr.Arg.Size()
 
 	case "alignof":
-		value = expr.Target.Align()
+		value = expr.Arg.Align()
 
 	default:
 		panic("codegen.VisitTypeCall() - Invalid name")
@@ -534,7 +541,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	function := expr.Callee.Result().Function
 
-	if f, ok := expr.Callee.Result().Type.(*ast.Func); ok && function == nil {
+	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok && function == nil {
 		function = f
 		callee = c.load(callee, expr.Callee.Result().Type)
 	}
@@ -561,7 +568,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Intrinsic
-	var intrinsic types.IntrinsicAttribute
+	var intrinsic ast.IntrinsicAttribute
 
 	if function.GetAttribute(&intrinsic) {
 		args = c.modifyIntrinsicArgs(function, intrinsic, args)
@@ -569,7 +576,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	// Call
 	result := c.block.Call(callee.v, args, c.getType(function.Returns))
-	result.SetLocation(expr.Token())
+	result.SetLocation(expr.Cst())
 
 	c.exprResult = exprValue{
 		v: result,
@@ -590,14 +597,14 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	value := c.acceptExpr(expr.Value)
 	index := c.loadExpr(expr.Index)
 
-	if pointer, ok := expr.Value.Result().Type.(*types.PointerType); ok {
+	if pointer, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
 		load := c.block.Load(value.v)
 		load.SetAlign(pointer.Pointee.Align())
 
 		value = exprValue{v: load}
 	}
 
-	t := types.PointerType{Pointee: expr.Result().Type}
+	t := ast.Pointer{Pointee: expr.Result().Type}
 	type_ := c.getType(&t)
 
 	result := c.block.GetElementPtr(
@@ -607,7 +614,7 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 		c.getType(expr.Result().Type),
 	)
 
-	result.SetLocation(expr.Token())
+	result.SetLocation(expr.Cst())
 
 	c.exprResult = exprValue{
 		v:           result,
@@ -621,11 +628,11 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	if expr.Value.Result().Kind == ast.TypeResultKind {
 		// Type
 
-		if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
+		if v, ok := ast.As[*ast.Struct](expr.Value.Result().Type); ok {
 			// Struct
 			switch expr.Result().Kind {
 			case ast.ValueResultKind:
-				_, field := v.GetStaticField(expr.Name.Lexeme)
+				_, field := v.GetStaticField(expr.Name.String())
 				c.exprResult = c.getStaticVariable(field)
 
 			case ast.FunctionResultKind:
@@ -634,14 +641,14 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			default:
 				panic("codegen.VisitMember() - Type, Struct - Invalid result kind")
 			}
-		} else if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
+		} else if v, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
 			// Enum
-			case_ := v.GetCase(expr.Name.Lexeme)
+			case_ := v.GetCase(expr.Name.String())
 
 			c.exprResult = exprValue{
 				v: c.function.Literal(
 					c.getType(v.Type),
-					llvm.Literal{Signed: int64(case_.Value), Unsigned: uint64(case_.Value)},
+					llvm.Literal{Signed: case_.ActualValue, Unsigned: uint64(case_.ActualValue)},
 				),
 			}
 		} else {
@@ -653,10 +660,10 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 		// Get struct and load the value if it is a pointer
 		var s *ast.Struct
 
-		if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
+		if v, ok := ast.As[*ast.Struct](expr.Value.Result().Type); ok {
 			s = v
-		} else if v, ok := expr.Value.Result().Type.(*types.PointerType); ok {
-			if v, ok := v.Pointee.(*ast.Struct); ok {
+		} else if v, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
+			if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
 				s = v
 
 				load := c.block.Load(value.v)
@@ -691,13 +698,13 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 		}
 
 		// Field
-		i, field := s.GetField(expr.Name.Lexeme)
+		i, field := s.GetField(expr.Name.String())
 
 		if value.addressable {
-			i32Type_ := types.PrimitiveType{Kind: types.I32}
+			i32Type_ := ast.Primitive{Kind: ast.I32}
 			i32Type := c.getType(&i32Type_)
 
-			t := types.PointerType{Pointee: field.Type}
+			t := ast.Pointer{Pointee: field.Type}
 
 			result := c.block.GetElementPtr(
 				value.v,
@@ -709,7 +716,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 				c.getType(s),
 			)
 
-			result.SetLocation(expr.Token())
+			result.SetLocation(expr.Cst())
 
 			c.exprResult = exprValue{
 				v:           result,
@@ -717,7 +724,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			}
 		} else {
 			result := c.block.ExtractValue(value.v, i)
-			result.SetLocation(expr.Token())
+			result.SetLocation(expr.Cst())
 
 			c.exprResult = exprValue{
 				v: result,
@@ -728,13 +735,13 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 // Utils
 
-func (c *codegen) binary(op scanner.Token, left exprValue, right exprValue, type_ types.Type) exprValue {
+func (c *codegen) binary(op ast.Node, left exprValue, right exprValue, type_ ast.Type) exprValue {
 	left = c.load(left, type_)
 	right = c.load(right, type_)
 
 	var kind llvm.BinaryKind
 
-	switch op.Kind {
+	switch op.Token().Kind {
 	case scanner.Plus, scanner.PlusEqual, scanner.PlusPlus:
 		kind = llvm.Add
 	case scanner.Minus, scanner.MinusEqual, scanner.MinusMinus:
@@ -776,7 +783,7 @@ func (c *codegen) binary(op scanner.Token, left exprValue, right exprValue, type
 	}
 
 	result := c.block.Binary(kind, left.v, right.v)
-	result.SetLocation(op)
+	result.SetLocation(op.Cst())
 
 	return exprValue{v: result}
 }

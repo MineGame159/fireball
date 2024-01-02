@@ -24,8 +24,8 @@ func (c *converter) convertExpr(node cst.Node) ast.Expr {
 		return c.convertStructExpr(node)
 	case cst.ArrayExprNode:
 		return c.convertArrayExpr(node)
-	case cst.NewArrayExprNode:
-		return c.convertNewArrayExpr(node)
+	case cst.AllocateArrayExprNode:
+		return c.convertAllocateArrayExpr(node)
 	case cst.IdentifierNode:
 		return c.convertIdentifierExpr(node)
 	case cst.BoolExprNode, cst.NumberExprNode, cst.StringExprNode:
@@ -37,45 +37,38 @@ func (c *converter) convertExpr(node cst.Node) ast.Expr {
 }
 
 func (c *converter) convertParenExpr(node cst.Node) ast.Expr {
-	p := &ast.Group{Token_: node.Token}
+	var expr ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			p.Expr = c.convertExpr(child)
+			expr = c.convertExpr(child)
 		}
 	}
 
-	p.SetRangeToken(node.Token, tokenEnd(node))
-	p.SetChildrenParent()
-
-	return p
+	return ast.NewParen(node, expr)
 }
 
 func (c *converter) convertUnaryExpr(node cst.Node) ast.Expr {
-	u := &ast.Unary{}
+	prefix := false
+	var operator *ast.Token
+	var value ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			u.Value = c.convertExpr(child)
+			value = c.convertExpr(child)
 		} else {
-			u.Op = child.Token
+			operator = c.convertToken(child)
 
-			if u.Value == nil {
-				u.Prefix = true
+			if value == nil {
+				prefix = true
 			}
 		}
 	}
 
-	u.SetRangeToken(node.Token, tokenEnd(node))
-	u.SetChildrenParent()
-
-	return u
+	return ast.NewUnary(node, prefix, operator, value)
 }
 
 func (c *converter) convertBinaryExpr(node cst.Node) ast.Expr {
-	if node.ContainsAny(scanner.AssignmentOperators) {
-		return c.convertAssignmentExpr(node)
-	}
 	if node.Contains(scanner.Dot) {
 		return c.convertMemberExpr(node)
 	}
@@ -83,223 +76,183 @@ func (c *converter) convertBinaryExpr(node cst.Node) ast.Expr {
 		return c.convertCastExpr(node)
 	}
 
-	b := &ast.Binary{}
+	var left ast.Expr
+	var operator *ast.Token
+	var right ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			if b.Left == nil {
-				b.Left = c.convertExpr(child)
+			if left == nil {
+				left = c.convertExpr(child)
 			} else {
-				b.Right = c.convertExpr(child)
+				right = c.convertExpr(child)
 			}
 		} else {
-			b.Op = child.Token
+			operator = c.convertToken(child)
 		}
 	}
 
-	b.SetRangeToken(node.Token, tokenEnd(node))
-	b.SetChildrenParent()
-
-	return b
-}
-
-func (c *converter) convertAssignmentExpr(node cst.Node) ast.Expr {
-	a := &ast.Assignment{}
-
-	for _, child := range node.Children {
-		if child.Kind.IsExpr() {
-			if a.Assignee == nil {
-				a.Assignee = c.convertExpr(child)
-			} else {
-				a.Value = c.convertExpr(child)
-			}
-		} else {
-			a.Op = child.Token
-		}
+	if node.ContainsAny(scanner.LogicalOperators) {
+		return ast.NewLogical(node, left, operator, right)
+	}
+	if node.ContainsAny(scanner.AssignmentOperators) {
+		return ast.NewAssignment(node, left, operator, right)
 	}
 
-	a.SetRangeToken(node.Token, tokenEnd(node))
-	a.SetChildrenParent()
-
-	return a
+	return ast.NewBinary(node, left, operator, right)
 }
 
 func (c *converter) convertMemberExpr(node cst.Node) ast.Expr {
-	m := &ast.Member{}
+	var value ast.Expr
+	var name *ast.Token
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			if m.Value == nil {
-				m.Value = c.convertExpr(child)
+			if value == nil {
+				value = c.convertExpr(child)
 			} else {
-				m.Name = child.Token
+				name = c.convertToken(child)
 			}
 		} else if child.Kind.IsExpr() {
-			m.Value = c.convertExpr(child)
+			value = c.convertExpr(child)
 		}
 	}
 
-	m.SetRangeToken(node.Token, tokenEnd(node))
-	m.SetChildrenParent()
-
-	return m
-}
-
-func (c *converter) convertCastExpr(node cst.Node) ast.Expr {
-	b := &ast.Cast{}
-
-	for _, child := range node.Children {
-		if child.Kind.IsExpr() {
-			b.Expr = c.convertExpr(child)
-		} else if child.Kind.IsType() {
-			b.Target = c.convertType(child)
-		}
-	}
-
-	b.SetRangeToken(node.Token, tokenEnd(node))
-	b.SetChildrenParent()
-
-	return b
+	return ast.NewMember(node, value, name)
 }
 
 func (c *converter) convertIndexExpr(node cst.Node) ast.Expr {
-	i := &ast.Index{Token_: node.Token}
+	var value ast.Expr
+	var index ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			if i.Value == nil {
-				i.Value = c.convertExpr(child)
+			if value == nil {
+				value = c.convertExpr(child)
 			} else {
-				i.Index = c.convertExpr(child)
+				index = c.convertExpr(child)
 			}
 		}
 	}
 
-	i.SetRangeToken(node.Token, tokenEnd(node))
-	i.SetChildrenParent()
+	return ast.NewIndex(node, value, index)
+}
 
-	return i
+func (c *converter) convertCastExpr(node cst.Node) ast.Expr {
+	var value ast.Expr
+	var target ast.Type
+
+	for _, child := range node.Children {
+		if child.Kind.IsExpr() {
+			value = c.convertExpr(child)
+		} else if child.Kind.IsType() {
+			target = c.convertType(child)
+		}
+	}
+
+	return ast.NewCast(node, value, target)
 }
 
 func (c *converter) convertCallExpr(node cst.Node) ast.Expr {
-	ca := &ast.Call{Token_: node.Token}
+	var callee ast.Expr
+	var args []ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			if ca.Callee == nil {
-				ca.Callee = c.convertExpr(child)
+			if callee == nil {
+				callee = c.convertExpr(child)
 			} else {
-				ca.Args = append(ca.Args, c.convertExpr(child))
+				args = append(args, c.convertExpr(child))
 			}
 		}
 	}
 
-	ca.SetRangeToken(node.Token, tokenEnd(node))
-	ca.SetChildrenParent()
-
-	return ca
+	return ast.NewCall(node, callee, args)
 }
 
 func (c *converter) convertTypeCallExpr(node cst.Node) ast.Expr {
-	t := &ast.TypeCall{}
+	var name *ast.Token
+	var arg ast.Type
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			t.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
-			t.Target = c.convertType(child)
+			arg = c.convertType(child)
 		}
 	}
 
-	t.SetRangeToken(node.Token, tokenEnd(node))
-	t.SetChildrenParent()
-
-	return t
+	return ast.NewTypeCall(node, name, arg)
 }
 
 func (c *converter) convertStructExpr(node cst.Node) ast.Expr {
-	s := &ast.StructInitializer{Token_: node.Token}
+	new_ := false
+	var type_ ast.Type
+	var fields []*ast.InitField
 
 	for _, child := range node.Children {
 		if child.Token.Lexeme == "new" {
-			s.New = true
+			new_ = true
 		} else if child.Kind.IsType() {
-			s.Target = c.convertType(child)
+			type_ = c.convertType(child)
 		} else if child.Kind == cst.StructFieldExprNode {
-			s.Fields = append(s.Fields, c.convertStructFieldExpr(child))
+			fields = append(fields, c.convertStructFieldExpr(child))
 		}
 	}
 
-	s.SetRangeToken(node.Token, tokenEnd(node))
-	s.SetChildrenParent()
-
-	return s
+	return ast.NewStructInitializer(node, new_, type_, fields)
 }
 
-func (c *converter) convertArrayExpr(node cst.Node) ast.Expr {
-	a := &ast.ArrayInitializer{Token_: node.Token}
-
-	for _, child := range node.Children {
-		if child.Kind.IsExpr() {
-			a.Values = append(a.Values, c.convertExpr(child))
-		}
-	}
-
-	a.SetRangeToken(node.Token, tokenEnd(node))
-	a.SetChildrenParent()
-
-	return a
-}
-
-func (c *converter) convertNewArrayExpr(node cst.Node) ast.Expr {
-	n := &ast.NewArray{Token_: node.Token}
-
-	for _, child := range node.Children {
-		if child.Kind.IsType() {
-			n.Type_ = c.convertType(child)
-		} else if child.Kind.IsExpr() {
-			n.Count = c.convertExpr(child)
-		}
-	}
-
-	n.SetRangeToken(node.Token, tokenEnd(node))
-	n.SetChildrenParent()
-
-	return n
-}
-
-func (c *converter) convertStructFieldExpr(node cst.Node) ast.InitField {
-	i := ast.InitField{}
+func (c *converter) convertStructFieldExpr(node cst.Node) *ast.InitField {
+	var name *ast.Token
+	var value ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			if i.Name.Lexeme == "" {
-				i.Name = child.Token
+			if name == nil {
+				name = c.convertToken(child)
 			} else {
-				i.Value = c.convertExpr(child)
+				value = c.convertExpr(child)
 			}
 		} else if child.Kind.IsExpr() {
-			i.Value = c.convertExpr(child)
+			value = c.convertExpr(child)
 		}
 	}
 
-	return i
+	return ast.NewInitField(node, name, value)
+}
+
+func (c *converter) convertArrayExpr(node cst.Node) ast.Expr {
+	var values []ast.Expr
+
+	for _, child := range node.Children {
+		if child.Kind.IsExpr() {
+			values = append(values, c.convertExpr(child))
+		}
+	}
+
+	return ast.NewArrayInitializer(node, values)
+}
+
+func (c *converter) convertAllocateArrayExpr(node cst.Node) ast.Expr {
+	var type_ ast.Type
+	var count ast.Expr
+
+	for _, child := range node.Children {
+		if child.Kind.IsType() {
+			type_ = c.convertType(child)
+		} else if child.Kind.IsExpr() {
+			count = c.convertExpr(child)
+		}
+	}
+
+	return ast.NewAllocateArray(node, type_, count)
 }
 
 func (c *converter) convertIdentifierExpr(node cst.Node) ast.Expr {
-	i := &ast.Identifier{Identifier: node.Token}
-
-	i.SetRangeToken(node.Token, node.Token)
-	i.SetChildrenParent()
-
-	return i
+	return ast.NewIdentifier(node, node.Token)
 }
 
 func (c *converter) convertLiteral(node cst.Node) ast.Expr {
-	l := &ast.Literal{Value: node.Token}
-
-	l.SetRangeToken(node.Token, node.Token)
-	l.SetChildrenParent()
-
-	return l
+	return ast.NewLiteral(node, node.Token)
 }

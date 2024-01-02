@@ -1,8 +1,8 @@
 package cst2ast
 
 import (
+	"fireball/core/ast"
 	"fireball/core/cst"
-	"fireball/core/types"
 )
 
 func (c *converter) convertAttributes(node cst.Node) []any {
@@ -32,14 +32,14 @@ func (c *converter) convertAttribute(node cst.Node) any {
 }
 
 func (c *converter) convertExternAttribute(node cst.Node) any {
-	e := types.ExternAttribute{}
+	e := ast.ExternAttribute{}
 
 	for _, child := range node.Children {
 		if child.Kind == cst.StringExprNode {
 			if e.Name == "" {
 				e.Name = child.Token.Lexeme[1 : len(child.Token.Lexeme)-1]
 			} else {
-				c.error(node.Token, "Extern attribute only have 1 optional parameter")
+				c.error(node, "Extern attribute only have 1 optional parameter")
 			}
 		}
 	}
@@ -48,14 +48,14 @@ func (c *converter) convertExternAttribute(node cst.Node) any {
 }
 
 func (c *converter) convertIntrinsicAttribute(node cst.Node) any {
-	e := types.IntrinsicAttribute{}
+	e := ast.IntrinsicAttribute{}
 
 	for _, child := range node.Children {
 		if child.Kind == cst.StringExprNode {
 			if e.Name == "" {
 				e.Name = child.Token.Lexeme[1 : len(child.Token.Lexeme)-1]
 			} else {
-				c.error(node.Token, "Intrinsic attribute only have 1 optional parameter")
+				c.error(node, "Intrinsic attribute only have 1 optional parameter")
 			}
 		}
 	}
@@ -64,11 +64,11 @@ func (c *converter) convertIntrinsicAttribute(node cst.Node) any {
 }
 
 func (c *converter) convertInlineAttribute(node cst.Node) any {
-	e := types.InlineAttribute{}
+	e := ast.InlineAttribute{}
 
 	for _, child := range node.Children {
 		if child.Kind == cst.StringExprNode {
-			c.error(node.Token, "Inline attribute doesn't have any parameters")
+			c.error(node, "Inline attribute doesn't have any parameters")
 		}
 	}
 

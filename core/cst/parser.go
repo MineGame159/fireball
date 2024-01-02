@@ -8,17 +8,15 @@ import (
 )
 
 type nodeInfo struct {
-	kind NodeKind
-	pos  core.Pos
-
+	kind   NodeKind
 	offset int
 }
 
 type parser struct {
 	scanner  *scanner.Scanner
-	previous scanner.Token
-	next     scanner.Token
-	next2    scanner.Token
+	previous scanner.PositionedToken
+	next     scanner.PositionedToken
+	next2    scanner.PositionedToken
 
 	nodes    []nodeInfo
 	children []Node
@@ -50,7 +48,6 @@ func Parse(reporter utils.Reporter, text string) Node {
 func (p *parser) begin(kind NodeKind) {
 	p.nodes = append(p.nodes, nodeInfo{
 		kind:   kind,
-		pos:    core.TokenToPos(p.next, false),
 		offset: len(p.children),
 	})
 }
@@ -79,8 +76,15 @@ func (p *parser) advanceGetLeaf() Node {
 	p.advance()
 
 	return Node{
-		Kind:  NodeKindFromToken(p.previous.Kind),
-		Token: p.previous,
+		Kind: NodeKindFromToken(p.previous.Token),
+		Range: core.Range{
+			Start: p.previous.Pos,
+			End: core.Pos{
+				Line:   p.previous.Pos.Line,
+				Column: p.previous.Pos.Column + uint16(len(p.previous.Token.Lexeme)),
+			},
+		},
+		Token: p.previous.Token,
 	}
 }
 
@@ -96,9 +100,9 @@ func (p *parser) end() Node {
 
 	return Node{
 		Kind: info.kind,
-		Token: scanner.Token{
-			Line_:   info.pos.Line,
-			Column_: info.pos.Column,
+		Range: core.Range{
+			Start: exactChildren[0].Range.Start,
+			End:   exactChildren[len(exactChildren)-1].Range.End,
 		},
 		Children: exactChildren,
 	}
@@ -213,7 +217,7 @@ func (p *parser) recovering() bool {
 func (p *parser) error(msg string) Node {
 	p.reporter.Report(utils.Diagnostic{
 		Kind:    utils.ErrorKind,
-		Range:   core.TokenToRange(p.next),
+		Range:   p.next.Range(),
 		Message: msg,
 	})
 

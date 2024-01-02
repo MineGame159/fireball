@@ -3,16 +3,15 @@ package codegen
 import (
 	"fireball/core/architecture"
 	"fireball/core/ast"
+	"fireball/core/fuckoff"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
-	"fireball/core/types"
-	"fireball/core/utils"
 	"io"
 )
 
 type codegen struct {
 	path     string
-	resolver utils.Resolver
+	resolver fuckoff.Resolver
 
 	types []typePair
 
@@ -37,7 +36,7 @@ type codegen struct {
 }
 
 type typePair struct {
-	fireball types.Type
+	fireball ast.Type
 	llvm     llvm.Type
 }
 
@@ -52,11 +51,11 @@ type exprValue struct {
 }
 
 type variable struct {
-	name  scanner.Token
+	name  ast.Node
 	value exprValue
 }
 
-func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writer) {
+func Emit(path string, resolver fuckoff.Resolver, file *ast.File, writer io.Writer) {
 	// Init codegen
 	c := &codegen{
 		path:     path,
@@ -72,18 +71,16 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 	c.module.Source(path)
 
 	// Find some declarations
-	for _, decl := range decls {
+	for _, decl := range file.Decls {
 		switch decl := decl.(type) {
 		case *ast.Struct:
 			for i := range decl.StaticFields {
-				c.createStaticVariable(&decl.StaticFields[i], false)
+				c.createStaticVariable(decl.StaticFields[i], false)
 			}
 
 		case *ast.Impl:
-			for _, decl := range decl.Functions {
-				if function, ok := decl.(*ast.Func); ok {
-					c.defineOrDeclare(function)
-				}
+			for _, function := range decl.Methods {
+				c.defineOrDeclare(function)
 			}
 
 		case *ast.Func:
@@ -92,7 +89,7 @@ func Emit(path string, resolver utils.Resolver, decls []ast.Decl, writer io.Writ
 	}
 
 	// Emit
-	for _, decl := range decls {
+	for _, decl := range file.Decls {
 		c.acceptDecl(decl)
 	}
 
@@ -111,7 +108,7 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 		c.functions[function] = f
 
 		// Inline
-		var inline types.InlineAttribute
+		var inline ast.InlineAttribute
 
 		if function.GetAttribute(&inline) {
 			f.SetAlwaysInline()
@@ -128,7 +125,7 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 				index++
 			}
 
-			f.GetParameter(index).SetName(param.Name.Lexeme)
+			f.GetParameter(index).SetName(param.Name.String())
 		}
 	} else {
 		// Declare
@@ -138,7 +135,7 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 
 // IR
 
-func (c *codegen) load(value exprValue, type_ types.Type) exprValue {
+func (c *codegen) load(value exprValue, type_ ast.Type) exprValue {
 	if value.addressable {
 		load := c.block.Load(value.v)
 		load.SetAlign(type_.Align())
@@ -169,7 +166,7 @@ func (c *codegen) getStaticVariable(field *ast.Field) exprValue {
 }
 
 func (c *codegen) createStaticVariable(field *ast.Field, external bool) exprValue {
-	ptr := types.PointerType{Pointee: field.Type}
+	ptr := ast.Pointer{Pointee: field.Type}
 
 	llvmValue := c.module.Variable(external, c.getType(field.Type), c.getType(&ptr))
 	llvmValue.SetName(field.GetMangledName())
@@ -194,7 +191,7 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 	}
 
 	// Resolve function from project
-	_, filePath := c.resolver.GetFunction(function.Name.Lexeme)
+	_, filePath := c.resolver.GetFunction(function.Name.String())
 
 	if filePath == c.path {
 		panic("codegen.getFunction() - Local function not found in functions map")
@@ -214,73 +211,64 @@ func (c *codegen) findAllocas(function *ast.Func) {
 	c.allocas = make(map[ast.Node]exprValue)
 
 	a := &allocaFinder{c: c}
-	a.AcceptDecl(function)
+	a.VisitNode(function)
 }
 
 type allocaFinder struct {
 	c *codegen
 }
 
-func (a *allocaFinder) AcceptDecl(decl ast.Decl) {
-	decl.AcceptChildren(a)
-}
+func (a *allocaFinder) VisitNode(node ast.Node) {
+	switch node := node.(type) {
+	case *ast.Var:
+		pointer := a.c.block.Alloca(a.c.getType(node.ActualType))
+		pointer.SetName(node.Name.String() + ".var")
+		pointer.SetAlign(node.ActualType.Align())
 
-func (a *allocaFinder) AcceptStmt(stmt ast.Stmt) {
-	if variable, ok := stmt.(*ast.Variable); ok {
-		pointer := a.c.block.Alloca(a.c.getType(variable.Type))
-		pointer.SetName(variable.Name.Lexeme + ".var")
-		pointer.SetAlign(variable.Type.Align())
-
-		a.c.allocas[variable] = exprValue{
+		a.c.allocas[node] = exprValue{
 			v:           pointer,
 			addressable: true,
 		}
-	}
 
-	stmt.AcceptChildren(a)
-}
-
-func (a *allocaFinder) AcceptExpr(expr ast.Expr) {
-	switch expr := expr.(type) {
 	case *ast.Call:
-		if callNeedsTempVariable(expr) {
-			returns := expr.Callee.Result().Function.Returns
+		if callNeedsTempVariable(node) {
+			returns := node.Callee.Result().Function.Returns
 
 			pointer := a.c.block.Alloca(a.c.getType(returns))
 			pointer.SetAlign(returns.Align())
 
-			a.c.allocas[expr] = exprValue{
+			a.c.allocas[node] = exprValue{
 				v:           pointer,
 				addressable: true,
 			}
 		}
 
 	case *ast.Member:
-		if expr.Value.Result().Kind != ast.TypeResultKind && expr.Result().Kind == ast.FunctionResultKind && !expr.Value.Result().IsAddressable() {
-			type_ := expr.Value.Result().Type
+		if node.Value.Result().Kind != ast.TypeResultKind && node.Result().Kind == ast.FunctionResultKind && !node.Value.Result().IsAddressable() {
+			type_ := node.Value.Result().Type
 
 			pointer := a.c.block.Alloca(a.c.getType(type_))
 			pointer.SetAlign(type_.Align())
 
-			a.c.allocas[expr] = exprValue{
+			a.c.allocas[node] = exprValue{
 				v:           pointer,
 				addressable: true,
 			}
 		}
 	}
 
-	expr.AcceptChildren(a)
+	node.AcceptChildren(a)
 }
 
 func callNeedsTempVariable(expr *ast.Call) bool {
 	function := expr.Callee.Result().Function
 
-	if f, ok := expr.Callee.Result().Type.(*ast.Func); ok && function == nil {
+	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok && function == nil {
 		function = f
 	}
 
-	if _, ok := expr.Parent().(*ast.Expression); !ok && !types.IsPrimitive(function.Returns, types.Void) {
-		if _, ok := function.Returns.(*types.ArrayType); ok {
+	if _, ok := expr.Parent().(*ast.Expression); !ok && !ast.IsPrimitive(function.Returns, ast.Void) {
+		if _, ok := ast.As[*ast.Array](function.Returns); ok {
 			if _, ok := expr.Parent().(*ast.Index); ok {
 				return true
 			}
@@ -292,7 +280,9 @@ func callNeedsTempVariable(expr *ast.Call) bool {
 
 // Types
 
-func (c *codegen) getType(type_ types.Type) llvm.Type {
+func (c *codegen) getType(type_ ast.Type) llvm.Type {
+	type_ = type_.Resolved()
+
 	// Check cache
 	for _, pair := range c.types {
 		if pair.fireball.Equals(type_) {
@@ -303,49 +293,49 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 	// Create type
 	var llvmType llvm.Type
 
-	if v, ok := type_.(*types.PrimitiveType); ok {
+	if v, ok := ast.As[*ast.Primitive](type_); ok {
 		// Primitive
 		switch v.Kind {
-		case types.Void:
+		case ast.Void:
 			llvmType = c.module.Void()
-		case types.Bool:
+		case ast.Bool:
 			llvmType = c.module.Primitive("bool", 8, llvm.BooleanEncoding)
 
-		case types.U8:
+		case ast.U8:
 			llvmType = c.module.Primitive("u8", 8, llvm.UnsignedEncoding)
-		case types.U16:
+		case ast.U16:
 			llvmType = c.module.Primitive("u16", 16, llvm.UnsignedEncoding)
-		case types.U32:
+		case ast.U32:
 			llvmType = c.module.Primitive("u32", 32, llvm.UnsignedEncoding)
-		case types.U64:
+		case ast.U64:
 			llvmType = c.module.Primitive("u64", 64, llvm.UnsignedEncoding)
 
-		case types.I8:
+		case ast.I8:
 			llvmType = c.module.Primitive("i8", 8, llvm.SignedEncoding)
-		case types.I16:
+		case ast.I16:
 			llvmType = c.module.Primitive("i16", 16, llvm.SignedEncoding)
-		case types.I32:
+		case ast.I32:
 			llvmType = c.module.Primitive("i32", 32, llvm.SignedEncoding)
-		case types.I64:
+		case ast.I64:
 			llvmType = c.module.Primitive("i64", 64, llvm.SignedEncoding)
 
-		case types.F32:
+		case ast.F32:
 			llvmType = c.module.Primitive("f32", 32, llvm.FloatEncoding)
-		case types.F64:
+		case ast.F64:
 			llvmType = c.module.Primitive("f64", 64, llvm.FloatEncoding)
 		}
-	} else if v, ok := type_.(*types.ArrayType); ok {
+	} else if v, ok := ast.As[*ast.Array](type_); ok {
 		// Array
-		llvmType = c.module.Array(v.String(), int(v.Count), c.getType(v.Base))
-	} else if v, ok := type_.(*types.PointerType); ok {
+		llvmType = c.module.Array(v.String(), v.Count, c.getType(v.Base))
+	} else if v, ok := ast.As[*ast.Pointer](type_); ok {
 		// Pointer
 		llvmType = c.module.Pointer(v.String(), c.getType(v.Pointee))
-	} else if v, ok := type_.(*ast.Func); ok {
+	} else if v, ok := ast.As[*ast.Func](type_); ok {
 		// Function
 		var parameters []llvm.Type
 		var returns llvm.Type
 
-		var intrinsic types.IntrinsicAttribute
+		var intrinsic ast.IntrinsicAttribute
 
 		if v.GetAttribute(&intrinsic) {
 			intrinsic := c.getIntrinsic(v, intrinsic)
@@ -363,7 +353,7 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 			parameters = make([]llvm.Type, parameterCount)
 
 			if this != nil {
-				type_ := types.PointerType{Pointee: this}
+				type_ := ast.Pointer{Pointee: this}
 				parameters[0] = c.getType(&type_)
 			}
 
@@ -380,25 +370,25 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 		}
 
 		llvmType = c.module.Function(getMangledName(v), parameters, v.IsVariadic(), returns)
-	} else if v, ok := type_.(*ast.Struct); ok {
+	} else if v, ok := ast.As[*ast.Struct](type_); ok {
 		// Struct
 		layout := architecture.CLayout{}
 		fields := make([]llvm.Field, len(v.Fields))
 
 		for i, field := range v.Fields {
-			offset := layout.Add(field.Type)
+			offset := layout.Add(field.Type.Size(), field.Type.Align())
 
 			fields[i] = llvm.Field{
-				Name:   field.Name.Lexeme,
+				Name:   field.Name.String(),
 				Type:   c.getType(field.Type),
 				Offset: offset * 8,
 			}
 		}
 
-		llvmType = c.module.Struct(v.Name.Lexeme, layout.Size()*8, fields)
-	} else if v, ok := type_.(*ast.Enum); ok {
+		llvmType = c.module.Struct(v.Name.String(), layout.Size()*8, fields)
+	} else if v, ok := ast.As[*ast.Enum](type_); ok {
 		// Enum
-		llvmType = c.module.Alias(v.Name.Lexeme, c.getType(v.Type))
+		llvmType = c.module.Alias(v.Name.String(), c.getType(v.Type))
 	}
 
 	if llvmType != nil {
@@ -413,7 +403,7 @@ func (c *codegen) getType(type_ types.Type) llvm.Type {
 	panic("codegen.getType() - Invalid type")
 }
 
-func (c *codegen) getIntrinsic(function *ast.Func, intrinsic types.IntrinsicAttribute) []llvm.Type {
+func (c *codegen) getIntrinsic(function *ast.Func, intrinsic ast.IntrinsicAttribute) []llvm.Type {
 	param := c.getType(function.Params[0].Type)
 
 	switch intrinsic.Name {
@@ -424,7 +414,7 @@ func (c *codegen) getIntrinsic(function *ast.Func, intrinsic types.IntrinsicAttr
 				param,
 			}
 		} else {
-			i1 := c.getPrimitiveType(types.Bool)
+			i1 := c.getPrimitiveType(ast.Bool)
 
 			return []llvm.Type{
 				param,
@@ -443,9 +433,9 @@ func (c *codegen) getIntrinsic(function *ast.Func, intrinsic types.IntrinsicAttr
 		return []llvm.Type{param, param, param, param}
 
 	case "memcpy", "memmove":
-		void := c.getPrimitiveType(types.Void)
-		i1 := c.getPrimitiveType(types.Bool)
-		i32 := c.getPrimitiveType(types.I32)
+		void := c.getPrimitiveType(ast.Void)
+		i1 := c.getPrimitiveType(ast.Bool)
+		i32 := c.getPrimitiveType(ast.I32)
 
 		return []llvm.Type{
 			void,
@@ -456,10 +446,10 @@ func (c *codegen) getIntrinsic(function *ast.Func, intrinsic types.IntrinsicAttr
 		}
 
 	case "memset":
-		void := c.getPrimitiveType(types.Void)
-		i1 := c.getPrimitiveType(types.Bool)
-		i8 := c.getPrimitiveType(types.I8)
-		i32 := c.getPrimitiveType(types.I32)
+		void := c.getPrimitiveType(ast.Void)
+		i1 := c.getPrimitiveType(ast.Bool)
+		i8 := c.getPrimitiveType(ast.I8)
+		i32 := c.getPrimitiveType(ast.I32)
 
 		return []llvm.Type{
 			void,
@@ -474,16 +464,16 @@ func (c *codegen) getIntrinsic(function *ast.Func, intrinsic types.IntrinsicAttr
 	}
 }
 
-func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsic types.IntrinsicAttribute, args []llvm.Value) []llvm.Value {
+func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsic ast.IntrinsicAttribute, args []llvm.Value) []llvm.Value {
 	switch intrinsic.Name {
 	case "abs":
 		if !isFloating(function.Returns) {
-			i1 := c.getPrimitiveType(types.Bool)
+			i1 := c.getPrimitiveType(ast.Bool)
 			args = append(args, c.function.Literal(i1, llvm.Literal{}))
 		}
 
 	case "memcpy", "memmove", "memset":
-		i1 := c.getPrimitiveType(types.Bool)
+		i1 := c.getPrimitiveType(ast.Bool)
 		args = append(args, c.function.Literal(i1, llvm.Literal{}))
 	}
 
@@ -491,7 +481,7 @@ func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsic types.Intrin
 }
 
 func getMangledName(function *ast.Func) string {
-	var intrinsic types.IntrinsicAttribute
+	var intrinsic ast.IntrinsicAttribute
 
 	if function.GetAttribute(&intrinsic) {
 		name := ""
@@ -526,17 +516,17 @@ func getMangledName(function *ast.Func) string {
 	return function.MangledName()
 }
 
-func isSigned(type_ types.Type) bool {
-	if v, ok := type_.(*types.PrimitiveType); ok {
-		return types.IsSigned(v.Kind)
+func isSigned(type_ ast.Type) bool {
+	if v, ok := ast.As[*ast.Primitive](type_); ok {
+		return ast.IsSigned(v.Kind)
 	}
 
 	return false
 }
 
-func isFloating(type_ types.Type) bool {
-	if v, ok := type_.(*types.PrimitiveType); ok {
-		return types.IsFloating(v.Kind)
+func isFloating(type_ ast.Type) bool {
+	if v, ok := ast.As[*ast.Primitive](type_); ok {
+		return ast.IsFloating(v.Kind)
 	}
 
 	return false
@@ -550,8 +540,8 @@ func ternary[T any](condition bool, true T, false T) T {
 	return false
 }
 
-func (c *codegen) getPrimitiveType(kind types.PrimitiveKind) llvm.Type {
-	type_ := types.PrimitiveType{Kind: kind}
+func (c *codegen) getPrimitiveType(kind ast.PrimitiveKind) llvm.Type {
+	type_ := ast.Primitive{Kind: kind}
 	return c.getType(&type_)
 }
 
@@ -559,7 +549,7 @@ func (c *codegen) getPrimitiveType(kind types.PrimitiveKind) llvm.Type {
 
 func (c *codegen) getVariable(name scanner.Token) *variable {
 	for i := len(c.variables) - 1; i >= 0; i-- {
-		if c.variables[i].name.Lexeme == name.Lexeme {
+		if c.variables[i].name.String() == name.Lexeme {
 			return &c.variables[i]
 		}
 	}
@@ -567,8 +557,8 @@ func (c *codegen) getVariable(name scanner.Token) *variable {
 	return nil
 }
 
-func (c *codegen) addVariable(name scanner.Token, value exprValue) *variable {
-	c.block.Variable(name.Lexeme, value.v).SetLocation(name)
+func (c *codegen) addVariable(name ast.Node, value exprValue) *variable {
+	c.block.Variable(name.String(), value.v).SetLocation(name.Cst())
 
 	value.addressable = true
 
@@ -601,19 +591,19 @@ func (c *codegen) peekScope() *scope {
 
 func (c *codegen) acceptDecl(decl ast.Decl) {
 	if decl != nil {
-		decl.Accept(c)
+		decl.AcceptDecl(c)
 	}
 }
 
 func (c *codegen) acceptStmt(stmt ast.Stmt) {
 	if stmt != nil {
-		stmt.Accept(c)
+		stmt.AcceptStmt(c)
 	}
 }
 
 func (c *codegen) acceptExpr(expr ast.Expr) exprValue {
 	if expr != nil {
-		expr.Accept(c)
+		expr.AcceptExpr(c)
 		return c.exprResult
 	}
 

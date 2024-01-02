@@ -2,10 +2,8 @@ package lsp
 
 import (
 	"cmp"
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/scanner"
-	"fireball/core/types"
 	"fireball/core/utils"
 	"slices"
 )
@@ -14,29 +12,27 @@ type highlighter struct {
 	enums utils.Set[string]
 
 	functions utils.Set[string]
-	params    []ast.Param
+	params    []*ast.Param
 
 	tokens []semantic
 }
 
-func highlight(decls []ast.Decl) []uint32 {
-	h := &highlighter{
+func highlight(node ast.Node) []uint32 {
+	h := highlighter{
 		enums:     utils.NewSet[string](),
 		functions: utils.NewSet[string](),
 		tokens:    make([]semantic, 0, 256),
 	}
 
-	for _, decl := range decls {
+	for _, decl := range node.(*ast.File).Decls {
 		if v, ok := decl.(*ast.Enum); ok {
-			h.enums.Add(v.Name.Lexeme)
+			h.enums.Add(v.Name.String())
 		} else if v, ok := decl.(*ast.Func); ok {
-			h.functions.Add(v.Name.Lexeme)
+			h.functions.Add(v.Name.String())
 		}
 	}
 
-	for _, decl := range decls {
-		h.AcceptDecl(decl)
-	}
+	h.VisitNode(node)
 
 	return h.data()
 }
@@ -44,36 +40,38 @@ func highlight(decls []ast.Decl) []uint32 {
 // Declarations
 
 func (h *highlighter) VisitStruct(decl *ast.Struct) {
-	h.addToken(decl.Name, classKind)
+	h.add(decl.Name, classKind)
 
 	for _, field := range decl.Fields {
-		h.addToken(field.Name, propertyKind)
+		h.add(field.Name, propertyKind)
 	}
 
 	decl.AcceptChildren(h)
 }
 
 func (h *highlighter) VisitImpl(decl *ast.Impl) {
-	h.addToken(decl.Struct, classKind)
+	h.add(decl.Struct, classKind)
 
 	decl.AcceptChildren(h)
 }
 
 func (h *highlighter) VisitEnum(decl *ast.Enum) {
-	h.addToken(decl.Name, enumKind)
+	h.add(decl.Name, enumKind)
 
 	for _, case_ := range decl.Cases {
-		h.addToken(case_.Name, enumMemberKind)
+		h.add(case_.Name, enumMemberKind)
 	}
 
 	decl.AcceptChildren(h)
 }
 
 func (h *highlighter) VisitFunc(decl *ast.Func) {
-	h.addToken(decl.Name, functionKind)
+	if decl.Name != nil {
+		h.add(decl.Name, functionKind)
+	}
 
 	for _, param := range decl.Params {
-		h.addToken(param.Name, parameterKind)
+		h.add(param.Name, parameterKind)
 	}
 
 	h.params = decl.Params
@@ -91,8 +89,8 @@ func (h *highlighter) VisitExpression(stmt *ast.Expression) {
 	stmt.AcceptChildren(h)
 }
 
-func (h *highlighter) VisitVariable(stmt *ast.Variable) {
-	h.addToken(stmt.Name, variableKind)
+func (h *highlighter) VisitVar(stmt *ast.Var) {
+	h.add(stmt.Name, variableKind)
 
 	stmt.AcceptChildren(h)
 }
@@ -119,7 +117,7 @@ func (h *highlighter) VisitContinue(stmt *ast.Continue) {
 
 // Expressions
 
-func (h *highlighter) VisitGroup(expr *ast.Group) {
+func (h *highlighter) VisitParen(expr *ast.Paren) {
 	expr.AcceptChildren(h)
 }
 
@@ -135,7 +133,7 @@ func (h *highlighter) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	expr.AcceptChildren(h)
 }
 
-func (h *highlighter) VisitNewArray(expr *ast.NewArray) {
+func (h *highlighter) VisitAllocateArray(expr *ast.AllocateArray) {
 	expr.AcceptChildren(h)
 }
 
@@ -171,7 +169,7 @@ func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
 		kind = parameterKind
 	}
 
-	h.addToken(expr.Identifier, kind)
+	h.add(expr, kind)
 
 	expr.AcceptChildren(h)
 }
@@ -185,7 +183,7 @@ func (h *highlighter) VisitCast(expr *ast.Cast) {
 }
 
 func (h *highlighter) VisitTypeCall(expr *ast.TypeCall) {
-	h.addToken(expr.Token(), functionKind)
+	h.add(expr.Callee, functionKind)
 
 	expr.AcceptChildren(h)
 }
@@ -200,47 +198,56 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 
 func (h *highlighter) VisitMember(expr *ast.Member) {
 	if expr.Result().Kind == ast.FunctionResultKind {
-		h.addToken(expr.Name, functionKind)
+		h.add(expr.Name, functionKind)
 	} else if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
-		h.addToken(expr.Name, enumMemberKind)
+		h.add(expr.Name, enumMemberKind)
 	} else {
-		h.addToken(expr.Name, propertyKind)
+		h.add(expr.Name, propertyKind)
 	}
 
 	expr.AcceptChildren(h)
 }
 
-// types.Visitor
+// Types
 
-func (h *highlighter) VisitType(type_ types.Type) {
-	if type_.Range().Valid() {
-		if _, ok := type_.(*types.PrimitiveType); ok {
-			h.addRange(type_.Range(), typeKind)
-		} else if _, ok := type_.(*ast.Struct); ok {
-			h.addRange(type_.Range(), classKind)
-		} else if _, ok := type_.(*ast.Enum); ok {
-			h.addRange(type_.Range(), enumKind)
-		} else {
-			type_.AcceptTypes(h)
+func (h *highlighter) visitType(type_ ast.Type) {
+	if type_.Cst() != nil {
+		switch type_ := type_.(type) {
+		case *ast.Primitive:
+			h.add(type_, typeKind)
+
+		case *ast.Resolvable:
+			switch type_.Resolved().(type) {
+			case *ast.Struct:
+				h.add(type_, classKind)
+			case *ast.Enum:
+				h.add(type_, enumKind)
+			}
 		}
 	}
+
+	type_.AcceptChildren(h)
 }
 
-// ast.Acceptor
+// ast.Visitor
 
-func (h *highlighter) AcceptDecl(decl ast.Decl) {
-	decl.Accept(h)
-	decl.AcceptTypes(h)
-}
+func (h *highlighter) VisitNode(node ast.Node) {
+	switch node := node.(type) {
+	case ast.Decl:
+		node.AcceptDecl(h)
 
-func (h *highlighter) AcceptStmt(stmt ast.Stmt) {
-	stmt.Accept(h)
-	stmt.AcceptTypes(h)
-}
+	case ast.Stmt:
+		node.AcceptStmt(h)
 
-func (h *highlighter) AcceptExpr(expr ast.Expr) {
-	expr.Accept(h)
-	expr.AcceptTypes(h)
+	case ast.Expr:
+		node.AcceptExpr(h)
+
+	case ast.Type:
+		h.visitType(node)
+
+	default:
+		node.AcceptChildren(h)
+	}
 }
 
 // Tokens
@@ -267,27 +274,20 @@ type semantic struct {
 	lengthKind uint8
 }
 
-func newSemantic(line, column, length int, kind semanticKind) semantic {
+func newSemantic(line, column, length uint16, kind semanticKind) semantic {
 	length = min(length, 31)
 
 	return semantic{
-		line:       uint16(line - 1),
+		line:       line - 1,
 		column:     uint8(column),
 		lengthKind: (uint8(length) & 0b00011111) | ((uint8(kind) << 5) & 0b11100000),
 	}
 }
 
-func (h *highlighter) addToken(token scanner.Token, kind semanticKind) {
-	if token.Column() < 256 {
-		h.tokens = append(h.tokens, newSemantic(token.Line(), token.Column(), len(token.Lexeme), kind))
-	}
-}
-
-func (h *highlighter) addRange(range_ core.Range, kind semanticKind) {
-	if range_.Start.Line == range_.End.Line {
-		if range_.Start.Column < 256 {
-			h.tokens = append(h.tokens, newSemantic(range_.Start.Line, range_.Start.Column, range_.End.Column-range_.Start.Column, kind))
-		}
+func (h *highlighter) add(node ast.Node, kind semanticKind) {
+	if node.Cst() != nil && node.Cst().Range.Start.Column < 256 {
+		range_ := node.Cst().Range
+		h.tokens = append(h.tokens, newSemantic(range_.Start.Line, range_.Start.Column, range_.End.Column-range_.Start.Column, kind))
 	}
 }
 
@@ -335,7 +335,7 @@ func (h *highlighter) data() []uint32 {
 
 func (h *highlighter) isParameter(name scanner.Token) bool {
 	for _, param := range h.params {
-		if param.Name.Lexeme == name.Lexeme {
+		if param.Name.String() == name.Lexeme {
 			return true
 		}
 	}

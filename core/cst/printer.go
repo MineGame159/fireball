@@ -12,9 +12,11 @@ func printNode(node Node, depth int) {
 	}
 
 	if node.Leaf() {
-		fmt.Printf("- '%s' (%s)\n", node.Token.Lexeme, node.Kind)
+		fmt.Printf("- '%s' (%s)", node.Token.Lexeme, node.Kind)
+		fmt.Printf("                [(%d, %d) - (%d, %d)]\n", node.Range.Start.Line, node.Range.Start.Column, node.Range.End.Line, node.Range.End.Column)
 	} else {
-		fmt.Printf("+ %s\n", node.Kind)
+		fmt.Printf("+ %s", node.Kind)
+		fmt.Printf("                [(%d, %d) - (%d, %d)]\n", node.Range.Start.Line, node.Range.Start.Column, node.Range.End.Line, node.Range.End.Column)
 
 		for _, child := range node.Children {
 			printNode(child, depth+1)

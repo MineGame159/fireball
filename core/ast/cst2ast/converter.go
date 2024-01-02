@@ -1,7 +1,6 @@
 package cst2ast
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/cst"
 	"fireball/core/scanner"
@@ -12,28 +11,32 @@ type converter struct {
 	reporter utils.Reporter
 }
 
-func Convert(reporter utils.Reporter, node cst.Node) []ast.Decl {
+func Convert(reporter utils.Reporter, node cst.Node) *ast.File {
 	c := converter{
 		reporter: reporter,
 	}
 
-	var nodes []ast.Decl
+	var decls []ast.Decl
 
 	for _, child := range node.Children {
-		nodes = append(nodes, c.convertDecl(child))
+		decls = append(decls, c.convertDecl(child))
 	}
 
-	return nodes
+	return ast.NewFile(node, decls)
+}
+
+func (c *converter) convertToken(node cst.Node) *ast.Token {
+	return ast.NewToken(node, node.Token)
 }
 
 func tokenEnd(node cst.Node) scanner.Token {
 	return node.Children[len(node.Children)-1].Token
 }
 
-func (c *converter) error(token scanner.Token, msg string) {
+func (c *converter) error(node cst.Node, msg string) {
 	c.reporter.Report(utils.Diagnostic{
 		Kind:    utils.ErrorKind,
-		Range:   core.TokenToRange(token),
+		Range:   node.Range,
 		Message: msg,
 	})
 }

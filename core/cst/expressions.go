@@ -91,7 +91,7 @@ func parsePrefixExprPratt(p *parser) Node {
 				return p.end()
 			}
 
-			p.begin(NewArrayExprNode)
+			p.begin(AllocateArrayExprNode)
 
 			p.childAdd(new_)
 			if p.child(parseType) {

@@ -1,6 +1,7 @@
 package cst
 
 import (
+	"fireball/core"
 	"fireball/core/scanner"
 	"slices"
 )
@@ -8,7 +9,8 @@ import (
 type NodeKind uint8
 
 type Node struct {
-	Kind NodeKind
+	Kind  NodeKind
+	Range core.Range
 
 	Token    scanner.Token
 	Children []Node
@@ -39,7 +41,8 @@ func (n Node) ContainsAny(kinds []scanner.TokenKind) bool {
 }
 
 const (
-	FileNode NodeKind = iota
+	UnknownNode NodeKind = iota
+	FileNode
 
 	IdentifierTypeNode
 	PointerTypeNode
@@ -73,7 +76,7 @@ const (
 	StructExprNode
 	StructFieldExprNode
 	ArrayExprNode
-	NewArrayExprNode
+	AllocateArrayExprNode
 	BoolExprNode
 	NumberExprNode
 	StringExprNode
@@ -86,8 +89,8 @@ const (
 	MiscNode
 )
 
-func NodeKindFromToken(kind scanner.TokenKind) NodeKind {
-	switch kind {
+func NodeKindFromToken(token scanner.Token) NodeKind {
+	switch token.Kind {
 	case scanner.Identifier:
 		return IdentifierNode
 
@@ -99,7 +102,7 @@ func NodeKindFromToken(kind scanner.TokenKind) NodeKind {
 		return StringExprNode
 
 	default:
-		if scanner.IsKeyword(kind) {
+		if scanner.IsKeyword(token.Kind) {
 			return KeywordNode
 		}
 
@@ -121,6 +124,8 @@ func (n NodeKind) IsExpr() bool {
 
 func (n NodeKind) String() string {
 	switch n {
+	case UnknownNode:
+		return "Unknown"
 	case FileNode:
 		return "File"
 
@@ -185,8 +190,8 @@ func (n NodeKind) String() string {
 		return "Struct field"
 	case ArrayExprNode:
 		return "Array"
-	case NewArrayExprNode:
-		return "New array"
+	case AllocateArrayExprNode:
+		return "Allocate array"
 	case BoolExprNode:
 		return "Bool"
 	case NumberExprNode:

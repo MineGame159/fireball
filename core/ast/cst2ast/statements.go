@@ -30,130 +30,108 @@ func (c *converter) convertStmt(node cst.Node) ast.Stmt {
 }
 
 func (c *converter) convertExprStmt(node cst.Node) ast.Stmt {
-	e := &ast.Expression{Token_: node.Token}
+	var expr ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			e.Expr = c.convertExpr(child)
+			expr = c.convertExpr(child)
 		}
 	}
 
-	e.SetRangeToken(node.Token, tokenEnd(node))
-	e.SetChildrenParent()
-
-	return e
+	return ast.NewExpression(node, expr)
 }
 
 func (c *converter) convertBlockStmt(node cst.Node) ast.Stmt {
-	b := &ast.Block{Token_: node.Token}
+	var stmts []ast.Stmt
 
 	for _, child := range node.Children {
 		if child.Kind.IsStmt() {
-			b.Stmts = append(b.Stmts, c.convertStmt(child))
+			stmts = append(stmts, c.convertStmt(child))
 		}
 	}
 
-	b.SetRangeToken(node.Token, tokenEnd(node))
-	b.SetChildrenParent()
-
-	return b
+	return ast.NewBlock(node, stmts)
 }
 
 func (c *converter) convertVarStmt(node cst.Node) ast.Stmt {
-	v := &ast.Variable{InferType: true}
+	var name *ast.Token
+	var type_ ast.Type
+	var value ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			v.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
-			v.Type = c.convertType(child)
-			v.InferType = false
+			type_ = c.convertType(child)
 		} else if child.Kind.IsExpr() {
-			v.Initializer = c.convertExpr(child)
+			value = c.convertExpr(child)
 		}
 	}
 
-	v.SetRangeToken(node.Token, tokenEnd(node))
-	v.SetChildrenParent()
-
-	return v
+	return ast.NewVar(node, name, type_, value)
 }
 
 func (c *converter) convertIfStmt(node cst.Node) ast.Stmt {
-	i := &ast.If{Token_: node.Token}
+	var condition ast.Expr
+	var then ast.Stmt
+	var else_ ast.Stmt
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			i.Condition = c.convertExpr(child)
+			condition = c.convertExpr(child)
 		} else if child.Kind.IsStmt() {
-			if i.Then == nil {
-				i.Then = c.convertStmt(child)
+			if then == nil {
+				then = c.convertStmt(child)
 			} else {
-				i.Else = c.convertStmt(child)
+				else_ = c.convertStmt(child)
 			}
 		}
 	}
 
-	i.SetRangeToken(node.Token, tokenEnd(node))
-	i.SetChildrenParent()
-
-	return i
+	return ast.NewIf(node, condition, then, else_)
 }
 
 func (c *converter) convertForStmt(node cst.Node) ast.Stmt {
-	f := &ast.For{Token_: node.Token}
+	var initializer ast.Stmt
+	var condition ast.Expr
+	var increment ast.Expr
+	var body ast.Stmt
 
 	for _, child := range node.Children {
 		if child.Kind.IsStmt() {
-			if f.Initializer == nil {
-				f.Initializer = c.convertStmt(child)
+			if initializer == nil {
+				initializer = c.convertStmt(child)
 			} else {
-				f.Body = c.convertStmt(child)
+				body = c.convertStmt(child)
 			}
 		} else if child.Kind.IsExpr() {
-			if f.Condition == nil {
-				f.Condition = c.convertExpr(child)
+			if condition == nil {
+				condition = c.convertExpr(child)
 			} else {
-				f.Increment = c.convertExpr(child)
+				increment = c.convertExpr(child)
 			}
 		}
 	}
 
-	f.SetRangeToken(node.Token, tokenEnd(node))
-	f.SetChildrenParent()
-
-	return f
+	return ast.NewFor(node, initializer, condition, increment, body)
 }
 
 func (c *converter) convertReturnStmt(node cst.Node) ast.Stmt {
-	r := &ast.Return{Token_: node.Token}
+	var value ast.Expr
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
-			r.Expr = c.convertExpr(child)
+			value = c.convertExpr(child)
 		}
 	}
 
-	r.SetRangeToken(node.Token, tokenEnd(node))
-	r.SetChildrenParent()
-
-	return r
+	return ast.NewReturn(node, value)
 }
 
 func (c *converter) convertBreakStmt(node cst.Node) ast.Stmt {
-	b := &ast.Break{Token_: node.Token}
-
-	b.SetRangeToken(node.Token, tokenEnd(node))
-	b.SetChildrenParent()
-
-	return b
+	return ast.NewBreak(node)
 }
 
 func (c *converter) convertContinueStmt(node cst.Node) ast.Stmt {
-	co := &ast.Continue{Token_: node.Token}
-
-	co.SetRangeToken(node.Token, tokenEnd(node))
-	co.SetChildrenParent()
-
-	return co
+	return ast.NewContinue(node)
 }

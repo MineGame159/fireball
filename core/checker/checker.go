@@ -1,10 +1,8 @@
 package checker
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/scanner"
-	"fireball/core/types"
+	"fireball/core/fuckoff"
 	"fireball/core/utils"
 	"fmt"
 )
@@ -20,8 +18,7 @@ type checker struct {
 	typeExpr ast.Expr
 
 	reporter utils.Reporter
-	resolver utils.Resolver
-	decls    []ast.Decl
+	resolver fuckoff.Resolver
 }
 
 type scope struct {
@@ -30,34 +27,30 @@ type scope struct {
 }
 
 type variable struct {
-	name  scanner.Token
-	type_ types.Type
+	name  *ast.Token
+	type_ ast.Type
 
 	param bool
 	used  bool
 }
 
-func Check(reporter utils.Reporter, resolver utils.Resolver, decls []ast.Decl) {
+func Check(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) {
 	c := &checker{
 		reporter: reporter,
 		resolver: resolver,
-		decls:    decls,
 	}
 
-	reset(c, decls)
-
-	for _, decl := range decls {
-		c.AcceptDecl(decl)
-	}
+	reset(c, node)
+	c.VisitNode(node)
 }
 
 // Scope / Variables
 
-func (c *checker) hasVariableInScope(name scanner.Token) bool {
+func (c *checker) hasVariableInScope(name *ast.Token) bool {
 	scope := c.peekScope()
 
 	for i := scope.variableCount - 1; i >= 0; i-- {
-		if c.variables[scope.variableI+i].name.Lexeme == name.Lexeme {
+		if c.variables[scope.variableI+i].name.String() == name.String() {
 			return true
 		}
 	}
@@ -65,9 +58,9 @@ func (c *checker) hasVariableInScope(name scanner.Token) bool {
 	return false
 }
 
-func (c *checker) getVariable(name scanner.Token) *variable {
+func (c *checker) getVariable(name ast.Node) *variable {
 	for i := len(c.variables) - 1; i >= 0; i-- {
-		if c.variables[i].name.Lexeme == name.Lexeme {
+		if c.variables[i].name.String() == name.String() {
 			return &c.variables[i]
 		}
 	}
@@ -75,7 +68,7 @@ func (c *checker) getVariable(name scanner.Token) *variable {
 	return nil
 }
 
-func (c *checker) addVariable(name scanner.Token, type_ types.Type) *variable {
+func (c *checker) addVariable(name *ast.Token, type_ ast.Type) *variable {
 	c.variables = append(c.variables, variable{
 		name:  name,
 		type_: type_,
@@ -98,8 +91,8 @@ func (c *checker) popScope() {
 		for i := len(c.variables) - 1; i >= c.peekScope().variableI; i-- {
 			v := c.variables[i]
 
-			if !v.used && v.name.Lexeme[0] != '_' && (c.function.HasBody() || !v.param) {
-				c.warningToken(v.name, "Unused variable '%s'. Prefix with '_' to ignore.", v.name)
+			if !v.used && v.name.String()[0] != '_' && (c.function.HasBody() || !v.param) {
+				c.warning(v.name, "Unused variable '%s'. Prefix with '_' to ignore.", v.name)
 			}
 		}
 	}
@@ -113,50 +106,38 @@ func (c *checker) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
 }
 
-// ast.Acceptor
+// ast.Visit
 
-func (c *checker) AcceptDecl(decl ast.Decl) {
-	decl.Accept(c)
-}
+func (c *checker) VisitNode(node ast.Node) {
+	switch node := node.(type) {
+	case ast.Decl:
+		node.AcceptDecl(c)
 
-func (c *checker) AcceptStmt(stmt ast.Stmt) {
-	stmt.Accept(c)
-}
+	case ast.Stmt:
+		node.AcceptStmt(c)
 
-func (c *checker) AcceptExpr(expr ast.Expr) {
-	expr.Accept(c)
+	case ast.Expr:
+		node.AcceptExpr(c)
+
+	default:
+		node.AcceptChildren(c)
+	}
 }
 
 // Diagnostics
 
-func (c *checker) errorRange(range_ core.Range, format string, args ...any) {
+func (c *checker) error(node ast.Node, format string, args ...any) {
 	c.reporter.Report(utils.Diagnostic{
 		Kind:    utils.ErrorKind,
-		Range:   range_,
+		Range:   node.Cst().Range,
 		Message: fmt.Sprintf(format, args...),
 	})
 }
 
-func (c *checker) errorToken(token scanner.Token, format string, args ...any) {
-	c.reporter.Report(utils.Diagnostic{
-		Kind:    utils.ErrorKind,
-		Range:   core.TokenToRange(token),
-		Message: fmt.Sprintf(format, args...),
-	})
-}
-
-func (c *checker) warningRange(range_ core.Range, format string, args ...any) {
+func (c *checker) warning(node ast.Node, format string, args ...any) {
 	c.reporter.Report(utils.Diagnostic{
 		Kind:    utils.WarningKind,
-		Range:   range_,
-		Message: fmt.Sprintf(format, args...),
-	})
-}
-
-func (c *checker) warningToken(token scanner.Token, format string, args ...any) {
-	c.reporter.Report(utils.Diagnostic{
-		Kind:    utils.WarningKind,
-		Range:   core.TokenToRange(token),
+		Range:   node.Cst().Range,
 		Message: fmt.Sprintf(format, args...),
 	})
 }

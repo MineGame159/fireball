@@ -1,13 +1,11 @@
 package workspace
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/ast/cst2ast"
 	"fireball/core/checker"
 	"fireball/core/cst"
 	"fireball/core/typeresolver"
-	"fireball/core/types"
 	"fireball/core/utils"
 	"fmt"
 	"math"
@@ -20,10 +18,10 @@ type File struct {
 
 	Text string
 
-	Cst   cst.Node
-	Decls []ast.Decl
+	Cst cst.Node
+	Ast *ast.File
 
-	Types     map[string]types.Type
+	Types     map[string]ast.Type
 	Functions map[string]*ast.Func
 
 	Data any
@@ -47,16 +45,16 @@ func (f *File) SetText(text string, parse bool) {
 
 		// Parse
 		f.Cst = cst.Parse(f, text)
-		f.Decls = cst2ast.Convert(f, f.Cst)
+		f.Ast = cst2ast.Convert(f, f.Cst)
 
 		f.CollectTypesAndFunctions()
-		typeresolver.Resolve(f, f.Project, f.Decls)
+		typeresolver.Resolve(f, f.Project, f.Ast)
 
 		f.parseWaitGroup.Done()
 
 		// Check
 		for _, file := range f.Project.Files {
-			checker.Check(file, file.Project, file.Decls)
+			checker.Check(file, file.Project, file.Ast)
 			file.checkWaitGroup.Done()
 		}
 	}
@@ -71,80 +69,80 @@ func (f *File) EnsureChecked() {
 }
 
 func (f *File) CollectTypesAndFunctions() {
-	typeMap := make(map[string]types.Type)
+	typeMap := make(map[string]ast.Type)
 	functionMap := make(map[string]*ast.Func)
 
-	for _, decl := range f.Decls {
+	for _, decl := range f.Ast.Decls {
 		if struct_, ok := decl.(*ast.Struct); ok {
 			// Struct
-			if _, ok := typeMap[struct_.Name.Lexeme]; ok {
+			if _, ok := typeMap[struct_.Name.String()]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
-					Range:   core.TokenToRange(struct_.Name),
+					Range:   struct_.Name.Cst().Range,
 					Message: fmt.Sprintf("Type with the name '%s' aleady exists.", struct_.Name),
 				})
 			} else {
-				typeMap[struct_.Name.Lexeme] = struct_
+				typeMap[struct_.Name.String()] = struct_
 			}
 		} else if enum, ok := decl.(*ast.Enum); ok {
 			// Enum
 			if enum.Type == nil {
-				minValue := math.MaxInt
-				maxValue := math.MinInt
+				minValue := int64(math.MaxInt64)
+				maxValue := int64(math.MinInt64)
 
 				for _, case_ := range enum.Cases {
-					minValue = min(minValue, case_.Value)
-					maxValue = max(maxValue, case_.Value)
+					minValue = min(minValue, case_.ActualValue)
+					maxValue = max(maxValue, case_.ActualValue)
 				}
 
-				var kind types.PrimitiveKind
+				var kind ast.PrimitiveKind
 
 				if minValue >= 0 {
 					// Unsigned
 					if maxValue <= math.MaxUint8 {
-						kind = types.U8
+						kind = ast.U8
 					} else if maxValue <= math.MaxUint16 {
-						kind = types.U16
+						kind = ast.U16
 					} else if maxValue <= math.MaxUint32 {
-						kind = types.U32
+						kind = ast.U32
 					} else {
-						kind = types.U64
+						kind = ast.U64
 					}
 				} else {
 					// Signed
 					if minValue >= math.MinInt8 && maxValue <= math.MaxInt8 {
-						kind = types.I8
+						kind = ast.I8
 					} else if minValue >= math.MinInt16 && maxValue <= math.MaxInt16 {
-						kind = types.I16
+						kind = ast.I16
 					} else if minValue >= math.MinInt32 && maxValue <= math.MaxInt32 {
-						kind = types.I32
+						kind = ast.I32
 					} else {
-						kind = types.I64
+						kind = ast.I64
 					}
 				}
 
-				enum.Type = types.Primitive(kind, core.Range{})
+				enum.ActualType = &ast.Primitive{Kind: kind}
 			}
 
-			if _, ok := typeMap[enum.Name.Lexeme]; ok {
+			if _, ok := typeMap[enum.Name.String()]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
-					Range:   core.TokenToRange(enum.Name),
+					Range:   enum.Name.Cst().Range,
 					Message: fmt.Sprintf("Type with the name '%s' aleady exists.", enum.Name),
 				})
 			} else {
-				typeMap[enum.Name.Lexeme] = enum
+				typeMap[enum.Name.String()] = enum
 			}
 		} else if function, ok := decl.(*ast.Func); ok {
 			// Function
-			if _, ok := functionMap[function.Name.Lexeme]; ok {
+			if _, ok := functionMap[function.Name.String()]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
-					Range:   core.TokenToRange(function.Name),
+					Range:   function.Name.Cst().Range,
 					Message: fmt.Sprintf("Function with the name '%s' already exists.", function.Name),
 				})
 			} else {
-				functionMap[function.Name.Lexeme] = function
+				functionMap[function.Name.String()] = function
 			}
 		}
 	}

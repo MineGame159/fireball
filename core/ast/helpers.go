@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"fireball/core/types"
 	"fmt"
 	"reflect"
 	"strings"
@@ -9,9 +8,9 @@ import (
 
 func (s *Struct) GetStaticField(name string) (int, *Field) {
 	for i := range s.StaticFields {
-		field := &s.StaticFields[i]
+		field := s.StaticFields[i]
 
-		if field.Name.Lexeme == name {
+		if field.Name.String() == name {
 			return i, field
 		}
 	}
@@ -21,9 +20,9 @@ func (s *Struct) GetStaticField(name string) (int, *Field) {
 
 func (s *Struct) GetField(name string) (int, *Field) {
 	for i := range s.Fields {
-		field := &s.Fields[i]
+		field := s.Fields[i]
 
-		if field.Name.Lexeme == name {
+		if field.Name.String() == name {
 			return i, field
 		}
 	}
@@ -37,10 +36,8 @@ func (i *Impl) GetMethod(name string, static bool) *Func {
 		staticValue = 1
 	}
 
-	for _, decl := range i.Functions {
-		function := decl.(*Func)
-
-		if function.Name.Lexeme == name && function.Flags&Static == staticValue {
+	for _, function := range i.Methods {
+		if function.Name.String() == name && function.Flags&Static == staticValue {
 			return function
 		}
 	}
@@ -50,9 +47,9 @@ func (i *Impl) GetMethod(name string, static bool) *Func {
 
 func (e *Enum) GetCase(name string) *EnumCase {
 	for i := range e.Cases {
-		case_ := &e.Cases[i]
+		case_ := e.Cases[i]
 
-		if case_.Name.Lexeme == name {
+		if case_.Name.String() == name {
 			return case_
 		}
 	}
@@ -90,12 +87,12 @@ func (f *Func) GetAttribute(attribute any) bool {
 }
 
 func (f *Func) HasBody() bool {
-	var extern types.ExternAttribute
+	var extern ExternAttribute
 	if f.GetAttribute(&extern) {
 		return false
 	}
 
-	var intrinsic types.IntrinsicAttribute
+	var intrinsic IntrinsicAttribute
 	if f.GetAttribute(&intrinsic) {
 		return false
 	}
@@ -113,7 +110,7 @@ func (f *Func) Signature(paramNames bool) string {
 		}
 
 		if paramNames {
-			signature.WriteString(param.Name.Lexeme)
+			signature.WriteString(param.Name.String())
 			signature.WriteRune(' ')
 		}
 
@@ -122,7 +119,7 @@ func (f *Func) Signature(paramNames bool) string {
 
 	signature.WriteRune(')')
 
-	if !types.IsPrimitive(f.Returns, types.Void) {
+	if !IsPrimitive(f.Returns, Void) {
 		signature.WriteRune(' ')
 		signature.WriteString(f.Returns.String())
 	}
@@ -132,7 +129,7 @@ func (f *Func) Signature(paramNames bool) string {
 
 func (f *Func) Method() *Struct {
 	if impl, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
-		return impl.Type_
+		return impl.Type.(*Struct)
 	}
 
 	return nil
@@ -140,16 +137,20 @@ func (f *Func) Method() *Struct {
 
 func (f *Func) MangledName() string {
 	// Extern
-	var extern types.ExternAttribute
+	var extern ExternAttribute
 	if f.GetAttribute(&extern) {
 		return extern.Name
 	}
 
 	// Normal
-	name := f.Name.Lexeme
+	name := ""
+
+	if f.Name != nil {
+		name = f.Name.String()
+	}
 
 	if struct_, ok := f.Parent().(*Impl); ok {
-		name = fmt.Sprintf("%s.%s", struct_, name)
+		name = fmt.Sprintf("%s.%s", struct_.Struct, name)
 	}
 
 	return "fb$" + name

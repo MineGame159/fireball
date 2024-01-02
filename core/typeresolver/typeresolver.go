@@ -1,9 +1,10 @@
 package typeresolver
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/types"
+	"fireball/core/cst"
+	"fireball/core/fuckoff"
+	"fireball/core/scanner"
 	"fireball/core/utils"
 	"fmt"
 )
@@ -12,88 +13,81 @@ type typeResolver struct {
 	expr ast.Expr
 
 	reporter utils.Reporter
-	resolver utils.Resolver
+	resolver fuckoff.Resolver
 }
 
-func Resolve(reporter utils.Reporter, resolver utils.Resolver, decls []ast.Decl) {
-	r := &typeResolver{
+func Resolve(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) {
+	r := typeResolver{
 		reporter: reporter,
 		resolver: resolver,
 	}
 
-	for _, decl := range decls {
-		r.AcceptDecl(decl)
-	}
+	r.VisitNode(node)
 }
 
 // Declarations
 
-func (r *typeResolver) visitImpl(decl *ast.Impl) {
-	type_, _ := r.resolver.GetType(decl.Struct.Lexeme)
+func (t *typeResolver) visitImpl(decl *ast.Impl) {
+	type_, _ := t.resolver.GetType(decl.Struct.Token().Lexeme)
 
 	if s, ok := type_.(*ast.Struct); ok {
-		decl.Type_ = s
+		decl.Type = s
 	} else {
-		r.reporter.Report(utils.Diagnostic{
+		t.reporter.Report(utils.Diagnostic{
 			Kind:    utils.ErrorKind,
-			Range:   core.TokenToRange(decl.Struct),
-			Message: fmt.Sprintf("Struct with the name '%s' does not exist.", decl.Struct),
+			Range:   decl.Struct.Cst().Range,
+			Message: fmt.Sprintf("Struct with the name '%s' does not exist", decl.Struct.Token()),
 		})
 
-		decl.Type_ = nil
+		decl.Type = nil
 	}
+
+	decl.AcceptChildren(t)
 }
 
-// types.PtrVisitor
+// Types
 
-func (r *typeResolver) VisitType(type_ *types.Type) {
-	if v, ok := (*type_).(*types.UnresolvedType); ok {
-		if t, _ := r.resolver.GetType(v.Identifier.Lexeme); t != nil {
-			*type_ = t.WithRange(v.Range())
+func (t *typeResolver) visitType(type_ ast.Type) {
+	if resolvable, ok := type_.(*ast.Resolvable); ok {
+		if resolved, _ := t.resolver.GetType(resolvable.Token().Lexeme); resolved != nil {
+			resolvable.Type = resolved
 		} else {
-			r.reporter.Report(utils.Diagnostic{
+			t.reporter.Report(utils.Diagnostic{
 				Kind:    utils.ErrorKind,
-				Range:   v.Range(),
-				Message: fmt.Sprintf("Unknown type '%s'.", v),
+				Range:   resolvable.Cst().Range,
+				Message: fmt.Sprintf("Unknown type '%s'", resolvable.Token()),
 			})
 
-			*type_ = types.Primitive(types.Void, v.Range())
+			resolvable.Type = ast.NewPrimitive(cst.Node{}, ast.Void, scanner.Token{})
 
-			if r.expr != nil {
-				r.expr.Result().SetInvalid()
+			if t.expr != nil {
+				t.expr.Result().SetInvalid()
 			}
 		}
 	}
 
-	if *type_ != nil {
-		(*type_).AcceptTypesPtr(r)
-	}
+	type_.AcceptChildren(t)
 }
 
-// ast.Acceptor
+// ast.Visitor
 
-func (r *typeResolver) AcceptDecl(decl ast.Decl) {
-	switch decl := decl.(type) {
+func (t *typeResolver) VisitNode(node ast.Node) {
+	switch node := node.(type) {
 	case *ast.Impl:
-		r.visitImpl(decl)
+		t.visitImpl(node)
+
+	case ast.Expr:
+		prevTypeExpr := t.expr
+		t.expr = node
+
+		node.AcceptChildren(t)
+
+		t.expr = prevTypeExpr
+
+	case ast.Type:
+		t.visitType(node)
+
+	default:
+		node.AcceptChildren(t)
 	}
-
-	decl.AcceptChildren(r)
-	decl.AcceptTypesPtr(r)
-}
-
-func (r *typeResolver) AcceptStmt(stmt ast.Stmt) {
-	stmt.AcceptChildren(r)
-	stmt.AcceptTypesPtr(r)
-}
-
-func (r *typeResolver) AcceptExpr(expr ast.Expr) {
-	expr.AcceptChildren(r)
-
-	prevTypeExpr := r.expr
-	r.expr = expr
-
-	expr.AcceptTypesPtr(r)
-
-	r.expr = prevTypeExpr
 }

@@ -1,12 +1,9 @@
 package cst2ast
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/cst"
 	"fireball/core/scanner"
-	"fireball/core/types"
-	"strconv"
 )
 
 func (c *converter) convertDecl(node cst.Node) ast.Decl {
@@ -28,172 +25,172 @@ func (c *converter) convertDecl(node cst.Node) ast.Decl {
 // Struct
 
 func (c *converter) convertStructDecl(node cst.Node) ast.Decl {
-	s := &ast.Struct{}
+	var name *ast.Token
+	var fields []*ast.Field
+	var staticFields []*ast.Field
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			s.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind == cst.StructFieldNode {
-			field, static := c.convertStructField(s, child)
+			field, static := c.convertStructField(child)
 
 			if static {
-				s.StaticFields = append(s.StaticFields, field)
+				staticFields = append(staticFields, field)
 			} else {
-				s.Fields = append(s.Fields, field)
+				fields = append(fields, field)
 			}
 		} else if child.Kind == cst.AttributesNode {
-			c.error(child.Children[0].Token, "Structs cannot have attributes")
+			c.error(child.Children[0], "Structs cannot have attributes")
 		}
 	}
 
-	s.SetRangeToken(node.Token, tokenEnd(node))
-	s.SetChildrenParent()
-
-	return s
+	return ast.NewStruct(node, name, fields, staticFields)
 }
 
-func (c *converter) convertStructField(s *ast.Struct, node cst.Node) (ast.Field, bool) {
-	f := ast.Field{Parent: s}
+func (c *converter) convertStructField(node cst.Node) (*ast.Field, bool) {
+	var name *ast.Token
+	var type_ ast.Type
+
 	static := false
 
 	for _, child := range node.Children {
 		if child.Token.Kind == scanner.Static {
 			static = true
 		} else if child.Kind == cst.IdentifierNode {
-			f.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
-			f.Type = c.convertType(child)
+			type_ = c.convertType(child)
 		}
 	}
 
-	return f, static
+	return ast.NewField(node, name, type_), static
 }
 
 // Impl
 
 func (c *converter) convertImplDecl(node cst.Node) ast.Decl {
-	i := &ast.Impl{}
+	var struct_ *ast.Token
+	var methods []*ast.Func
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			i.Struct = child.Token
+			struct_ = c.convertToken(child)
 		} else if child.Kind == cst.FuncNode {
-			i.Functions = append(i.Functions, c.convertFuncDecl(child))
+			methods = append(methods, c.convertFuncDecl(child))
 		} else if child.Kind == cst.AttributesNode {
-			c.error(child.Children[0].Token, "Implementations cannot have attributes")
+			c.error(child.Children[0], "Implementations cannot have attributes")
 		}
 	}
 
-	i.SetRangeToken(node.Token, tokenEnd(node))
-	i.SetChildrenParent()
-
-	return i
+	return ast.NewImpl(node, struct_, methods)
 }
 
 // Enum
 
 func (c *converter) convertEnumDecl(node cst.Node) ast.Decl {
-	e := &ast.Enum{InferType: true}
+	var name *ast.Token
+	var type_ ast.Type
+	var cases []*ast.EnumCase
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			e.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
-			e.Type = c.convertType(child)
-			e.InferType = false
+			type_ = c.convertType(child)
 		} else if child.Kind == cst.EnumCaseNode {
-			e.Cases = append(e.Cases, c.convertEnumCase(child))
+			cases = append(cases, c.convertEnumCase(child))
 		} else if child.Kind == cst.AttributesNode {
-			c.error(child.Children[0].Token, "Enums cannot have attributes")
+			c.error(child.Children[0], "Enums cannot have attributes")
 		}
 	}
 
-	e.SetRangeToken(node.Token, tokenEnd(node))
-	e.SetChildrenParent()
-
-	return e
+	return ast.NewEnum(node, name, type_, cases)
 }
 
-func (c *converter) convertEnumCase(node cst.Node) ast.EnumCase {
-	e := ast.EnumCase{InferValue: true}
+func (c *converter) convertEnumCase(node cst.Node) *ast.EnumCase {
+	var name *ast.Token
+	var value *ast.Token
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			e.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind == cst.NumberExprNode {
-			value, _ := strconv.ParseInt(child.Token.Lexeme, 10, 32)
-
-			e.Value = int(value)
-			e.InferValue = false
+			value = c.convertToken(child)
 		}
 	}
 
-	return e
+	return ast.NewEnumCase(node, name, value)
 }
 
 // Func
 
-func (c *converter) convertFuncDecl(node cst.Node) ast.Decl {
-	f := &ast.Func{}
+func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
+	var attributes []any
+	var flags ast.FuncFlags
+	var name *ast.Token
+	var params []*ast.Param
+	var returns ast.Type
+	var body []ast.Stmt
+
 	reported := false
 
-	for i, child := range node.Children {
+	for _, child := range node.Children {
 		if child.Token.Kind == scanner.Static {
-			f.Flags |= ast.Static
+			flags |= ast.Static
 		} else if child.Kind == cst.IdentifierNode {
-			f.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind == cst.FuncParamNode {
 			param, varArgs := c.convertFuncParam(child)
 
 			if varArgs {
-				f.Flags |= ast.Variadic
+				flags |= ast.Variadic
 			} else {
-				if f.IsVariadic() && !reported {
-					c.error(node.Children[i-2].Children[0].Token, "Variadic arguments can only appear at the end of the parameter list")
+				if flags&ast.Variadic != 0 && !reported {
+					c.error(child, "Variadic arguments can only appear at the end of the parameter list")
 					reported = true
 				}
 
-				f.Params = append(f.Params, param)
+				params = append(params, param)
 			}
 		} else if child.Kind.IsType() {
-			f.Returns = c.convertType(child)
+			returns = c.convertType(child)
 		} else if child.Kind.IsStmt() {
-			f.Body = append(f.Body, c.convertStmt(child))
+			body = append(body, c.convertStmt(child))
 		} else if child.Kind == cst.AttributesNode {
-			f.Attributes = c.convertAttributes(child)
+			attributes = c.convertAttributes(child)
 		}
 	}
 
-	var extern types.ExternAttribute
-	var intrinsic types.IntrinsicAttribute
+	var extern ast.ExternAttribute
+	var intrinsic ast.IntrinsicAttribute
 
-	if !node.Contains(scanner.LeftBrace) && !f.GetAttribute(&extern) && !f.GetAttribute(&intrinsic) {
-		c.error(f.Name, "Functions without the extern or intrinsic attribute need to have a body")
+	if !node.Contains(scanner.LeftBrace) && !ast.GetAttribute(attributes, &extern) && !ast.GetAttribute(attributes, &intrinsic) {
+		c.error(node, "Functions without the extern or intrinsic attribute need to have a body")
 	}
 
-	if f.Returns == nil {
-		f.Returns = types.Primitive(types.Void, core.Range{})
+	if returns == nil {
+		returns = ast.NewPrimitive(cst.Node{}, ast.Void, scanner.Token{})
 	}
 
-	f.SetRangeToken(node.Token, tokenEnd(node))
-	f.SetChildrenParent()
-
-	return f
+	return ast.NewFunc(node, attributes, flags, name, params, returns, body)
 }
 
-func (c *converter) convertFuncParam(node cst.Node) (ast.Param, bool) {
-	p := ast.Param{}
+func (c *converter) convertFuncParam(node cst.Node) (*ast.Param, bool) {
+	var name *ast.Token
+	var type_ ast.Type
+
 	varArgs := false
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			p.Name = child.Token
+			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
-			p.Type = c.convertType(child)
+			type_ = c.convertType(child)
 		} else if child.Token.Kind == scanner.DotDotDot {
 			varArgs = true
 		}
 	}
 
-	return p, varArgs
+	return ast.NewParam(node, name, type_), varArgs
 }

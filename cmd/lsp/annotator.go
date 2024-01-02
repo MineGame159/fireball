@@ -3,7 +3,6 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/scanner"
 	"fmt"
 	"github.com/MineGame159/protocol"
 )
@@ -13,142 +12,52 @@ type annotator struct {
 	hints     []protocol.InlayHint
 }
 
-func annotate(decls []ast.Decl) []protocol.InlayHint {
+func annotate(node ast.Node) []protocol.InlayHint {
 	a := annotator{
 		functions: make(map[string]*ast.Func),
 		hints:     make([]protocol.InlayHint, 0, 16),
 	}
 
-	for _, decl := range decls {
+	for _, decl := range node.(*ast.File).Decls {
 		if f, ok := decl.(*ast.Func); ok {
-			a.functions[f.Name.Lexeme] = f
+			a.functions[f.Name.String()] = f
 		}
 	}
 
-	for _, decl := range decls {
-		a.AcceptDecl(decl)
-	}
+	a.VisitNode(node)
 
 	return a.hints
 }
 
 // Declarations
 
-func (a *annotator) VisitStruct(decl *ast.Struct) {
-	decl.AcceptChildren(a)
-}
-
-func (a *annotator) VisitImpl(decl *ast.Impl) {
-	decl.AcceptChildren(a)
-}
-
-func (a *annotator) VisitEnum(decl *ast.Enum) {
-	if decl.InferType {
-		a.addToken(decl.Name, " "+decl.Type.String(), protocol.InlayHintKindType)
+func (a *annotator) visitEnum(decl *ast.Enum) {
+	if decl.Type == nil {
+		a.addToken(decl.Name, " "+ast.PrintType(decl.ActualType), protocol.InlayHintKindType)
 	}
 
 	for _, case_ := range decl.Cases {
-		if case_.InferValue {
-			a.addToken(case_.Name, fmt.Sprintf(" = %d", case_.Value), protocol.InlayHintKindParameter)
+		if case_.Value == nil {
+			a.addToken(case_.Name, fmt.Sprintf(" = %d", case_.ActualValue), protocol.InlayHintKindParameter)
 		}
 	}
 
 	decl.AcceptChildren(a)
 }
 
-func (a *annotator) VisitFunc(decl *ast.Func) {
-	decl.AcceptChildren(a)
-}
-
 // Statements
 
-func (a *annotator) VisitBlock(stmt *ast.Block) {
-	stmt.AcceptChildren(a)
-}
-
-func (a *annotator) VisitExpression(stmt *ast.Expression) {
-	stmt.AcceptChildren(a)
-}
-
-func (a *annotator) VisitVariable(stmt *ast.Variable) {
-	if stmt.InferType {
-		a.addToken(stmt.Name, " "+stmt.Type.String(), protocol.InlayHintKindType)
+func (a *annotator) visitVar(stmt *ast.Var) {
+	if stmt.Type == nil {
+		a.addToken(stmt.Name, " "+ast.PrintType(stmt.ActualType), protocol.InlayHintKindType)
 	}
 
 	stmt.AcceptChildren(a)
 }
 
-func (a *annotator) VisitIf(stmt *ast.If) {
-	stmt.AcceptChildren(a)
-}
-
-func (a *annotator) VisitFor(stmt *ast.For) {
-	stmt.AcceptChildren(a)
-}
-
-func (a *annotator) VisitReturn(stmt *ast.Return) {
-	stmt.AcceptChildren(a)
-}
-
-func (a *annotator) VisitBreak(stmt *ast.Break) {
-	stmt.AcceptChildren(a)
-}
-
-func (a *annotator) VisitContinue(stmt *ast.Continue) {
-	stmt.AcceptChildren(a)
-}
-
 // Expressions
 
-func (a *annotator) VisitGroup(expr *ast.Group) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitLiteral(expr *ast.Literal) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitStructInitializer(expr *ast.StructInitializer) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitArrayInitializer(expr *ast.ArrayInitializer) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitNewArray(expr *ast.NewArray) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitUnary(expr *ast.Unary) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitBinary(expr *ast.Binary) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitLogical(expr *ast.Logical) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitIdentifier(expr *ast.Identifier) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitAssignment(expr *ast.Assignment) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitCast(expr *ast.Cast) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitTypeCall(expr *ast.TypeCall) {
-	expr.AcceptChildren(a)
-}
-
-func (a *annotator) VisitCall(expr *ast.Call) {
+func (a *annotator) visitCall(expr *ast.Call) {
 	if false {
 		if expr.Callee.Result().Kind == ast.FunctionResultKind {
 			function := expr.Callee.Result().Function
@@ -159,7 +68,10 @@ func (a *annotator) VisitCall(expr *ast.Call) {
 				}
 
 				param := function.Params[i]
-				a.add(arg.Range().Start, param.Name.Lexeme+": ", protocol.InlayHintKindParameter)
+
+				if arg.Cst() != nil {
+					a.add(arg.Cst().Range.Start, param.Name.String()+": ", protocol.InlayHintKindParameter)
+				}
 			}
 		}
 	}
@@ -167,32 +79,30 @@ func (a *annotator) VisitCall(expr *ast.Call) {
 	expr.AcceptChildren(a)
 }
 
-func (a *annotator) VisitIndex(expr *ast.Index) {
-	expr.AcceptChildren(a)
-}
+// ast.Visitor
 
-func (a *annotator) VisitMember(expr *ast.Member) {
-	expr.AcceptChildren(a)
-}
+func (a *annotator) VisitNode(node ast.Node) {
+	switch node := node.(type) {
+	case *ast.Enum:
+		a.visitEnum(node)
 
-// ast.Acceptor
+	case *ast.Var:
+		a.visitVar(node)
 
-func (a *annotator) AcceptDecl(decl ast.Decl) {
-	decl.Accept(a)
-}
+	case *ast.Call:
+		a.visitCall(node)
 
-func (a *annotator) AcceptStmt(stmt ast.Stmt) {
-	stmt.Accept(a)
-}
-
-func (a *annotator) AcceptExpr(expr ast.Expr) {
-	expr.Accept(a)
+	default:
+		node.AcceptChildren(a)
+	}
 }
 
 // Utils
 
-func (a *annotator) addToken(token scanner.Token, text string, kind protocol.InlayHintKind) {
-	a.add(core.TokenToPos(token, true), text, kind)
+func (a *annotator) addToken(node ast.Node, text string, kind protocol.InlayHintKind) {
+	if node.Cst() != nil {
+		a.add(node.Cst().Range.End, text, kind)
+	}
 }
 
 func (a *annotator) add(pos core.Pos, text string, kind protocol.InlayHintKind) {

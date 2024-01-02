@@ -1,9 +1,8 @@
 package llvm
 
-type Location interface {
-	Line() int
-	Column() int
-}
+import (
+	"fireball/core/cst"
+)
 
 type Module struct {
 	source string
@@ -147,7 +146,7 @@ func (m *Module) Void() Type {
 	return &voidType{}
 }
 
-func (m *Module) Primitive(name string, bitSize int, encoding Encoding) Type {
+func (m *Module) Primitive(name string, bitSize uint32, encoding Encoding) Type {
 	t := &primitiveType{
 		name:     name,
 		bitSize:  bitSize,
@@ -163,7 +162,7 @@ func (m *Module) Primitive(name string, bitSize int, encoding Encoding) Type {
 			},
 			{
 				Name:  "size",
-				Value: numberMetadataValue(bitSize),
+				Value: numberMetadataValue(int(bitSize)),
 			},
 			{
 				Name:  "encoding",
@@ -176,7 +175,7 @@ func (m *Module) Primitive(name string, bitSize int, encoding Encoding) Type {
 	return t
 }
 
-func (m *Module) Array(name string, count int, base Type) Type {
+func (m *Module) Array(name string, count uint32, base Type) Type {
 	t := &arrayType{
 		name:  name,
 		count: count,
@@ -196,7 +195,7 @@ func (m *Module) Array(name string, count int, base Type) Type {
 			},
 			{
 				Name:  "size",
-				Value: numberMetadataValue(t.Size()),
+				Value: numberMetadataValue(int(t.Size())),
 			},
 			{
 				Name: "elements",
@@ -206,7 +205,7 @@ func (m *Module) Array(name string, count int, base Type) Type {
 						Fields: []MetadataField{
 							{
 								Name:  "count",
-								Value: numberMetadataValue(count),
+								Value: numberMetadataValue(int(count)),
 							},
 						},
 					}))},
@@ -238,7 +237,7 @@ func (m *Module) Pointer(name string, pointee Type) Type {
 			},
 			{
 				Name:  "size",
-				Value: numberMetadataValue(t.Size()),
+				Value: numberMetadataValue(int(t.Size())),
 			},
 		},
 	})
@@ -281,7 +280,7 @@ func (m *Module) Function(name string, parameters []Type, variadic bool, returns
 	return t
 }
 
-func (m *Module) Struct(name string, size int, fields []Field) Type {
+func (m *Module) Struct(name string, size uint32, fields []Field) Type {
 	t := &structType{
 		name:   name,
 		size:   size,
@@ -316,7 +315,7 @@ func (m *Module) Struct(name string, size int, fields []Field) Type {
 				},
 				{
 					Name:  "offset",
-					Value: numberMetadataValue(field.Offset),
+					Value: numberMetadataValue(int(field.Offset)),
 				},
 			},
 		}))}
@@ -340,7 +339,7 @@ func (m *Module) Struct(name string, size int, fields []Field) Type {
 			},
 			{
 				Name:  "size",
-				Value: numberMetadataValue(size),
+				Value: numberMetadataValue(int(size)),
 			},
 			{
 				Name:  "flags",
@@ -376,7 +375,7 @@ func (m *Module) Alias(name string, underlying Type) Type {
 			},
 			{
 				Name:  "size",
-				Value: numberMetadataValue(underlying.Size()),
+				Value: numberMetadataValue(int(underlying.Size())),
 			},
 		},
 	})
@@ -466,28 +465,33 @@ func (m *Module) Variable(external bool, type_ Type, ptr Type) NameableValue {
 
 // Metadata
 
-func (m *Module) PushScope(location Location) {
+func (m *Module) PushScope(node *cst.Node) {
+	fields := []MetadataField{
+		{
+			Name:  "scope",
+			Value: refMetadataValue(m.getScope()),
+		},
+		{
+			Name:  "file",
+			Value: refMetadataValue(m.getFile()),
+		},
+	}
+
+	if node != nil {
+		fields = append(fields, MetadataField{
+			Name:  "line",
+			Value: numberMetadataValue(int(node.Range.Start.Line)),
+		})
+		fields = append(fields, MetadataField{
+			Name:  "column",
+			Value: numberMetadataValue(int(node.Range.Start.Column)),
+		})
+	}
+
 	m.scopes = append(m.scopes, m.addMetadata(Metadata{
 		Distinct: true,
 		Type:     "DILexicalBlock",
-		Fields: []MetadataField{
-			{
-				Name:  "scope",
-				Value: refMetadataValue(m.getScope()),
-			},
-			{
-				Name:  "file",
-				Value: refMetadataValue(m.getFile()),
-			},
-			{
-				Name:  "line",
-				Value: numberMetadataValue(location.Line()),
-			},
-			{
-				Name:  "column",
-				Value: numberMetadataValue(location.Line()),
-			},
-		},
+		Fields:   fields,
 	}))
 }
 

@@ -1,13 +1,17 @@
 package scanner
 
+import (
+	"fireball/core"
+)
+
 type Scanner struct {
 	text string
 
 	startI   int
 	currentI int
 
-	line   int
-	column int
+	line   uint16
+	column uint16
 }
 
 func NewScanner(text string) *Scanner {
@@ -19,7 +23,7 @@ func NewScanner(text string) *Scanner {
 	}
 }
 
-func (s *Scanner) Next() Token {
+func (s *Scanner) Next() PositionedToken {
 	s.skipWhitespace()
 	s.startI = s.currentI
 
@@ -137,7 +141,7 @@ func (s *Scanner) Next() Token {
 	return s.error("Unexpected character.")
 }
 
-func (s *Scanner) identifier() Token {
+func (s *Scanner) identifier() PositionedToken {
 	for isAlpha(s.peek()) || isDigit(s.peek()) {
 		s.advance()
 	}
@@ -221,7 +225,7 @@ func (s *Scanner) checkKeyword(start int, rest string, kind TokenKind) TokenKind
 	return Identifier
 }
 
-func (s *Scanner) number(c uint8) Token {
+func (s *Scanner) number(c uint8) PositionedToken {
 	next := s.peek()
 
 	// Hex
@@ -240,7 +244,7 @@ func (s *Scanner) number(c uint8) Token {
 	return s.integerOrFloat()
 }
 
-func (s *Scanner) integerOrFloat() Token {
+func (s *Scanner) integerOrFloat() PositionedToken {
 	for isDigit(s.peek()) {
 		s.advance()
 	}
@@ -260,7 +264,7 @@ func (s *Scanner) integerOrFloat() Token {
 	return s.make(Number)
 }
 
-func (s *Scanner) hex() Token {
+func (s *Scanner) hex() PositionedToken {
 	for isHex(s.peek()) {
 		s.advance()
 	}
@@ -268,7 +272,7 @@ func (s *Scanner) hex() Token {
 	return s.make(Hex)
 }
 
-func (s *Scanner) binary() Token {
+func (s *Scanner) binary() PositionedToken {
 	for isBinary(s.peek()) {
 		s.advance()
 	}
@@ -276,7 +280,7 @@ func (s *Scanner) binary() Token {
 	return s.make(Binary)
 }
 
-func (s *Scanner) string() Token {
+func (s *Scanner) string() PositionedToken {
 	for s.peek() != '"' && !s.isAtEnd() {
 		if s.peek() == '\n' {
 			s.line++
@@ -293,7 +297,7 @@ func (s *Scanner) string() Token {
 	return s.make(String)
 }
 
-func (s *Scanner) character() Token {
+func (s *Scanner) character() PositionedToken {
 	if s.isAtEnd() || s.peek() == '\'' {
 		return s.error("Empty character.")
 	}
@@ -314,7 +318,7 @@ func (s *Scanner) character() Token {
 	return s.make(Character)
 }
 
-func (s *Scanner) matchToken(expected uint8, kindTrue TokenKind, kindFalse TokenKind) Token {
+func (s *Scanner) matchToken(expected uint8, kindTrue TokenKind, kindFalse TokenKind) PositionedToken {
 	if s.match(expected) {
 		return s.make(kindTrue)
 	}
@@ -414,23 +418,31 @@ func (s *Scanner) isAtEnd() bool {
 	return s.currentI >= len(s.text)
 }
 
-func (s *Scanner) make(kind TokenKind) Token {
+func (s *Scanner) make(kind TokenKind) PositionedToken {
 	lexeme := s.text[s.startI:s.currentI]
 
-	return Token{
-		Kind:    kind,
-		Lexeme:  lexeme,
-		Line_:   s.line,
-		Column_: s.column - len(lexeme),
+	return PositionedToken{
+		Token: Token{
+			Kind:   kind,
+			Lexeme: lexeme,
+		},
+		Pos: core.Pos{
+			Line:   s.line,
+			Column: s.column - uint16(len(lexeme)),
+		},
 	}
 }
 
-func (s *Scanner) error(msg string) Token {
-	return Token{
-		Kind:    Error,
-		Lexeme:  msg,
-		Line_:   s.line,
-		Column_: s.column,
+func (s *Scanner) error(msg string) PositionedToken {
+	return PositionedToken{
+		Token: Token{
+			Kind:   Error,
+			Lexeme: msg,
+		},
+		Pos: core.Pos{
+			Line:   s.line,
+			Column: s.column,
+		},
 	}
 }
 

@@ -2,10 +2,9 @@ package cmd
 
 import (
 	"fireball/cmd/build"
+	"fireball/core/ast"
 	"fireball/core/codegen"
 	"fireball/core/llvm"
-	"fireball/core/scanner"
-	"fireball/core/types"
 	"fireball/core/utils"
 	"fireball/core/workspace"
 	"fmt"
@@ -88,7 +87,7 @@ func buildProject() string {
 		path = filepath.Join(project.Path, "build", path[:len(path)-3]+".ll")
 
 		irFile, _ := os.Create(path)
-		codegen.Emit(file.Path, project, file.Decls, irFile)
+		codegen.Emit(file.Path, project, file.Ast, irFile)
 		_ = irFile.Close()
 
 		irPaths = append(irPaths, path)
@@ -157,20 +156,20 @@ func generateEntrypoint(project *workspace.Project, path string) error {
 	if function != nil {
 		var fbMain llvm.Value
 
-		if types.IsPrimitive(function.Returns, types.I32) {
+		if ast.IsPrimitive(function.Returns, ast.I32) {
 			fbMain = m.Declare(m.Function(function.MangledName(), []llvm.Type{}, false, i32))
 		} else {
 			fbMain = m.Declare(m.Function(function.MangledName(), []llvm.Type{}, false, void))
 		}
 
-		if types.IsPrimitive(function.Returns, types.I32) {
+		if ast.IsPrimitive(function.Returns, ast.I32) {
 			call := mainBlock.Call(fbMain, []llvm.Value{}, i32)
-			call.SetLocation(scanner.Token{})
+			call.SetLocation(nil)
 
 			mainBlock.Ret(call)
 		} else {
 			call := mainBlock.Call(fbMain, []llvm.Value{}, void)
-			call.SetLocation(scanner.Token{})
+			call.SetLocation(nil)
 
 			mainBlock.Ret(main.Literal(i32, llvm.Literal{Signed: 0}))
 		}

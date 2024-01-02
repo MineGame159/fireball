@@ -310,7 +310,7 @@ func (h *handler) SemanticTokensFull(_ context.Context, params *protocol.Semanti
 	}
 
 	// Get semantic tokens
-	data := highlight(file.Decls)
+	data := highlight(file.Ast)
 
 	tokens := &protocol.SemanticTokens{
 		Data: data,
@@ -357,7 +357,7 @@ func (h *handler) InlayHint(_ context.Context, params *protocol.InlayHintParams)
 	}
 
 	// Get hints
-	hints := annotate(file.Decls)
+	hints := annotate(file.Ast)
 
 	doc.inlayHints = hints
 	return hints, nil
@@ -376,12 +376,12 @@ func (h *handler) Hover(_ context.Context, params *protocol.HoverParams) (result
 
 	// Convert position
 	pos := core.Pos{
-		Line:   int(params.Position.Line + 1),
-		Column: int(params.Position.Character),
+		Line:   uint16(params.Position.Line + 1),
+		Column: uint16(params.Position.Character),
 	}
 
 	// Get hover
-	return getHover(file.Decls, pos), nil
+	return getHover(file.Ast, pos), nil
 }
 
 func (h *handler) Symbols(_ context.Context, _ *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {
@@ -417,8 +417,8 @@ func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParam
 
 	// Get position
 	pos := core.Pos{
-		Line:   int(params.Position.Line + 1),
-		Column: int(params.Position.Character),
+		Line:   uint16(params.Position.Line + 1),
+		Column: uint16(params.Position.Character),
 	}
 
 	// Get declaration

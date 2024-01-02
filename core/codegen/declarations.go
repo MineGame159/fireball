@@ -2,16 +2,16 @@ package codegen
 
 import (
 	"fireball/core/ast"
+	"fireball/core/cst"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
-	"fireball/core/types"
 )
 
 func (c *codegen) VisitStruct(_ *ast.Struct) {
 }
 
 func (c *codegen) VisitImpl(impl *ast.Impl) {
-	for _, function := range impl.Functions {
+	for _, function := range impl.Methods {
 		c.acceptDecl(function)
 	}
 }
@@ -43,7 +43,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	// Add this variable
 	if struct_ := decl.Method(); struct_ != nil {
 		name := scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}
-		c.addVariable(name, exprValue{v: function.GetParameter(0)})
+		c.addVariable(ast.NewToken(cst.Node{}, name), exprValue{v: function.GetParameter(0)})
 	}
 
 	// Copy parameters
@@ -54,7 +54,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 		}
 
 		pointer := c.block.Alloca(c.getType(param.Type))
-		pointer.SetName(param.Name.Lexeme + ".var")
+		pointer.SetName(param.Name.String() + ".var")
 		pointer.SetAlign(param.Type.Align())
 
 		store := c.block.Store(pointer, function.GetParameter(index))
@@ -71,7 +71,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	}
 
 	// Add return if needed
-	if types.IsPrimitive(decl.Returns, types.Void) {
+	if ast.IsPrimitive(decl.Returns, ast.Void) {
 		c.block.Ret(nil)
 	}
 

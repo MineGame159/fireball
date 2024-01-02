@@ -1,10 +1,5 @@
 package ast
 
-import (
-	"fireball/core"
-	"fireball/core/types"
-)
-
 type ExprResultKind = uint8
 
 const (
@@ -25,7 +20,7 @@ type ExprResult struct {
 	Kind  ExprResultKind
 	Flags ExprResultFlags
 
-	Type     types.Type
+	Type     Type
 	Function *Func
 }
 
@@ -44,21 +39,21 @@ func (e *ExprResult) SetInvalid() {
 	e.Flags = 0
 }
 
-func (e *ExprResult) SetType(type_ types.Type) {
+func (e *ExprResult) SetType(type_ Type) {
 	e.Kind = TypeResultKind
 	e.Flags = 0
-	e.Type = type_
+	e.Type = type_.Resolved()
 }
 
 func (e *ExprResult) SetFunction(function *Func) {
 	e.Kind = FunctionResultKind
 	e.Flags = 0
-	e.Type = function.WithRange(core.Range{})
+	e.Type = function
 	e.Function = function
 }
 
-func (e *ExprResult) SetValue(type_ types.Type, flags ExprResultFlags) {
+func (e *ExprResult) SetValue(type_ Type, flags ExprResultFlags) {
 	e.Kind = ValueResultKind
 	e.Flags = flags
-	e.Type = type_.WithRange(core.Range{})
+	e.Type = type_.Resolved()
 }

@@ -1,5 +1,9 @@
 package llvm
 
+import (
+	"fireball/core/cst"
+)
+
 type instruction struct {
 	module *Module
 
@@ -25,23 +29,28 @@ func (i *instruction) SetName(name string) {
 	i.name = name
 }
 
-func (i *instruction) SetLocation(location Location) {
-	i.location = i.module.addMetadata(Metadata{
-		Type: "DILocation",
-		Fields: []MetadataField{
-			{
-				Name:  "scope",
-				Value: refMetadataValue(i.module.getScope()),
-			},
-			{
-				Name:  "line",
-				Value: numberMetadataValue(location.Line()),
-			},
-			{
-				Name:  "column",
-				Value: numberMetadataValue(location.Column()),
-			},
+func (i *instruction) SetLocation(node *cst.Node) {
+	fields := []MetadataField{
+		{
+			Name:  "scope",
+			Value: refMetadataValue(i.module.getScope()),
 		},
+	}
+
+	if node != nil {
+		fields = append(fields, MetadataField{
+			Name:  "line",
+			Value: numberMetadataValue(int(node.Range.Start.Line)),
+		})
+		fields = append(fields, MetadataField{
+			Name:  "column",
+			Value: numberMetadataValue(int(node.Range.Start.Column)),
+		})
+	}
+
+	i.location = i.module.addMetadata(Metadata{
+		Type:   "DILocation",
+		Fields: fields,
 	})
 }
 
@@ -131,20 +140,20 @@ type insertValue struct {
 type alloca struct {
 	instruction
 	type_ Type
-	align int
+	align uint32
 }
 
-func (a *alloca) SetAlign(align int) {
+func (a *alloca) SetAlign(align uint32) {
 	a.align = align
 }
 
 type load struct {
 	instruction
 	pointer Value
-	align   int
+	align   uint32
 }
 
-func (l *load) SetAlign(align int) {
+func (l *load) SetAlign(align uint32) {
 	l.align = align
 }
 
@@ -152,10 +161,10 @@ type store struct {
 	instruction
 	pointer Value
 	value   Value
-	align   int
+	align   uint32
 }
 
-func (s *store) SetAlign(align int) {
+func (s *store) SetAlign(align uint32) {
 	s.align = align
 }
 

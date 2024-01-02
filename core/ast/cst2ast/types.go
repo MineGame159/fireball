@@ -1,14 +1,12 @@
 package cst2ast
 
 import (
-	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/cst"
-	"fireball/core/types"
 	"strconv"
 )
 
-func (c *converter) convertType(node cst.Node) types.Type {
+func (c *converter) convertType(node cst.Node) ast.Type {
 	switch node.Kind {
 	case cst.IdentifierTypeNode:
 		return c.convertIdentifierType(node)
@@ -24,62 +22,84 @@ func (c *converter) convertType(node cst.Node) types.Type {
 	}
 }
 
-func (c *converter) convertIdentifierType(node cst.Node) types.Type {
-	token := node.Children[0].Token
-	range_ := core.TokenToRange(token)
+func (c *converter) convertIdentifierType(node cst.Node) ast.Type {
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			var kind ast.PrimitiveKind
 
-	var kind types.PrimitiveKind
+			switch child.Token.Lexeme {
+			case "void":
+				kind = ast.Void
+			case "bool":
+				kind = ast.Bool
 
-	switch token.Lexeme {
-	case "void":
-		kind = types.Void
-	case "bool":
-		kind = types.Bool
+			case "u8":
+				kind = ast.U8
+			case "u16":
+				kind = ast.U16
+			case "u32":
+				kind = ast.U32
+			case "u64":
+				kind = ast.U64
 
-	case "u8":
-		kind = types.U8
-	case "u16":
-		kind = types.U16
-	case "u32":
-		kind = types.U32
-	case "u64":
-		kind = types.U64
+			case "i8":
+				kind = ast.I8
+			case "i16":
+				kind = ast.I16
+			case "i32":
+				kind = ast.I32
+			case "i64":
+				kind = ast.I64
 
-	case "i8":
-		kind = types.I8
-	case "i16":
-		kind = types.I16
-	case "i32":
-		kind = types.I32
-	case "i64":
-		kind = types.I64
+			case "f32":
+				kind = ast.F32
+			case "f64":
+				kind = ast.F64
 
-	case "f32":
-		kind = types.F32
-	case "f64":
-		kind = types.F64
+			default:
+				return ast.NewResolvable(node, child.Token)
+			}
 
-	default:
-		return types.Unresolved(token, range_)
+			return ast.NewPrimitive(node, kind, child.Token)
+		}
 	}
 
-	return types.Primitive(kind, range_)
+	panic("cst2ast.convertIdentifierType() - Not implemented")
 }
 
-func (c *converter) convertPointerType(node cst.Node) types.Type {
-	range_ := core.TokenToRange(node.Token)
-	return types.Pointer(c.convertType(node.Children[1]), range_)
+func (c *converter) convertPointerType(node cst.Node) ast.Type {
+	var pointee ast.Type
+
+	for _, child := range node.Children {
+		if child.Kind.IsType() {
+			pointee = c.convertType(child)
+		}
+	}
+
+	return ast.NewPointer(node, pointee)
 }
 
-func (c *converter) convertArrayType(node cst.Node) types.Type {
-	range_ := core.TokenToRange(node.Token)
-	value, _ := strconv.ParseUint(node.Children[1].Token.Lexeme, 10, 32)
+func (c *converter) convertArrayType(node cst.Node) ast.Type {
+	var base ast.Type
+	count := uint32(0)
 
-	return types.Array(uint32(value), c.convertType(node.Children[3]), range_)
+	for _, child := range node.Children {
+		if child.Kind.IsType() {
+			base = c.convertType(child)
+		} else if child.Kind == cst.NumberExprNode {
+			c, _ := strconv.ParseUint(child.Token.Lexeme, 10, 32)
+			count = uint32(c)
+		}
+	}
+
+	return ast.NewArray(node, base, count)
 }
 
-func (c *converter) convertFuncType(node cst.Node) types.Type {
-	f := &ast.Func{}
+func (c *converter) convertFuncType(node cst.Node) ast.Type {
+	var flags ast.FuncFlags
+	var params []*ast.Param
+	var returns ast.Type
+
 	reported := false
 
 	for i, child := range node.Children {
@@ -87,19 +107,19 @@ func (c *converter) convertFuncType(node cst.Node) types.Type {
 			param, varArgs := c.convertFuncParam(child)
 
 			if varArgs {
-				f.Flags |= ast.Variadic
+				flags |= ast.Variadic
 			} else {
-				if f.IsVariadic() && !reported {
-					c.error(node.Children[i-2].Children[0].Token, "Variadic arguments can only appear at the end of the parameter list")
+				if flags&ast.Variadic != 0 && !reported {
+					c.error(node.Children[i-2].Children[0], "Variadic arguments can only appear at the end of the parameter list")
 					reported = true
 				}
 
-				f.Params = append(f.Params, param)
+				params = append(params, param)
 			}
 		} else if child.Kind.IsType() {
-			f.Returns = c.convertType(child)
+			returns = c.convertType(child)
 		}
 	}
 
-	return f
+	return ast.NewFunc(node, nil, flags, nil, params, returns, nil)
 }

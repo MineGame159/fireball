@@ -30,54 +30,54 @@ type symbolConsumer interface {
 
 func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 	// Find method count per struct
-	methodCount := make(map[*ast.Struct]int)
+	methodCount := make(map[ast.Type]int)
 
 	for _, file := range files {
-		for _, decl := range file.Decls {
-			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil {
-				methodCount[impl.Type_] += len(impl.Functions)
+		for _, decl := range file.Ast.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil {
+				methodCount[impl.Type] += len(impl.Methods)
 			}
 		}
 	}
 
 	// Structs
-	structs := make(map[*ast.Struct]int)
+	structs := make(map[ast.Type]int)
 
 	for _, file := range files {
-		for _, decl := range file.Decls {
-			if struct_, ok := decl.(*ast.Struct); ok {
+		for _, decl := range file.Ast.Decls {
+			if struct_, ok := decl.(*ast.Struct); ok && struct_.Cst() != nil && struct_.Name.Cst() != nil {
 				id := symbols.add(symbol{
 					kind:           protocol.SymbolKindStruct,
-					name:           struct_.Name.Lexeme,
-					range_:         struct_.Range(),
-					selectionRange: core.TokenToRange(struct_.Name),
+					name:           struct_.Name.String(),
+					range_:         struct_.Cst().Range,
+					selectionRange: struct_.Name.Cst().Range,
 					file:           file,
 				}, len(struct_.StaticFields)+len(struct_.Fields)+methodCount[struct_])
 
 				for _, field := range struct_.StaticFields {
-					range_ := core.TokenToRange(field.Name)
-
-					symbols.addChild(id, symbol{
-						file:           file,
-						kind:           protocol.SymbolKindField,
-						name:           field.Name.Lexeme,
-						detail:         field.Type.String(),
-						range_:         range_,
-						selectionRange: range_,
-					})
+					if field.Name.Cst() != nil {
+						symbols.addChild(id, symbol{
+							file:           file,
+							kind:           protocol.SymbolKindField,
+							name:           field.Name.String(),
+							detail:         ast.PrintType(field.Type),
+							range_:         field.Name.Cst().Range,
+							selectionRange: field.Name.Cst().Range,
+						})
+					}
 				}
 
 				for _, field := range struct_.Fields {
-					range_ := core.TokenToRange(field.Name)
-
-					symbols.addChild(id, symbol{
-						file:           file,
-						kind:           protocol.SymbolKindField,
-						name:           field.Name.Lexeme,
-						detail:         field.Type.String(),
-						range_:         range_,
-						selectionRange: range_,
-					})
+					if field.Cst() != nil {
+						symbols.addChild(id, symbol{
+							file:           file,
+							kind:           protocol.SymbolKindField,
+							name:           field.Name.String(),
+							detail:         ast.PrintType(field.Type),
+							range_:         field.Name.Cst().Range,
+							selectionRange: field.Name.Cst().Range,
+						})
+					}
 				}
 
 				structs[struct_] = id
@@ -87,60 +87,61 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 
 	// Rest
 	for _, file := range files {
-		for _, decl := range file.Decls {
-			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil {
+		for _, decl := range file.Ast.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil {
 				// Methods
-				id, ok := structs[impl.Type_]
+				id, ok := structs[impl.Type]
 
 				if !ok {
 					id = symbols.add(symbol{
 						kind: protocol.SymbolKindStruct,
-						name: impl.Type_.Name.Lexeme,
-					}, methodCount[impl.Type_])
+						name: impl.Type.(*ast.Struct).Name.String(),
+					}, methodCount[impl.Type])
 
-					structs[impl.Type_] = id
+					structs[impl.Type] = id
 				}
 
-				for _, f := range impl.Functions {
-					function := f.(*ast.Func)
-					detail := ""
+				for _, function := range impl.Methods {
+					if function.Cst() != nil && function.Name.Cst() != nil {
+						detail := ""
 
-					if symbols.supportsDetail() {
-						detail = function.Signature(true)
+						if symbols.supportsDetail() {
+							detail = function.Signature(true)
+						}
+
+						symbols.addChild(id, symbol{
+							file:           file,
+							kind:           protocol.SymbolKindMethod,
+							name:           function.Name.String(),
+							detail:         detail,
+							range_:         function.Cst().Range,
+							selectionRange: function.Name.Cst().Range,
+						})
 					}
-
-					symbols.addChild(id, symbol{
-						file:           file,
-						kind:           protocol.SymbolKindMethod,
-						name:           function.Name.Lexeme,
-						detail:         detail,
-						range_:         function.Range(),
-						selectionRange: core.TokenToRange(function.Name),
-					})
 				}
-			} else if enum, ok := decl.(*ast.Enum); ok {
+			} else if enum, ok := decl.(*ast.Enum); ok && enum.Cst() != nil && enum.Name.Cst() != nil {
 				// Enum
 				id := symbols.add(symbol{
 					kind:           protocol.SymbolKindEnum,
-					name:           enum.Name.Lexeme,
-					range_:         enum.Range(),
-					selectionRange: core.TokenToRange(enum.Name),
+					name:           enum.Name.String(),
+					range_:         enum.Cst().Range,
+					selectionRange: enum.Name.Cst().Range,
 					file:           file,
 				}, len(enum.Cases))
 
 				for _, case_ := range enum.Cases {
-					range_ := core.TokenToRange(case_.Name)
-
-					symbols.addChild(id, symbol{
-						file:           file,
-						kind:           protocol.SymbolKindEnumMember,
-						name:           case_.Name.Lexeme,
-						detail:         strconv.Itoa(case_.Value),
-						range_:         range_,
-						selectionRange: range_,
-					})
+					if case_.Name.Cst() != nil {
+						symbols.addChild(id, symbol{
+							file:           file,
+							kind:           protocol.SymbolKindEnumMember,
+							name:           case_.Name.String(),
+							detail:         strconv.FormatInt(case_.ActualValue, 10),
+							range_:         case_.Name.Cst().Range,
+							selectionRange: case_.Name.Cst().Range,
+						})
+					}
 				}
-			} else if function, ok := decl.(*ast.Func); ok {
+			} else if function, ok := decl.(*ast.Func); ok && function.Cst() != nil && function.Name.Cst() != nil {
 				// Function
 				detail := ""
 
@@ -151,10 +152,10 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 				symbols.add(symbol{
 					file:           file,
 					kind:           protocol.SymbolKindFunction,
-					name:           function.Name.Lexeme,
+					name:           function.Name.String(),
 					detail:         detail,
-					range_:         function.Range(),
-					selectionRange: core.TokenToRange(function.Name),
+					range_:         function.Cst().Range,
+					selectionRange: function.Name.Cst().Range,
 				}, 0)
 			}
 		}

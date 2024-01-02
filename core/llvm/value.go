@@ -1,5 +1,9 @@
 package llvm
 
+import (
+	"fireball/core/cst"
+)
+
 type ValueKind uint8
 
 const (
@@ -21,13 +25,13 @@ type NameableValue interface {
 }
 
 type Instruction interface {
-	SetLocation(location Location)
+	SetLocation(node *cst.Node)
 }
 
 type AlignedInstruction interface {
 	Instruction
 
-	SetAlign(align int)
+	SetAlign(align uint32)
 }
 
 type InstructionValue interface {

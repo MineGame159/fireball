@@ -1,17 +1,13 @@
 package core
 
-import (
-	"fireball/core/scanner"
-)
-
 type Range struct {
 	Start Pos
 	End   Pos
 }
 
 type Pos struct {
-	Line   int
-	Column int
+	Line   uint16
+	Column uint16
 }
 
 func (r Range) Valid() bool {
@@ -36,31 +32,4 @@ func (r Range) Contains(pos Pos) bool {
 
 	// True
 	return true
-}
-
-func TokensToRange(start, end scanner.Token) Range {
-	return Range{
-		Start: TokenToPos(start, false),
-		End:   TokenToPos(end, true),
-	}
-}
-
-func TokenToRange(token scanner.Token) Range {
-	return Range{
-		Start: TokenToPos(token, false),
-		End:   TokenToPos(token, true),
-	}
-}
-
-func TokenToPos(token scanner.Token, end bool) Pos {
-	offset := 0
-
-	if end {
-		offset = len(token.Lexeme)
-	}
-
-	return Pos{
-		Line:   token.Line(),
-		Column: token.Column() + offset,
-	}
 }

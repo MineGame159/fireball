@@ -6,7 +6,7 @@ import (
 
 func (c *codegen) VisitBlock(stmt *ast.Block) {
 	c.pushScope()
-	c.module.PushScope(stmt.Token())
+	c.module.PushScope(stmt.Cst())
 
 	for _, s := range stmt.Stmts {
 		c.acceptStmt(s)
@@ -20,18 +20,18 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 	c.acceptExpr(stmt.Expr)
 }
 
-func (c *codegen) VisitVariable(stmt *ast.Variable) {
+func (c *codegen) VisitVar(stmt *ast.Var) {
 	// Variable
 	pointer := c.allocas[stmt]
 	c.addVariable(stmt.Name, pointer)
 
 	// Initializer
-	if stmt.Initializer != nil {
-		initializer := c.loadExpr(stmt.Initializer)
+	if stmt.Value != nil {
+		initializer := c.loadExpr(stmt.Value)
 
 		store := c.block.Store(pointer.v, initializer.v)
-		store.SetAlign(stmt.Type.Align())
-		store.SetLocation(stmt.Name)
+		store.SetAlign(stmt.ActualType.Align())
+		store.SetLocation(stmt.Name.Cst())
 	}
 }
 
@@ -80,7 +80,7 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 
 	// Initializer
 	c.pushScope()
-	c.module.PushScope(stmt.Token())
+	c.module.PushScope(stmt.Cst())
 
 	c.acceptStmt(stmt.Initializer)
 	c.block.Br(nil, c.loopStart, nil)
@@ -114,20 +114,20 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 }
 
 func (c *codegen) VisitReturn(stmt *ast.Return) {
-	if stmt.Expr == nil {
+	if stmt.Value == nil {
 		// Void
-		c.block.Ret(nil).SetLocation(stmt.Token())
+		c.block.Ret(nil).SetLocation(stmt.Cst())
 	} else {
 		// Other
-		value := c.loadExpr(stmt.Expr)
-		c.block.Ret(value.v).SetLocation(stmt.Token())
+		value := c.loadExpr(stmt.Value)
+		c.block.Ret(value.v).SetLocation(stmt.Cst())
 	}
 }
 
 func (c *codegen) VisitBreak(stmt *ast.Break) {
-	c.block.Br(nil, c.loopEnd, nil).SetLocation(stmt.Token())
+	c.block.Br(nil, c.loopEnd, nil).SetLocation(stmt.Cst())
 }
 
 func (c *codegen) VisitContinue(stmt *ast.Continue) {
-	c.block.Br(nil, c.loopStart, nil).SetLocation(stmt.Token())
+	c.block.Br(nil, c.loopStart, nil).SetLocation(stmt.Cst())
 }

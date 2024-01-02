@@ -7,7 +7,6 @@ import (
 	"fireball/core/checker"
 	"fireball/core/cst"
 	"fireball/core/typeresolver"
-	"fireball/core/types"
 	"fireball/core/utils"
 	"github.com/pelletier/go-toml/v2"
 	"os"
@@ -112,7 +111,7 @@ func (p *Project) LoadFiles() error {
 
 	for _, file := range p.Files {
 		file.Cst = cst.Parse(file, file.Text)
-		file.Decls = cst2ast.Convert(file, file.Cst)
+		file.Ast = cst2ast.Convert(file, file.Cst)
 	}
 
 	for _, file := range p.Files {
@@ -120,21 +119,21 @@ func (p *Project) LoadFiles() error {
 	}
 
 	for _, file := range p.Files {
-		typeresolver.Resolve(file, p, file.Decls)
+		typeresolver.Resolve(file, p, file.Ast)
 
 		file.parseWaitGroup.Done()
 	}
 
 	// Check
 	for _, file := range p.Files {
-		checker.Check(file, p, file.Decls)
+		checker.Check(file, p, file.Ast)
 		file.checkWaitGroup.Done()
 	}
 
 	return nil
 }
 
-func (p *Project) GetType(name string) (types.Type, string) {
+func (p *Project) GetType(name string) (ast.Type, string) {
 	for _, file := range p.Files {
 		if v, ok := file.Types[name]; ok {
 			return v, file.Path
@@ -154,10 +153,10 @@ func (p *Project) GetFunction(name string) (*ast.Func, string) {
 	return nil, ""
 }
 
-func (p *Project) GetMethod(type_ types.Type, name string, static bool) (*ast.Func, string) {
+func (p *Project) GetMethod(type_ ast.Type, name string, static bool) (*ast.Func, string) {
 	for _, file := range p.Files {
-		for _, decl := range file.Decls {
-			if impl, ok := decl.(*ast.Impl); ok && impl.Type_ != nil && impl.Type_.Equals(type_) {
+		for _, decl := range file.Ast.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(type_) {
 				function := impl.GetMethod(name, static)
 
 				if function != nil {
@@ -208,7 +207,7 @@ func (p *Project) RemoveFile(path string) bool {
 		}
 
 		for _, file := range p.Files {
-			checker.Check(file, p, file.Decls)
+			checker.Check(file, p, file.Ast)
 			file.checkWaitGroup.Done()
 		}
 

@@ -1,37 +1,33 @@
 package architecture
 
-import (
-	"fireball/core/types"
-)
-
 type Layout interface {
-	Add(type_ types.Type) (offset, size int)
-	Size() int
+	Add(size, align uint32) uint32
+	Size() uint32
 }
 
 type CLayout struct {
-	biggestAlign int
-	offset       int
+	biggestAlign uint32
+	offset       uint32
 }
 
-func (l *CLayout) Add(type_ types.Type) int {
-	l.biggestAlign = max(l.biggestAlign, type_.Align())
+func (l *CLayout) Add(size, align uint32) uint32 {
+	l.biggestAlign = max(l.biggestAlign, align)
 
-	offset := align(l.offset, l.biggestAlign)
-	l.offset = offset + type_.Size()
+	offset := alignValue(l.offset, l.biggestAlign)
+	l.offset = offset + size
 
 	return offset
 }
 
-func (l *CLayout) Size() int {
+func (l *CLayout) Size() uint32 {
 	if l.offset == 0 {
 		return 0
 	}
 
-	return align(l.offset, l.biggestAlign)
+	return alignValue(l.offset, l.biggestAlign)
 }
 
-func align(value, align int) int {
+func alignValue(value, align uint32) uint32 {
 	if value%align != 0 {
 		value += align - (value % align)
 	}
