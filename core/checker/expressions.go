@@ -734,7 +734,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 		}
 
 		if !arg.Result().Type.CanAssignTo(param.Type) {
-			c.error(arg, "Argument with type '%s' cannot be assigned to a parameter with type '%s'", arg.Result().Type, param.Type)
+			c.error(arg, "Argument with type '%s' cannot be assigned to a parameter with type '%s'", ast.PrintType(arg.Result().Type), ast.PrintType(param.Type))
 			ok = false
 		}
 	}
@@ -767,7 +767,7 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 		}
 
 		if base == nil {
-			c.error(expr.Value, "Can only index into array and pointer types, not '%s'", expr.Value.Result().Type)
+			c.error(expr.Value, "Can only index into array and pointer types, not '%s'", ast.PrintType(expr.Value.Result().Type))
 			ok = false
 		}
 	} else {
@@ -786,7 +786,7 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 		}
 
 		if !ok2 {
-			c.error(expr.Index, "Can only index using integer types, not '%s'", expr.Index.Result().Type)
+			c.error(expr.Index, "Can only index using integer types, not '%s'", ast.PrintType(expr.Index.Result().Type))
 			ok = false
 		}
 	} else {
@@ -825,7 +825,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 					function, _ := c.resolver.GetMethod(v, expr.Name.String(), true)
 
 					if function == nil {
-						c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", v, expr.Name)
+						c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(v), expr.Name)
 						expr.Result().SetInvalid()
 
 						return
@@ -839,7 +839,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 				_, field := v.GetStaticField(expr.Name.String())
 
 				if field == nil {
-					c.error(expr.Name, "Struct '%s' does not contain static field '%s'", v, expr.Name)
+					c.error(expr.Name, "Struct '%s' does not contain static field '%s'", ast.PrintType(v), expr.Name)
 					expr.Result().SetInvalid()
 
 					return
@@ -854,7 +854,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 			if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
 				if case_ := v.GetCase(expr.Name.String()); case_ == nil {
-					c.error(expr.Name, "Enum '%s' does not contain case '%s'", v, expr.Name)
+					c.error(expr.Name, "Enum '%s' does not contain case '%s'", ast.PrintType(v), expr.Name)
 				}
 
 				expr.Result().SetValue(v, 0)
@@ -882,7 +882,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		}
 
 		if s == nil {
-			c.error(expr.Value, "Only structs and pointers to structs can have members, not '%s'", expr.Value.Result().Type)
+			c.error(expr.Value, "Only structs and pointers to structs can have members, not '%s'", ast.PrintType(expr.Value.Result().Type))
 			expr.Result().SetInvalid()
 
 			return
@@ -895,7 +895,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			if function != nil {
 				expr.Result().SetFunction(function)
 			} else {
-				c.error(expr.Name, "Struct '%s' does not contain method '%s'", s, expr.Name)
+				c.error(expr.Name, "Struct '%s' does not contain method '%s'", ast.PrintType(s), expr.Name)
 				expr.Result().SetInvalid()
 			}
 
@@ -906,7 +906,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		_, field := s.GetField(expr.Name.String())
 
 		if field == nil {
-			c.error(expr.Name, "Struct '%s' does not contain field '%s'.", s, expr.Name)
+			c.error(expr.Name, "Struct '%s' does not contain field '%s'.", ast.PrintType(s), expr.Name)
 			expr.Result().SetInvalid()
 
 			return

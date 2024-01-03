@@ -124,11 +124,7 @@ func (r *Resolvable) Equals(other Type) bool {
 		panic("ast.Resolvable.Equals() - Not resolved")
 	}
 
-	if r2, ok := other.(*Resolvable); ok {
-		return r.Resolved().Equals(r2.Resolved())
-	}
-
-	return false
+	return r.Resolved().Equals(other.Resolved())
 }
 
 func (r *Resolvable) CanAssignTo(other Type) bool {
@@ -136,11 +132,7 @@ func (r *Resolvable) CanAssignTo(other Type) bool {
 		panic("ast.Resolvable.Equals() - Not resolved")
 	}
 
-	if r2, ok := other.(*Resolvable); ok {
-		return r.Resolved().CanAssignTo(r2.Resolved())
-	}
-
-	return false
+	return r.Resolved().CanAssignTo(other.Resolved())
 }
 
 // Struct

@@ -10,7 +10,11 @@ func (c *converter) convertAttributes(node cst.Node) []any {
 
 	for _, child := range node.Children {
 		if child.Kind == cst.AttributeNode {
-			attributes = append(attributes, c.convertAttribute(child))
+			attribute := c.convertAttribute(child)
+
+			if attribute != nil {
+				attributes = append(attributes, attribute)
+			}
 		}
 	}
 
@@ -27,7 +31,7 @@ func (c *converter) convertAttribute(node cst.Node) any {
 		return c.convertInlineAttribute(node)
 
 	default:
-		panic("cst2ast.convertAttribute() - Not implemented")
+		return nil
 	}
 }
 

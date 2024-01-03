@@ -30,7 +30,8 @@ type File struct {
 	parseWaitGroup sync.WaitGroup
 	checkWaitGroup sync.WaitGroup
 
-	diagnostics []utils.Diagnostic
+	diagnostics          []utils.Diagnostic
+	parseDiagnosticCount int
 }
 
 func (f *File) AbsolutePath() string {
@@ -49,15 +50,22 @@ func (f *File) SetText(text string, parse bool) {
 		}
 
 		// Parse
+		f.diagnostics = nil
+
 		f.Cst = cst.Parse(f, text)
 		f.Ast = cst2ast.Convert(f, f.AbsolutePath(), f.Cst)
 
-		f.CollectTypesAndFunctions()
-		typeresolver.Resolve(f, f.Project, f.Ast)
+		f.parseDiagnosticCount = len(f.diagnostics)
 
+		f.CollectTypesAndFunctions()
 		f.parseWaitGroup.Done()
 
 		// Check
+		for _, file := range f.Project.Files {
+			file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
+			typeresolver.Resolve(file, file.Project, file.Ast)
+		}
+
 		for _, file := range f.Project.Files {
 			checker.Check(file, file.Project, file.Ast)
 			file.checkWaitGroup.Done()
@@ -160,8 +168,6 @@ func (f *File) Report(diag utils.Diagnostic) {
 	f.diagnostics = append(f.diagnostics, diag)
 }
 
-func (f *File) FlushDiagnostics() []utils.Diagnostic {
-	diagnostics := f.diagnostics
-	f.diagnostics = make([]utils.Diagnostic, 0)
-	return diagnostics
+func (f *File) Diagnostics() []utils.Diagnostic {
+	return f.diagnostics
 }

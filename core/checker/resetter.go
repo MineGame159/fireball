@@ -15,6 +15,9 @@ func reset(c *checker, node ast.Node) {
 
 func (r *resetter) VisitNode(node ast.Node) {
 	switch node := node.(type) {
+	case *ast.Var:
+		node.ActualType = nil
+
 	case ast.Expr:
 		node.AcceptChildren(r)
 		node.Result().SetInvalid()

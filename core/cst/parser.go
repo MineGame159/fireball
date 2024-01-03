@@ -93,6 +93,11 @@ func (p *parser) end() Node {
 	p.nodes = p.nodes[:len(p.nodes)-1]
 
 	children := p.children[info.offset:]
+
+	if len(children) == 0 {
+		return Node{Kind: info.kind}
+	}
+
 	exactChildren := make([]Node, len(children))
 	copy(exactChildren, children)
 

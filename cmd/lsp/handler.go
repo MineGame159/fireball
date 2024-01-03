@@ -450,7 +450,7 @@ func (h *handler) publishDiagnostics(ctx context.Context, project *workspace.Pro
 	// Loop all files
 	for _, file := range project.Files {
 		// Flush
-		fbDiagnostics := file.FlushDiagnostics()
+		fbDiagnostics := file.Diagnostics()
 
 		// Check if diagnostics need to be sent
 		doc := getDocument(file)

@@ -51,7 +51,7 @@ func parseStruct(p *parser, attributes Node) Node {
 	if p.consume(scanner.LeftBrace) {
 		return p.end()
 	}
-	if p.repeat(parseStructField, scanner.Static, scanner.Identifier) {
+	if p.repeatSync(parseStructField, scanner.RightBrace, scanner.Static, scanner.Identifier) {
 		return p.end()
 	}
 	if p.consume(scanner.RightBrace) {
@@ -136,7 +136,7 @@ func parseEnum(p *parser, attributes Node) Node {
 	if p.consume(scanner.LeftBrace) {
 		return p.end()
 	}
-	if p.repeat(parseEnumCase, scanner.Identifier) {
+	if p.repeatSync(parseEnumCase, scanner.RightBrace, scanner.Identifier) {
 		return p.end()
 	}
 	if p.consume(scanner.RightBrace) {

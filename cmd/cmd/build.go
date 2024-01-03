@@ -59,7 +59,7 @@ func buildProject() string {
 	}
 
 	for _, file := range project.Files {
-		for _, diagnostic := range file.FlushDiagnostics() {
+		for _, diagnostic := range file.Diagnostics() {
 			reporter.Report(file, diagnostic)
 		}
 	}

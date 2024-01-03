@@ -110,18 +110,22 @@ func (p *Project) LoadFiles() error {
 	}
 
 	for _, file := range p.Files {
+		file.diagnostics = nil
+
 		file.Cst = cst.Parse(file, file.Text)
 		file.Ast = cst2ast.Convert(file, file.AbsolutePath(), file.Cst)
+
+		file.parseDiagnosticCount = len(file.diagnostics)
 	}
 
 	for _, file := range p.Files {
 		file.CollectTypesAndFunctions()
+		file.parseWaitGroup.Done()
 	}
 
 	for _, file := range p.Files {
+		file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
 		typeresolver.Resolve(file, p, file.Ast)
-
-		file.parseWaitGroup.Done()
 	}
 
 	// Check
@@ -204,6 +208,9 @@ func (p *Project) RemoveFile(path string) bool {
 		// Check the rest of the files
 		for _, file := range p.Files {
 			file.checkWaitGroup.Add(1)
+
+			file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
+			typeresolver.Resolve(file, file.Project, file.Ast)
 		}
 
 		for _, file := range p.Files {

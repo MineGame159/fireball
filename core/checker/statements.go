@@ -28,6 +28,10 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 			c.error(stmt.Value, "Invalid value")
 			valueOk = false
 		} else {
+			if stmt.Type != nil {
+				stmt.ActualType = stmt.Type
+			}
+
 			if stmt.ActualType == nil {
 				if stmt.Value == nil {
 					c.error(stmt.Name, "Variable with no initializer needs to have an explicit type")
@@ -36,8 +40,8 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 					stmt.ActualType = stmt.Value.Result().Type
 				}
 			} else {
-				if stmt.Value != nil && !stmt.Value.Result().Type.CanAssignTo(stmt.Type) {
-					c.error(stmt.Value, "Initializer with type '%s' cannot be assigned to a variable with type '%s'", ast.PrintType(stmt.Value.Result().Type), ast.PrintType(stmt.Type))
+				if stmt.Value != nil && !stmt.Value.Result().Type.CanAssignTo(stmt.ActualType) {
+					c.error(stmt.Value, "Initializer with type '%s' cannot be assigned to a variable with type '%s'", ast.PrintType(stmt.Value.Result().Type), ast.PrintType(stmt.ActualType))
 				}
 			}
 		}
