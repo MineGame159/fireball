@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 )
 
@@ -71,30 +70,39 @@ func (f *Func) IsVariadic() bool {
 	return f.Flags&Variadic != 0
 }
 
-func (f *Func) GetAttribute(attribute any) bool {
-	value := reflect.ValueOf(attribute)
-	elem := value.Elem()
-	type_ := elem.Type()
+func (f *Func) ExternName() string {
+	for _, attribute := range f.Attributes {
+		if attribute.Name.String() == "Extern" {
+			if len(attribute.Args) > 0 {
+				return attribute.Args[0].String()[1 : len(attribute.Args[0].String())-1]
+			}
 
-	for _, attr := range f.Attributes {
-		if reflect.TypeOf(attr) == type_ {
-			elem.Set(reflect.ValueOf(attr))
-			return true
+			return f.Name.String()
 		}
 	}
 
-	return false
+	return ""
+}
+
+func (f *Func) IntrinsicName() string {
+	for _, attribute := range f.Attributes {
+		if attribute.Name.String() == "Intrinsic" {
+			if len(attribute.Args) > 0 {
+				return attribute.Args[0].String()[1 : len(attribute.Args[0].String())-1]
+			}
+
+			return f.Name.String()
+		}
+	}
+
+	return ""
 }
 
 func (f *Func) HasBody() bool {
-	var extern ExternAttribute
-	if f.GetAttribute(&extern) {
-		return false
-	}
-
-	var intrinsic IntrinsicAttribute
-	if f.GetAttribute(&intrinsic) {
-		return false
+	for _, attribute := range f.Attributes {
+		if attribute.Name.String() == "Extern" || attribute.Name.String() == "Intrinsic" {
+			return false
+		}
 	}
 
 	return true
@@ -137,9 +145,10 @@ func (f *Func) Method() *Struct {
 
 func (f *Func) MangledName() string {
 	// Extern
-	var extern ExternAttribute
-	if f.GetAttribute(&extern) {
-		return extern.Name
+	externName := f.ExternName()
+
+	if externName != "" {
+		return externName
 	}
 
 	// Normal

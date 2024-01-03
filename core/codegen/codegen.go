@@ -108,10 +108,11 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 		c.functions[function] = f
 
 		// Inline
-		var inline ast.InlineAttribute
-
-		if function.GetAttribute(&inline) {
-			f.SetAlwaysInline()
+		for _, attribute := range function.Attributes {
+			if attribute.Name.String() == "Inline" {
+				f.SetAlwaysInline()
+				break
+			}
 		}
 
 		// Set parameter names
@@ -335,10 +336,10 @@ func (c *codegen) getType(type_ ast.Type) llvm.Type {
 		var parameters []llvm.Type
 		var returns llvm.Type
 
-		var intrinsic ast.IntrinsicAttribute
+		intrinsicName := v.IntrinsicName()
 
-		if v.GetAttribute(&intrinsic) {
-			intrinsic := c.getIntrinsic(v, intrinsic)
+		if intrinsicName != "" {
+			intrinsic := c.getIntrinsic(v, intrinsicName)
 
 			parameters = intrinsic[1:]
 			returns = intrinsic[0]
@@ -388,7 +389,7 @@ func (c *codegen) getType(type_ ast.Type) llvm.Type {
 		llvmType = c.module.Struct(v.Name.String(), layout.Size()*8, fields)
 	} else if v, ok := ast.As[*ast.Enum](type_); ok {
 		// Enum
-		llvmType = c.module.Alias(v.Name.String(), c.getType(v.Type))
+		llvmType = c.module.Alias(v.Name.String(), c.getType(v.ActualType))
 	}
 
 	if llvmType != nil {
@@ -403,10 +404,10 @@ func (c *codegen) getType(type_ ast.Type) llvm.Type {
 	panic("codegen.getType() - Invalid type")
 }
 
-func (c *codegen) getIntrinsic(function *ast.Func, intrinsic ast.IntrinsicAttribute) []llvm.Type {
+func (c *codegen) getIntrinsic(function *ast.Func, intrinsicName string) []llvm.Type {
 	param := c.getType(function.Params[0].Type)
 
-	switch intrinsic.Name {
+	switch intrinsicName {
 	case "abs":
 		if isFloating(function.Params[0].Type) {
 			return []llvm.Type{
@@ -464,8 +465,8 @@ func (c *codegen) getIntrinsic(function *ast.Func, intrinsic ast.IntrinsicAttrib
 	}
 }
 
-func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsic ast.IntrinsicAttribute, args []llvm.Value) []llvm.Value {
-	switch intrinsic.Name {
+func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsicName string, args []llvm.Value) []llvm.Value {
+	switch intrinsicName {
 	case "abs":
 		if !isFloating(function.Returns) {
 			i1 := c.getPrimitiveType(ast.Bool)
@@ -481,12 +482,12 @@ func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsic ast.Intrinsi
 }
 
 func getMangledName(function *ast.Func) string {
-	var intrinsic ast.IntrinsicAttribute
+	intrinsicName := function.IntrinsicName()
 
-	if function.GetAttribute(&intrinsic) {
+	if intrinsicName != "" {
 		name := ""
 
-		switch intrinsic.Name {
+		switch intrinsicName {
 		case "abs":
 			name = ternary(isFloating(function.Returns), "llvm.fabs", "llvm.abs")
 
@@ -497,7 +498,7 @@ func getMangledName(function *ast.Func) string {
 			name = ternary(isFloating(function.Returns), "llvm.maxnum", ternary(isSigned(function.Returns), "llvm.smax", "llvm.umax"))
 
 		case "sqrt", "pow", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "fma", "copysign", "floor", "ceil", "round":
-			name = "llvm." + intrinsic.Name
+			name = "llvm." + intrinsicName
 
 		case "memcpy", "memmove":
 			return "llvm.memcpy.p0.p0.i32"

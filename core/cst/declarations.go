@@ -224,6 +224,7 @@ func parseFuncParam(p *parser) Node {
 
 // Attribute
 
+var canStartAttribute = []scanner.TokenKind{scanner.Identifier}
 var canStartAttributeArg = []scanner.TokenKind{scanner.String}
 
 func parseAttributes(p *parser) Node {
@@ -235,7 +236,7 @@ func parseAttributes(p *parser) Node {
 	if p.consume(scanner.LeftBracket) {
 		return p.end()
 	}
-	if p.repeatSync(parseAttribute, scanner.RightBracket, scanner.Identifier) {
+	if p.repeatSeparated(parseAttribute, canStartAttribute, scanner.Comma) {
 		return p.end()
 	}
 	if p.consume(scanner.RightBracket) {

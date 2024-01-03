@@ -320,6 +320,70 @@ func (p *Param) String() string {
 	return ""
 }
 
+// Attribute
+
+type Attribute struct {
+	cst    cst.Node
+	parent Node
+
+	Name *Token
+	Args []*Token
+}
+
+func NewAttribute(node cst.Node, name *Token, args []*Token) *Attribute {
+	a := &Attribute{
+		cst:  node,
+		Name: name,
+		Args: args,
+	}
+
+	if name != nil {
+		name.SetParent(a)
+	}
+	for _, child := range args {
+		child.SetParent(a)
+	}
+
+	return a
+}
+
+func (a *Attribute) Cst() *cst.Node {
+	if a.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &a.cst
+}
+
+func (a *Attribute) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (a *Attribute) Parent() Node {
+	return a.parent
+}
+
+func (a *Attribute) SetParent(parent Node) {
+	if parent != nil && a.parent != nil {
+		panic("ast.Attribute.SetParent() - Parent is already set")
+	}
+
+	a.parent = parent
+}
+
+func (a *Attribute) AcceptChildren(visitor Visitor) {
+	if a.Name != nil {
+		visitor.VisitNode(a.Name)
+	}
+	for _, child := range a.Args {
+		visitor.VisitNode(child)
+	}
+}
+
+func (a *Attribute) String() string {
+	return ""
+}
+
 // Token
 
 type Token struct {

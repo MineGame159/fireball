@@ -126,7 +126,7 @@ func (c *converter) convertEnumCase(node cst.Node) *ast.EnumCase {
 // Func
 
 func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
-	var attributes []any
+	var attributes []*ast.Attribute
 	var flags ast.FuncFlags
 	var name *ast.Token
 	var params []*ast.Param
@@ -162,11 +162,23 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 		}
 	}
 
-	var extern ast.ExternAttribute
-	var intrinsic ast.IntrinsicAttribute
+	needsBody := true
 
-	if !node.Contains(scanner.LeftBrace) && !ast.GetAttribute(attributes, &extern) && !ast.GetAttribute(attributes, &intrinsic) {
-		c.error(node, "Functions without the extern or intrinsic attribute need to have a body")
+	for _, attribute := range attributes {
+		if attribute.Name.String() == "Extern" || attribute.Name.String() == "Intrinsic" {
+			needsBody = false
+			break
+		}
+	}
+
+	if needsBody {
+		if !node.Contains(scanner.LeftBrace) {
+			c.error(node, "Functions without the extern or intrinsic attribute need to have a body")
+		}
+	} else {
+		if node.Contains(scanner.LeftBrace) {
+			c.error(node, "Functions with the extern or intrinsic attribute can't have a body")
+		}
 	}
 
 	if returns == nil {
@@ -193,4 +205,33 @@ func (c *converter) convertFuncParam(node cst.Node) (*ast.Param, bool) {
 	}
 
 	return ast.NewParam(node, name, type_), varArgs
+}
+
+// Attributes
+
+func (c *converter) convertAttributes(node cst.Node) []*ast.Attribute {
+	var attributes []*ast.Attribute
+
+	for _, child := range node.Children {
+		if child.Kind == cst.AttributeNode {
+			attributes = append(attributes, c.convertAttribute(child))
+		}
+	}
+
+	return attributes
+}
+
+func (c *converter) convertAttribute(node cst.Node) *ast.Attribute {
+	var name *ast.Token
+	var args []*ast.Token
+
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			name = c.convertToken(child)
+		} else if child.Kind == cst.StringExprNode {
+			args = append(args, c.convertToken(child))
+		}
+	}
+
+	return ast.NewAttribute(node, name, args)
 }

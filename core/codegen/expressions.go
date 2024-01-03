@@ -568,10 +568,10 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Intrinsic
-	var intrinsic ast.IntrinsicAttribute
+	intrinsicName := function.IntrinsicName()
 
-	if function.GetAttribute(&intrinsic) {
-		args = c.modifyIntrinsicArgs(function, intrinsic, args)
+	if intrinsicName != "" {
+		args = c.modifyIntrinsicArgs(function, intrinsicName, args)
 	}
 
 	// Call
@@ -647,7 +647,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 
 			c.exprResult = exprValue{
 				v: c.function.Literal(
-					c.getType(v.Type),
+					c.getType(v.ActualType),
 					llvm.Literal{Signed: case_.ActualValue, Unsigned: uint64(case_.ActualValue)},
 				),
 			}

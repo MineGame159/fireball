@@ -99,33 +99,23 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 
 func (c *checker) VisitFunc(decl *ast.Func) {
 	// Check attributes
-	for i, attribute := range decl.Attributes {
-		switch attribute := attribute.(type) {
-		case ast.ExternAttribute:
-			if attribute.Name == "" {
-				decl.Attributes[i] = ast.ExternAttribute{Name: decl.Name.String()}
-			}
-
-		case ast.IntrinsicAttribute:
-			if attribute.Name == "" {
-				decl.Attributes[i] = ast.IntrinsicAttribute{Name: decl.Name.String()}
-			}
-
-		case ast.InlineAttribute:
-
-		default:
-			c.error(decl.Name, "Invalid attribute for a function")
-		}
+	for _, attribute := range decl.Attributes {
+		c.visitAttribute(decl, attribute)
 	}
 
 	// Check flags
 	_, isImpl := decl.Parent().(*ast.Impl)
 
-	var extern ast.ExternAttribute
-	isExtern := decl.GetAttribute(&extern)
+	isExtern := false
+	isIntrinsic := false
 
-	var intrinsic ast.IntrinsicAttribute
-	isIntrinsic := decl.GetAttribute(&intrinsic)
+	for _, attribute := range decl.Attributes {
+		if attribute.Name.String() == "Extern" {
+			isExtern = true
+		} else if attribute.Name.String() == "Intrinsic" {
+			isIntrinsic = true
+		}
+	}
 
 	if isImpl && isExtern && !decl.IsStatic() {
 		c.error(decl.Name, "Non static methods can't be extern")
@@ -136,12 +126,6 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	if decl.IsVariadic() && !isExtern {
 		c.error(decl.Name, "Only extern functions can be variadic")
-	}
-
-	// Intrinsic
-	if isIntrinsic {
-		c.checkIntrinsic(decl, intrinsic)
-		return
 	}
 
 	// Push scope
@@ -187,113 +171,4 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 			c.error(decl.Name, "Function needs to return a '%s' value", ast.PrintType(decl.Returns))
 		}
 	}
-}
-
-func (c *checker) checkIntrinsic(decl *ast.Func, intrinsic ast.IntrinsicAttribute) {
-	valid := false
-
-	switch intrinsic.Name {
-	case "abs":
-		valid = isSimpleIntrinsic(decl, 1, signedPredicate|floatingPredicate)
-
-	case "min", "max":
-		valid = isSimpleIntrinsic(decl, 2, unsignedPredicate|signedPredicate|floatingPredicate)
-
-	case "pow", "copysign":
-		valid = isSimpleIntrinsic(decl, 2, floatingPredicate)
-
-	case "sqrt", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "floor", "ceil", "round":
-		valid = isSimpleIntrinsic(decl, 1, floatingPredicate)
-
-	case "fma":
-		valid = isSimpleIntrinsic(decl, 3, floatingPredicate)
-
-	case "memcpy", "memmove":
-		valid = isExactIntrinsic(decl, ast.Void, ast.Void, ast.U32)
-
-	case "memset":
-		valid = isExactIntrinsic(decl, ast.Void, ast.U8, ast.U32)
-	}
-
-	if !valid {
-		c.error(decl.Name, "Unknown intrinsic")
-	}
-}
-
-type simpleIntrinsicPredicate uint8
-
-const (
-	unsignedPredicate simpleIntrinsicPredicate = 1 << iota
-	signedPredicate
-	floatingPredicate
-)
-
-func isSimpleIntrinsic(decl *ast.Func, paramCount int, predicate simpleIntrinsicPredicate) bool {
-	if len(decl.Params) != paramCount {
-		return false
-	}
-
-	for _, param := range decl.Params {
-		if !isSimpleIntrinsicType(param.Type, predicate) {
-			return false
-		}
-	}
-
-	if !isSimpleIntrinsicType(decl.Returns, predicate) {
-		return false
-	}
-
-	for i, param := range decl.Params {
-		if i > 0 {
-			if !param.Type.Equals(decl.Params[0].Type) {
-				return false
-			}
-		}
-	}
-
-	if !decl.Returns.Equals(decl.Params[0].Type) {
-		return false
-	}
-
-	return true
-}
-
-func isSimpleIntrinsicType(type_ ast.Type, predicate simpleIntrinsicPredicate) bool {
-	valid := false
-
-	if v, ok := ast.As[*ast.Primitive](type_); ok {
-		if predicate&unsignedPredicate != 0 && ast.IsUnsigned(v.Kind) {
-			valid = true
-		} else if predicate&signedPredicate != 0 && ast.IsSigned(v.Kind) {
-			valid = true
-		} else if predicate&floatingPredicate != 0 && ast.IsFloating(v.Kind) {
-			valid = true
-		}
-	}
-
-	return valid
-}
-
-func isExactIntrinsic(decl *ast.Func, params ...ast.PrimitiveKind) bool {
-	if len(decl.Params) != len(params) {
-		return false
-	}
-
-	for i, param := range decl.Params {
-		if params[i] == ast.Void {
-			if _, ok := ast.As[*ast.Pointer](param.Type); !ok {
-				return false
-			}
-		} else {
-			if !ast.IsPrimitive(param.Type, params[i]) {
-				return false
-			}
-		}
-	}
-
-	if !ast.IsPrimitive(decl.Returns, ast.Void) {
-		return false
-	}
-
-	return true
 }

@@ -71,7 +71,7 @@ var declarations = Group{
 		),
 		node(
 			"Func",
-			field("attributes", array("any")),
+			field("attributes", array("Attribute")),
 			field("flags", type_("FuncFlags")),
 			field("name", type_("Token")),
 			field("params", array("Param")),
@@ -244,6 +244,11 @@ var other = Group{
 			"Param",
 			field("name", type_("Token")),
 			field("type", type_("Type")),
+		),
+		node(
+			"Attribute",
+			field("name", type_("Token")),
+			field("args", array("Token")),
 		),
 		node(
 			"Token",

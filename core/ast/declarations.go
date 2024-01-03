@@ -248,7 +248,7 @@ type Func struct {
 	cst    cst.Node
 	parent Node
 
-	Attributes []any
+	Attributes []*Attribute
 	Flags      FuncFlags
 	Name       *Token
 	Params     []*Param
@@ -256,7 +256,7 @@ type Func struct {
 	Body       []Stmt
 }
 
-func NewFunc(node cst.Node, attributes []any, flags FuncFlags, name *Token, params []*Param, returns Type, body []Stmt) *Func {
+func NewFunc(node cst.Node, attributes []*Attribute, flags FuncFlags, name *Token, params []*Param, returns Type, body []Stmt) *Func {
 	f := &Func{
 		cst:        node,
 		Attributes: attributes,
@@ -267,6 +267,9 @@ func NewFunc(node cst.Node, attributes []any, flags FuncFlags, name *Token, para
 		Body:       body,
 	}
 
+	for _, child := range attributes {
+		child.SetParent(f)
+	}
 	if name != nil {
 		name.SetParent(f)
 	}
@@ -308,6 +311,9 @@ func (f *Func) SetParent(parent Node) {
 }
 
 func (f *Func) AcceptChildren(visitor Visitor) {
+	for _, child := range f.Attributes {
+		visitor.VisitNode(child)
+	}
 	if f.Name != nil {
 		visitor.VisitNode(f.Name)
 	}
