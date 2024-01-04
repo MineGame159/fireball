@@ -185,6 +185,60 @@ func genNode(w *Writer, node Node, visitor string) {
 	w.write("}")
 	w.write("")
 
+	// Clone()
+
+	w.write("%s Clone() Node {", method)
+
+	w.write("%s2 := &%s{", this, node.name)
+	w.write("cst: %s.cst,", this)
+
+	for _, field := range node.fields {
+		if !field.type_.node() || field.public {
+			w.write("%s: %s.%s,", name(field.name), this, name(field.name))
+		}
+	}
+
+	w.write("}")
+	w.write("")
+
+	setParents := false
+
+	for _, field := range node.fields {
+		if !field.type_.node() {
+			continue
+		}
+
+		fieldName := name(field.name)
+
+		castTo := field.type_.name
+		if field.type_.concreteNode() {
+			castTo = "*" + castTo
+		}
+
+		if field.type_.array {
+			w.write("%s2.%s = make(%s, len(%s.%s))", this, fieldName, field.type_, this, fieldName)
+			w.write("for i, child := range %s2.%s {", this, fieldName)
+			w.write("%s2.%s[i] = child.Clone().(%s)", this, fieldName, castTo)
+			w.write("%s2.%s[i].SetParent(%s2)", this, fieldName, this)
+			w.write("}")
+		} else {
+			w.write("if %s.%s != nil {", this, fieldName)
+			w.write("%s2.%s = %s.%s.Clone().(%s)", this, fieldName, this, fieldName, castTo)
+			w.write("%s2.%s.SetParent(%s2)", this, fieldName, this)
+			w.write("}")
+		}
+
+		setParents = true
+	}
+
+	if setParents {
+		w.write("")
+	}
+
+	w.write("return %s2", this)
+	w.write("}")
+	w.write("")
+
 	// String()
 
 	w.write("%s String() string {", method)

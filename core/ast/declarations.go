@@ -92,6 +92,29 @@ func (s *Struct) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (s *Struct) Clone() Node {
+	s2 := &Struct{
+		cst: s.cst,
+	}
+
+	if s.Name != nil {
+		s2.Name = s.Name.Clone().(*Token)
+		s2.Name.SetParent(s2)
+	}
+	s2.Fields = make([]*Field, len(s.Fields))
+	for i, child := range s2.Fields {
+		s2.Fields[i] = child.Clone().(*Field)
+		s2.Fields[i].SetParent(s2)
+	}
+	s2.StaticFields = make([]*Field, len(s.StaticFields))
+	for i, child := range s2.StaticFields {
+		s2.StaticFields[i] = child.Clone().(*Field)
+		s2.StaticFields[i].SetParent(s2)
+	}
+
+	return s2
+}
+
 func (s *Struct) String() string {
 	return ""
 }
@@ -173,6 +196,33 @@ func (e *Enum) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (e *Enum) Clone() Node {
+	e2 := &Enum{
+		cst:        e.cst,
+		ActualType: e.ActualType,
+	}
+
+	if e.Name != nil {
+		e2.Name = e.Name.Clone().(*Token)
+		e2.Name.SetParent(e2)
+	}
+	if e.Type != nil {
+		e2.Type = e.Type.Clone().(Type)
+		e2.Type.SetParent(e2)
+	}
+	if e.ActualType != nil {
+		e2.ActualType = e.ActualType.Clone().(Type)
+		e2.ActualType.SetParent(e2)
+	}
+	e2.Cases = make([]*EnumCase, len(e.Cases))
+	for i, child := range e2.Cases {
+		e2.Cases[i] = child.Clone().(*EnumCase)
+		e2.Cases[i].SetParent(e2)
+	}
+
+	return e2
+}
+
 func (e *Enum) String() string {
 	return ""
 }
@@ -244,6 +294,29 @@ func (i *Impl) AcceptChildren(visitor Visitor) {
 	for _, child := range i.Methods {
 		visitor.VisitNode(child)
 	}
+}
+
+func (i *Impl) Clone() Node {
+	i2 := &Impl{
+		cst:  i.cst,
+		Type: i.Type,
+	}
+
+	if i.Struct != nil {
+		i2.Struct = i.Struct.Clone().(*Token)
+		i2.Struct.SetParent(i2)
+	}
+	if i.Type != nil {
+		i2.Type = i.Type.Clone().(Type)
+		i2.Type.SetParent(i2)
+	}
+	i2.Methods = make([]*Func, len(i.Methods))
+	for i, child := range i2.Methods {
+		i2.Methods[i] = child.Clone().(*Func)
+		i2.Methods[i].SetParent(i2)
+	}
+
+	return i2
 }
 
 func (i *Impl) String() string {
@@ -342,6 +415,39 @@ func (f *Func) AcceptChildren(visitor Visitor) {
 	for _, child := range f.Body {
 		visitor.VisitNode(child)
 	}
+}
+
+func (f *Func) Clone() Node {
+	f2 := &Func{
+		cst:   f.cst,
+		Flags: f.Flags,
+	}
+
+	f2.Attributes = make([]*Attribute, len(f.Attributes))
+	for i, child := range f2.Attributes {
+		f2.Attributes[i] = child.Clone().(*Attribute)
+		f2.Attributes[i].SetParent(f2)
+	}
+	if f.Name != nil {
+		f2.Name = f.Name.Clone().(*Token)
+		f2.Name.SetParent(f2)
+	}
+	f2.Params = make([]*Param, len(f.Params))
+	for i, child := range f2.Params {
+		f2.Params[i] = child.Clone().(*Param)
+		f2.Params[i].SetParent(f2)
+	}
+	if f.Returns != nil {
+		f2.Returns = f.Returns.Clone().(Type)
+		f2.Returns.SetParent(f2)
+	}
+	f2.Body = make([]Stmt, len(f.Body))
+	for i, child := range f2.Body {
+		f2.Body[i] = child.Clone().(Stmt)
+		f2.Body[i].SetParent(f2)
+	}
+
+	return f2
 }
 
 func (f *Func) String() string {

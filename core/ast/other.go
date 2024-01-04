@@ -59,6 +59,21 @@ func (f *File) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (f *File) Clone() Node {
+	f2 := &File{
+		cst:  f.cst,
+		Path: f.Path,
+	}
+
+	f2.Decls = make([]Decl, len(f.Decls))
+	for i, child := range f2.Decls {
+		f2.Decls[i] = child.Clone().(Decl)
+		f2.Decls[i].SetParent(f2)
+	}
+
+	return f2
+}
+
 func (f *File) String() string {
 	return ""
 }
@@ -127,6 +142,23 @@ func (f *Field) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (f *Field) Clone() Node {
+	f2 := &Field{
+		cst: f.cst,
+	}
+
+	if f.Name != nil {
+		f2.Name = f.Name.Clone().(*Token)
+		f2.Name.SetParent(f2)
+	}
+	if f.Type != nil {
+		f2.Type = f.Type.Clone().(Type)
+		f2.Type.SetParent(f2)
+	}
+
+	return f2
+}
+
 func (f *Field) String() string {
 	return ""
 }
@@ -193,6 +225,23 @@ func (i *InitField) AcceptChildren(visitor Visitor) {
 	if i.Value != nil {
 		visitor.VisitNode(i.Value)
 	}
+}
+
+func (i *InitField) Clone() Node {
+	i2 := &InitField{
+		cst: i.cst,
+	}
+
+	if i.Name != nil {
+		i2.Name = i.Name.Clone().(*Token)
+		i2.Name.SetParent(i2)
+	}
+	if i.Value != nil {
+		i2.Value = i.Value.Clone().(Expr)
+		i2.Value.SetParent(i2)
+	}
+
+	return i2
 }
 
 func (i *InitField) String() string {
@@ -264,6 +313,24 @@ func (e *EnumCase) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (e *EnumCase) Clone() Node {
+	e2 := &EnumCase{
+		cst:         e.cst,
+		ActualValue: e.ActualValue,
+	}
+
+	if e.Name != nil {
+		e2.Name = e.Name.Clone().(*Token)
+		e2.Name.SetParent(e2)
+	}
+	if e.Value != nil {
+		e2.Value = e.Value.Clone().(*Token)
+		e2.Value.SetParent(e2)
+	}
+
+	return e2
+}
+
 func (e *EnumCase) String() string {
 	return ""
 }
@@ -330,6 +397,23 @@ func (p *Param) AcceptChildren(visitor Visitor) {
 	if p.Type != nil {
 		visitor.VisitNode(p.Type)
 	}
+}
+
+func (p *Param) Clone() Node {
+	p2 := &Param{
+		cst: p.cst,
+	}
+
+	if p.Name != nil {
+		p2.Name = p.Name.Clone().(*Token)
+		p2.Name.SetParent(p2)
+	}
+	if p.Type != nil {
+		p2.Type = p.Type.Clone().(Type)
+		p2.Type.SetParent(p2)
+	}
+
+	return p2
 }
 
 func (p *Param) String() string {
@@ -400,6 +484,24 @@ func (a *Attribute) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (a *Attribute) Clone() Node {
+	a2 := &Attribute{
+		cst: a.cst,
+	}
+
+	if a.Name != nil {
+		a2.Name = a.Name.Clone().(*Token)
+		a2.Name.SetParent(a2)
+	}
+	a2.Args = make([]*Token, len(a.Args))
+	for i, child := range a2.Args {
+		a2.Args[i] = child.Clone().(*Token)
+		a2.Args[i].SetParent(a2)
+	}
+
+	return a2
+}
+
 func (a *Attribute) String() string {
 	return ""
 }
@@ -451,6 +553,15 @@ func (t *Token) SetParent(parent Node) {
 }
 
 func (t *Token) AcceptChildren(visitor Visitor) {
+}
+
+func (t *Token) Clone() Node {
+	t2 := &Token{
+		cst:    t.cst,
+		Token_: t.Token_,
+	}
+
+	return t2
 }
 
 func (t *Token) String() string {

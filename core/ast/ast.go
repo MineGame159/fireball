@@ -15,6 +15,8 @@ type Node interface {
 
 	AcceptChildren(visitor Visitor)
 
+	Clone() Node
+
 	String() string
 }
 
@@ -45,9 +47,11 @@ func (g *get) VisitNode(node Node) {
 	}
 
 	// Check if node contains target position
-	if node.Cst() == nil || node.Cst().Range.Contains(g.pos) {
+	contains := node.Cst().Range.Contains(g.pos)
+
+	if node.Cst() == nil || contains {
 		// Check if node is a leaf node
-		if !node.Token().IsError() {
+		if !node.Token().IsEmpty() && contains {
 			g.node = node
 			return
 		}

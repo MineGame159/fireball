@@ -91,6 +91,19 @@ func (p *Paren) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (p *Paren) Clone() Node {
+	p2 := &Paren{
+		cst: p.cst,
+	}
+
+	if p.Expr != nil {
+		p2.Expr = p.Expr.Clone().(Expr)
+		p2.Expr.SetParent(p2)
+	}
+
+	return p2
+}
+
 func (p *Paren) String() string {
 	return ""
 }
@@ -169,6 +182,24 @@ func (u *Unary) AcceptChildren(visitor Visitor) {
 	if u.Value != nil {
 		visitor.VisitNode(u.Value)
 	}
+}
+
+func (u *Unary) Clone() Node {
+	u2 := &Unary{
+		cst:    u.cst,
+		Prefix: u.Prefix,
+	}
+
+	if u.Operator != nil {
+		u2.Operator = u.Operator.Clone().(*Token)
+		u2.Operator.SetParent(u2)
+	}
+	if u.Value != nil {
+		u2.Value = u.Value.Clone().(Expr)
+		u2.Value.SetParent(u2)
+	}
+
+	return u2
 }
 
 func (u *Unary) String() string {
@@ -257,6 +288,27 @@ func (b *Binary) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (b *Binary) Clone() Node {
+	b2 := &Binary{
+		cst: b.cst,
+	}
+
+	if b.Left != nil {
+		b2.Left = b.Left.Clone().(Expr)
+		b2.Left.SetParent(b2)
+	}
+	if b.Operator != nil {
+		b2.Operator = b.Operator.Clone().(*Token)
+		b2.Operator.SetParent(b2)
+	}
+	if b.Right != nil {
+		b2.Right = b.Right.Clone().(Expr)
+		b2.Right.SetParent(b2)
+	}
+
+	return b2
+}
+
 func (b *Binary) String() string {
 	return ""
 }
@@ -341,6 +393,27 @@ func (l *Logical) AcceptChildren(visitor Visitor) {
 	if l.Right != nil {
 		visitor.VisitNode(l.Right)
 	}
+}
+
+func (l *Logical) Clone() Node {
+	l2 := &Logical{
+		cst: l.cst,
+	}
+
+	if l.Left != nil {
+		l2.Left = l.Left.Clone().(Expr)
+		l2.Left.SetParent(l2)
+	}
+	if l.Operator != nil {
+		l2.Operator = l.Operator.Clone().(*Token)
+		l2.Operator.SetParent(l2)
+	}
+	if l.Right != nil {
+		l2.Right = l.Right.Clone().(Expr)
+		l2.Right.SetParent(l2)
+	}
+
+	return l2
 }
 
 func (l *Logical) String() string {
@@ -429,6 +502,27 @@ func (a *Assignment) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (a *Assignment) Clone() Node {
+	a2 := &Assignment{
+		cst: a.cst,
+	}
+
+	if a.Assignee != nil {
+		a2.Assignee = a.Assignee.Clone().(Expr)
+		a2.Assignee.SetParent(a2)
+	}
+	if a.Operator != nil {
+		a2.Operator = a.Operator.Clone().(*Token)
+		a2.Operator.SetParent(a2)
+	}
+	if a.Value != nil {
+		a2.Value = a.Value.Clone().(Expr)
+		a2.Value.SetParent(a2)
+	}
+
+	return a2
+}
+
 func (a *Assignment) String() string {
 	return ""
 }
@@ -505,6 +599,23 @@ func (m *Member) AcceptChildren(visitor Visitor) {
 	if m.Name != nil {
 		visitor.VisitNode(m.Name)
 	}
+}
+
+func (m *Member) Clone() Node {
+	m2 := &Member{
+		cst: m.cst,
+	}
+
+	if m.Value != nil {
+		m2.Value = m.Value.Clone().(Expr)
+		m2.Value.SetParent(m2)
+	}
+	if m.Name != nil {
+		m2.Name = m.Name.Clone().(*Token)
+		m2.Name.SetParent(m2)
+	}
+
+	return m2
 }
 
 func (m *Member) String() string {
@@ -585,6 +696,23 @@ func (i *Index) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (i *Index) Clone() Node {
+	i2 := &Index{
+		cst: i.cst,
+	}
+
+	if i.Value != nil {
+		i2.Value = i.Value.Clone().(Expr)
+		i2.Value.SetParent(i2)
+	}
+	if i.Index != nil {
+		i2.Index = i.Index.Clone().(Expr)
+		i2.Index.SetParent(i2)
+	}
+
+	return i2
+}
+
 func (i *Index) String() string {
 	return ""
 }
@@ -661,6 +789,23 @@ func (c *Cast) AcceptChildren(visitor Visitor) {
 	if c.Target != nil {
 		visitor.VisitNode(c.Target)
 	}
+}
+
+func (c *Cast) Clone() Node {
+	c2 := &Cast{
+		cst: c.cst,
+	}
+
+	if c.Value != nil {
+		c2.Value = c.Value.Clone().(Expr)
+		c2.Value.SetParent(c2)
+	}
+	if c.Target != nil {
+		c2.Target = c.Target.Clone().(Type)
+		c2.Target.SetParent(c2)
+	}
+
+	return c2
 }
 
 func (c *Cast) String() string {
@@ -741,6 +886,24 @@ func (c *Call) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (c *Call) Clone() Node {
+	c2 := &Call{
+		cst: c.cst,
+	}
+
+	if c.Callee != nil {
+		c2.Callee = c.Callee.Clone().(Expr)
+		c2.Callee.SetParent(c2)
+	}
+	c2.Args = make([]Expr, len(c.Args))
+	for i, child := range c2.Args {
+		c2.Args[i] = child.Clone().(Expr)
+		c2.Args[i].SetParent(c2)
+	}
+
+	return c2
+}
+
 func (c *Call) String() string {
 	return ""
 }
@@ -817,6 +980,23 @@ func (t *TypeCall) AcceptChildren(visitor Visitor) {
 	if t.Arg != nil {
 		visitor.VisitNode(t.Arg)
 	}
+}
+
+func (t *TypeCall) Clone() Node {
+	t2 := &TypeCall{
+		cst: t.cst,
+	}
+
+	if t.Callee != nil {
+		t2.Callee = t.Callee.Clone().(*Token)
+		t2.Callee.SetParent(t2)
+	}
+	if t.Arg != nil {
+		t2.Arg = t.Arg.Clone().(Type)
+		t2.Arg.SetParent(t2)
+	}
+
+	return t2
 }
 
 func (t *TypeCall) String() string {
@@ -899,6 +1079,25 @@ func (s *StructInitializer) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (s *StructInitializer) Clone() Node {
+	s2 := &StructInitializer{
+		cst: s.cst,
+		New: s.New,
+	}
+
+	if s.Type != nil {
+		s2.Type = s.Type.Clone().(Type)
+		s2.Type.SetParent(s2)
+	}
+	s2.Fields = make([]*InitField, len(s.Fields))
+	for i, child := range s2.Fields {
+		s2.Fields[i] = child.Clone().(*InitField)
+		s2.Fields[i].SetParent(s2)
+	}
+
+	return s2
+}
+
 func (s *StructInitializer) String() string {
 	return ""
 }
@@ -967,6 +1166,20 @@ func (a *ArrayInitializer) AcceptChildren(visitor Visitor) {
 	for _, child := range a.Values {
 		visitor.VisitNode(child)
 	}
+}
+
+func (a *ArrayInitializer) Clone() Node {
+	a2 := &ArrayInitializer{
+		cst: a.cst,
+	}
+
+	a2.Values = make([]Expr, len(a.Values))
+	for i, child := range a2.Values {
+		a2.Values[i] = child.Clone().(Expr)
+		a2.Values[i].SetParent(a2)
+	}
+
+	return a2
 }
 
 func (a *ArrayInitializer) String() string {
@@ -1047,6 +1260,23 @@ func (a *AllocateArray) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (a *AllocateArray) Clone() Node {
+	a2 := &AllocateArray{
+		cst: a.cst,
+	}
+
+	if a.Type != nil {
+		a2.Type = a.Type.Clone().(Type)
+		a2.Type.SetParent(a2)
+	}
+	if a.Count != nil {
+		a2.Count = a.Count.Clone().(Expr)
+		a2.Count.SetParent(a2)
+	}
+
+	return a2
+}
+
 func (a *AllocateArray) String() string {
 	return ""
 }
@@ -1111,6 +1341,16 @@ func (i *Identifier) SetParent(parent Node) {
 func (i *Identifier) AcceptChildren(visitor Visitor) {
 }
 
+func (i *Identifier) Clone() Node {
+	i2 := &Identifier{
+		cst:  i.cst,
+		Name: i.Name,
+		Kind: i.Kind,
+	}
+
+	return i2
+}
+
 func (i *Identifier) String() string {
 	return i.Name.String()
 }
@@ -1172,6 +1412,15 @@ func (l *Literal) SetParent(parent Node) {
 }
 
 func (l *Literal) AcceptChildren(visitor Visitor) {
+}
+
+func (l *Literal) Clone() Node {
+	l2 := &Literal{
+		cst:    l.cst,
+		Token_: l.Token_,
+	}
+
+	return l2
 }
 
 func (l *Literal) String() string {

@@ -82,6 +82,16 @@ func (p *Primitive) SetParent(parent Node) {
 func (p *Primitive) AcceptChildren(visitor Visitor) {
 }
 
+func (p *Primitive) Clone() Node {
+	p2 := &Primitive{
+		cst:    p.cst,
+		Kind:   p.Kind,
+		Token_: p.Token_,
+	}
+
+	return p2
+}
+
 func (p *Primitive) String() string {
 	return p.Token_.String()
 }
@@ -148,6 +158,19 @@ func (p *Pointer) AcceptChildren(visitor Visitor) {
 	if p.Pointee != nil {
 		visitor.VisitNode(p.Pointee)
 	}
+}
+
+func (p *Pointer) Clone() Node {
+	p2 := &Pointer{
+		cst: p.cst,
+	}
+
+	if p.Pointee != nil {
+		p2.Pointee = p.Pointee.Clone().(Type)
+		p2.Pointee.SetParent(p2)
+	}
+
+	return p2
 }
 
 func (p *Pointer) String() string {
@@ -220,6 +243,20 @@ func (a *Array) AcceptChildren(visitor Visitor) {
 	}
 }
 
+func (a *Array) Clone() Node {
+	a2 := &Array{
+		cst:   a.cst,
+		Count: a.Count,
+	}
+
+	if a.Base != nil {
+		a2.Base = a.Base.Clone().(Type)
+		a2.Base.SetParent(a2)
+	}
+
+	return a2
+}
+
 func (a *Array) String() string {
 	return ""
 }
@@ -280,6 +317,21 @@ func (r *Resolvable) SetParent(parent Node) {
 }
 
 func (r *Resolvable) AcceptChildren(visitor Visitor) {
+}
+
+func (r *Resolvable) Clone() Node {
+	r2 := &Resolvable{
+		cst:  r.cst,
+		Name: r.Name,
+		Type: r.Type,
+	}
+
+	if r.Type != nil {
+		r2.Type = r.Type.Clone().(Type)
+		r2.Type.SetParent(r2)
+	}
+
+	return r2
 }
 
 func (r *Resolvable) String() string {
