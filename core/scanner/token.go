@@ -123,6 +123,10 @@ func (t Token) String() string {
 	return t.Lexeme
 }
 
+func (t Token) IsEmpty() bool {
+	return t.Kind == Error && t.Lexeme == ""
+}
+
 type PositionedToken struct {
 	Token
 

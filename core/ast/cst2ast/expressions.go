@@ -45,7 +45,11 @@ func (c *converter) convertParenExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewParen(node, expr)
+	if p := ast.NewParen(node, expr); p != nil {
+		return p
+	}
+
+	return nil
 }
 
 func (c *converter) convertUnaryExpr(node cst.Node) ast.Expr {
@@ -65,7 +69,11 @@ func (c *converter) convertUnaryExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewUnary(node, prefix, operator, value)
+	if u := ast.NewUnary(node, prefix, operator, value); u != nil {
+		return u
+	}
+
+	return nil
 }
 
 func (c *converter) convertBinaryExpr(node cst.Node) ast.Expr {
@@ -99,7 +107,11 @@ func (c *converter) convertBinaryExpr(node cst.Node) ast.Expr {
 		return ast.NewAssignment(node, left, operator, right)
 	}
 
-	return ast.NewBinary(node, left, operator, right)
+	if b := ast.NewBinary(node, left, operator, right); b != nil {
+		return b
+	}
+
+	return nil
 }
 
 func (c *converter) convertMemberExpr(node cst.Node) ast.Expr {
@@ -118,7 +130,11 @@ func (c *converter) convertMemberExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewMember(node, value, name)
+	if m := ast.NewMember(node, value, name); m != nil {
+		return m
+	}
+
+	return nil
 }
 
 func (c *converter) convertIndexExpr(node cst.Node) ast.Expr {
@@ -135,7 +151,11 @@ func (c *converter) convertIndexExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewIndex(node, value, index)
+	if i := ast.NewIndex(node, value, index); i != nil {
+		return i
+	}
+
+	return nil
 }
 
 func (c *converter) convertCastExpr(node cst.Node) ast.Expr {
@@ -150,7 +170,11 @@ func (c *converter) convertCastExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewCast(node, value, target)
+	if c := ast.NewCast(node, value, target); c != nil {
+		return c
+	}
+
+	return nil
 }
 
 func (c *converter) convertCallExpr(node cst.Node) ast.Expr {
@@ -167,7 +191,11 @@ func (c *converter) convertCallExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewCall(node, callee, args)
+	if c := ast.NewCall(node, callee, args); c != nil {
+		return c
+	}
+
+	return nil
 }
 
 func (c *converter) convertTypeCallExpr(node cst.Node) ast.Expr {
@@ -182,7 +210,11 @@ func (c *converter) convertTypeCallExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewTypeCall(node, name, arg)
+	if t := ast.NewTypeCall(node, name, arg); t != nil {
+		return t
+	}
+
+	return nil
 }
 
 func (c *converter) convertStructExpr(node cst.Node) ast.Expr {
@@ -200,7 +232,11 @@ func (c *converter) convertStructExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewStructInitializer(node, new_, type_, fields)
+	if s := ast.NewStructInitializer(node, new_, type_, fields); s != nil {
+		return s
+	}
+
+	return nil
 }
 
 func (c *converter) convertStructFieldExpr(node cst.Node) *ast.InitField {
@@ -219,7 +255,11 @@ func (c *converter) convertStructFieldExpr(node cst.Node) *ast.InitField {
 		}
 	}
 
-	return ast.NewInitField(node, name, value)
+	if i := ast.NewInitField(node, name, value); i != nil {
+		return i
+	}
+
+	return nil
 }
 
 func (c *converter) convertArrayExpr(node cst.Node) ast.Expr {
@@ -231,7 +271,11 @@ func (c *converter) convertArrayExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewArrayInitializer(node, values)
+	if a := ast.NewArrayInitializer(node, values); a != nil {
+		return a
+	}
+
+	return nil
 }
 
 func (c *converter) convertAllocateArrayExpr(node cst.Node) ast.Expr {
@@ -246,13 +290,25 @@ func (c *converter) convertAllocateArrayExpr(node cst.Node) ast.Expr {
 		}
 	}
 
-	return ast.NewAllocateArray(node, type_, count)
+	if a := ast.NewAllocateArray(node, type_, count); a != nil {
+		return a
+	}
+
+	return nil
 }
 
 func (c *converter) convertIdentifierExpr(node cst.Node) ast.Expr {
-	return ast.NewIdentifier(node, node.Token)
+	if i := ast.NewIdentifier(node, node.Token); i != nil {
+		return i
+	}
+
+	return nil
 }
 
 func (c *converter) convertLiteral(node cst.Node) ast.Expr {
-	return ast.NewLiteral(node, node.Token)
+	if l := ast.NewLiteral(node, node.Token); l != nil {
+		return l
+	}
+
+	return nil
 }

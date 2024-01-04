@@ -2,9 +2,7 @@ package typeresolver
 
 import (
 	"fireball/core/ast"
-	"fireball/core/cst"
 	"fireball/core/fuckoff"
-	"fireball/core/scanner"
 	"fireball/core/utils"
 	"fmt"
 )
@@ -28,18 +26,20 @@ func Resolve(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) 
 // Declarations
 
 func (t *typeResolver) visitImpl(decl *ast.Impl) {
-	type_, _ := t.resolver.GetType(decl.Struct.Token().Lexeme)
+	if decl.Struct != nil {
+		type_, _ := t.resolver.GetType(decl.Struct.Token().Lexeme)
 
-	if s, ok := type_.(*ast.Struct); ok {
-		decl.Type = s
-	} else {
-		t.reporter.Report(utils.Diagnostic{
-			Kind:    utils.ErrorKind,
-			Range:   decl.Struct.Cst().Range,
-			Message: fmt.Sprintf("Struct with the name '%s' does not exist", decl.Struct.Token()),
-		})
+		if s, ok := type_.(*ast.Struct); ok {
+			decl.Type = s
+		} else {
+			t.reporter.Report(utils.Diagnostic{
+				Kind:    utils.ErrorKind,
+				Range:   decl.Struct.Cst().Range,
+				Message: fmt.Sprintf("Struct with the name '%s' does not exist", decl.Struct.Token()),
+			})
 
-		decl.Type = nil
+			decl.Type = nil
+		}
 	}
 
 	decl.AcceptChildren(t)
@@ -58,7 +58,7 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 				Message: fmt.Sprintf("Unknown type '%s'", resolvable.Token()),
 			})
 
-			resolvable.Type = ast.NewPrimitive(cst.Node{}, ast.Void, scanner.Token{})
+			resolvable.Type = &ast.Primitive{Kind: ast.Void}
 
 			if t.expr != nil {
 				t.expr.Result().SetInvalid()

@@ -32,6 +32,10 @@ type Struct struct {
 }
 
 func NewStruct(node cst.Node, name *Token, fields []*Field, staticfields []*Field) *Struct {
+	if name == nil && fields == nil && staticfields == nil {
+		return nil
+	}
+
 	s := &Struct{
 		cst:          node,
 		Name:         name,
@@ -109,6 +113,10 @@ type Enum struct {
 }
 
 func NewEnum(node cst.Node, name *Token, type_ Type, cases []*EnumCase) *Enum {
+	if name == nil && type_ == nil && cases == nil {
+		return nil
+	}
+
 	e := &Enum{
 		cst:   node,
 		Name:  name,
@@ -185,6 +193,10 @@ type Impl struct {
 }
 
 func NewImpl(node cst.Node, struct_ *Token, methods []*Func) *Impl {
+	if struct_ == nil && methods == nil {
+		return nil
+	}
+
 	i := &Impl{
 		cst:     node,
 		Struct:  struct_,
@@ -257,6 +269,10 @@ type Func struct {
 }
 
 func NewFunc(node cst.Node, attributes []*Attribute, flags FuncFlags, name *Token, params []*Param, returns Type, body []Stmt) *Func {
+	if attributes == nil && flags == 0 && name == nil && params == nil && returns == nil && body == nil {
+		return nil
+	}
+
 	f := &Func{
 		cst:        node,
 		Attributes: attributes,

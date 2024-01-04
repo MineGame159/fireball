@@ -34,6 +34,10 @@ type Expression struct {
 }
 
 func NewExpression(node cst.Node, expr Expr) *Expression {
+	if expr == nil {
+		return nil
+	}
+
 	e := &Expression{
 		cst:  node,
 		Expr: expr,
@@ -94,6 +98,10 @@ type Block struct {
 }
 
 func NewBlock(node cst.Node, stmts []Stmt) *Block {
+	if stmts == nil {
+		return nil
+	}
+
 	b := &Block{
 		cst:   node,
 		Stmts: stmts,
@@ -157,6 +165,10 @@ type Var struct {
 }
 
 func NewVar(node cst.Node, name *Token, type_ Type, value Expr) *Var {
+	if name == nil && type_ == nil && value == nil {
+		return nil
+	}
+
 	v := &Var{
 		cst:   node,
 		Name:  name,
@@ -233,6 +245,10 @@ type If struct {
 }
 
 func NewIf(node cst.Node, condition Expr, then Stmt, else_ Stmt) *If {
+	if condition == nil && then == nil && else_ == nil {
+		return nil
+	}
+
 	i := &If{
 		cst:       node,
 		Condition: condition,
@@ -310,6 +326,10 @@ type For struct {
 }
 
 func NewFor(node cst.Node, initializer Stmt, condition Expr, increment Expr, body Stmt) *For {
+	if initializer == nil && condition == nil && increment == nil && body == nil {
+		return nil
+	}
+
 	f := &For{
 		cst:         node,
 		Initializer: initializer,
@@ -391,6 +411,10 @@ type Return struct {
 }
 
 func NewReturn(node cst.Node, value Expr) *Return {
+	if value == nil {
+		return nil
+	}
+
 	r := &Return{
 		cst:   node,
 		Value: value,

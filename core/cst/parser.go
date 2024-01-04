@@ -57,12 +57,12 @@ func (p *parser) child(parseFn func(p *parser) Node) bool {
 }
 
 func (p *parser) childAdd(node Node) bool {
-	if p.recovering() {
-		return true
-	}
-
 	if node.Token.Lexeme != "" || len(node.Children) != 0 {
 		p.children = append(p.children, node)
+	}
+
+	if p.recovering() {
+		return true
 	}
 
 	return false

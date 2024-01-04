@@ -45,39 +45,47 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 
 	for _, file := range files {
 		for _, decl := range file.Ast.Decls {
-			if struct_, ok := decl.(*ast.Struct); ok && struct_.Cst() != nil && struct_.Name.Cst() != nil {
+			if struct_, ok := decl.(*ast.Struct); ok {
+				if struct_.Cst() == nil || nodeCst(struct_.Name) == nil {
+					continue
+				}
+
 				id := symbols.add(symbol{
 					kind:           protocol.SymbolKindStruct,
 					name:           struct_.Name.String(),
 					range_:         struct_.Cst().Range,
-					selectionRange: struct_.Name.Cst().Range,
+					selectionRange: nodeCst(struct_.Name).Range,
 					file:           file,
 				}, len(struct_.StaticFields)+len(struct_.Fields)+methodCount[struct_])
 
 				for _, field := range struct_.StaticFields {
-					if field.Name.Cst() != nil {
-						symbols.addChild(id, symbol{
-							file:           file,
-							kind:           protocol.SymbolKindField,
-							name:           field.Name.String(),
-							detail:         ast.PrintType(field.Type),
-							range_:         field.Name.Cst().Range,
-							selectionRange: field.Name.Cst().Range,
-						})
+					if nodeCst(field.Name) == nil {
+						continue
 					}
+
+					symbols.addChild(id, symbol{
+						file:           file,
+						kind:           protocol.SymbolKindField,
+						name:           field.Name.String(),
+						detail:         ast.PrintType(field.Type),
+						range_:         nodeCst(field.Name).Range,
+						selectionRange: nodeCst(field.Name).Range,
+					})
 				}
 
 				for _, field := range struct_.Fields {
-					if field.Cst() != nil {
-						symbols.addChild(id, symbol{
-							file:           file,
-							kind:           protocol.SymbolKindField,
-							name:           field.Name.String(),
-							detail:         ast.PrintType(field.Type),
-							range_:         field.Name.Cst().Range,
-							selectionRange: field.Name.Cst().Range,
-						})
+					if nodeCst(field.Name) == nil {
+						continue
 					}
+
+					symbols.addChild(id, symbol{
+						file:           file,
+						kind:           protocol.SymbolKindField,
+						name:           field.Name.String(),
+						detail:         ast.PrintType(field.Type),
+						range_:         nodeCst(field.Name).Range,
+						selectionRange: nodeCst(field.Name).Range,
+					})
 				}
 
 				structs[struct_] = id
@@ -102,7 +110,7 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 				}
 
 				for _, function := range impl.Methods {
-					if function.Cst() != nil && function.Name.Cst() != nil {
+					if nodeCst(function) != nil && nodeCst(function.Name) != nil {
 						detail := ""
 
 						if symbols.supportsDetail() {
@@ -114,34 +122,34 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 							kind:           protocol.SymbolKindMethod,
 							name:           function.Name.String(),
 							detail:         detail,
-							range_:         function.Cst().Range,
-							selectionRange: function.Name.Cst().Range,
+							range_:         nodeCst(function).Range,
+							selectionRange: nodeCst(function.Name).Range,
 						})
 					}
 				}
-			} else if enum, ok := decl.(*ast.Enum); ok && enum.Cst() != nil && enum.Name.Cst() != nil {
+			} else if enum, ok := decl.(*ast.Enum); ok && nodeCst(enum) != nil && nodeCst(enum.Name) != nil {
 				// Enum
 				id := symbols.add(symbol{
 					kind:           protocol.SymbolKindEnum,
 					name:           enum.Name.String(),
-					range_:         enum.Cst().Range,
-					selectionRange: enum.Name.Cst().Range,
+					range_:         nodeCst(enum).Range,
+					selectionRange: nodeCst(enum.Name).Range,
 					file:           file,
 				}, len(enum.Cases))
 
 				for _, case_ := range enum.Cases {
-					if case_.Name.Cst() != nil {
+					if nodeCst(case_.Name) != nil {
 						symbols.addChild(id, symbol{
 							file:           file,
 							kind:           protocol.SymbolKindEnumMember,
 							name:           case_.Name.String(),
 							detail:         strconv.FormatInt(case_.ActualValue, 10),
-							range_:         case_.Name.Cst().Range,
-							selectionRange: case_.Name.Cst().Range,
+							range_:         nodeCst(case_.Name).Range,
+							selectionRange: nodeCst(case_.Name).Range,
 						})
 					}
 				}
-			} else if function, ok := decl.(*ast.Func); ok && function.Cst() != nil && function.Name.Cst() != nil {
+			} else if function, ok := decl.(*ast.Func); ok && nodeCst(function) != nil && nodeCst(function.Name) != nil {
 				// Function
 				detail := ""
 
@@ -154,8 +162,8 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 					kind:           protocol.SymbolKindFunction,
 					name:           function.Name.String(),
 					detail:         detail,
-					range_:         function.Cst().Range,
-					selectionRange: function.Name.Cst().Range,
+					range_:         nodeCst(function).Range,
+					selectionRange: nodeCst(function.Name).Range,
 				}, 0)
 			}
 		}

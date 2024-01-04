@@ -47,20 +47,22 @@ func Check(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) {
 // Scope / Variables
 
 func (c *checker) hasVariableInScope(name *ast.Token) bool {
-	scope := c.peekScope()
+	if name != nil {
+		scope := c.peekScope()
 
-	for i := scope.variableCount - 1; i >= 0; i-- {
-		if c.variables[scope.variableI+i].name.String() == name.String() {
-			return true
+		for i := scope.variableCount - 1; i >= 0; i-- {
+			if c.variables[scope.variableI+i].name.String() == name.String() {
+				return true
+			}
 		}
 	}
 
 	return false
 }
 
-func (c *checker) getVariable(name ast.Node) *variable {
+func (c *checker) getVariable(name string) *variable {
 	for i := len(c.variables) - 1; i >= 0; i-- {
-		if c.variables[i].name.String() == name.String() {
+		if c.variables[i].name.String() == name {
 			return &c.variables[i]
 		}
 	}
@@ -69,6 +71,10 @@ func (c *checker) getVariable(name ast.Node) *variable {
 }
 
 func (c *checker) addVariable(name *ast.Token, type_ ast.Type) *variable {
+	if name == nil || type_ == nil {
+		return nil
+	}
+
 	c.variables = append(c.variables, variable{
 		name:  name,
 		type_: type_,
@@ -104,6 +110,28 @@ func (c *checker) popScope() {
 
 func (c *checker) peekScope() *scope {
 	return &c.scopes[len(c.scopes)-1]
+}
+
+// Other
+
+func (c *checker) expectPrimitiveValue(expr ast.Expr, kind ast.PrimitiveKind) {
+	if expr == nil {
+		return
+	}
+
+	if expr.Result().Kind == ast.InvalidResultKind {
+		// Do not cascade errors
+		return
+	}
+
+	if expr.Result().Kind != ast.ValueResultKind {
+		c.error(expr, "Invalid value")
+		return
+	}
+
+	if !ast.IsPrimitive(expr.Result().Type, kind) {
+		c.error(expr, "Expected a '%s' but got a '%s'", kind.String(), ast.PrintType(expr.Result().Type))
+	}
 }
 
 // ast.Visit

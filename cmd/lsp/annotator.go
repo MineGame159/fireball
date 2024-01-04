@@ -33,7 +33,7 @@ func annotate(node ast.Node) []protocol.InlayHint {
 
 func (a *annotator) visitEnum(decl *ast.Enum) {
 	if decl.Type == nil {
-		a.addToken(decl.Name, " "+ast.PrintType(decl.ActualType), protocol.InlayHintKindType)
+		a.addToken(decl.Name, " : "+ast.PrintType(decl.ActualType), protocol.InlayHintKindType)
 	}
 
 	for _, case_ := range decl.Cases {

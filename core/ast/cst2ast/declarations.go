@@ -15,7 +15,11 @@ func (c *converter) convertDecl(node cst.Node) ast.Decl {
 	case cst.EnumNode:
 		return c.convertEnumDecl(node)
 	case cst.FuncNode:
-		return c.convertFuncDecl(node)
+		if f := c.convertFuncDecl(node); f != nil {
+			return f
+		}
+
+		return nil
 
 	default:
 		panic("cst2ast.convertDecl() - Not implemented")
@@ -35,17 +39,23 @@ func (c *converter) convertStructDecl(node cst.Node) ast.Decl {
 		} else if child.Kind == cst.StructFieldNode {
 			field, static := c.convertStructField(child)
 
-			if static {
-				staticFields = append(staticFields, field)
-			} else {
-				fields = append(fields, field)
+			if field != nil {
+				if static {
+					staticFields = append(staticFields, field)
+				} else {
+					fields = append(fields, field)
+				}
 			}
 		} else if child.Kind == cst.AttributesNode {
 			c.error(child.Children[0], "Structs cannot have attributes")
 		}
 	}
 
-	return ast.NewStruct(node, name, fields, staticFields)
+	if s := ast.NewStruct(node, name, fields, staticFields); s != nil {
+		return s
+	}
+
+	return nil
 }
 
 func (c *converter) convertStructField(node cst.Node) (*ast.Field, bool) {
@@ -77,13 +87,21 @@ func (c *converter) convertImplDecl(node cst.Node) ast.Decl {
 		if child.Kind == cst.IdentifierNode {
 			struct_ = c.convertToken(child)
 		} else if child.Kind == cst.FuncNode {
-			methods = append(methods, c.convertFuncDecl(child))
+			method := c.convertFuncDecl(child)
+
+			if method != nil {
+				methods = append(methods, method)
+			}
 		} else if child.Kind == cst.AttributesNode {
 			c.error(child.Children[0], "Implementations cannot have attributes")
 		}
 	}
 
-	return ast.NewImpl(node, struct_, methods)
+	if i := ast.NewImpl(node, struct_, methods); i != nil {
+		return i
+	}
+
+	return nil
 }
 
 // Enum
@@ -99,13 +117,21 @@ func (c *converter) convertEnumDecl(node cst.Node) ast.Decl {
 		} else if child.Kind.IsType() {
 			type_ = c.convertType(child)
 		} else if child.Kind == cst.EnumCaseNode {
-			cases = append(cases, c.convertEnumCase(child))
+			case_ := c.convertEnumCase(child)
+
+			if case_ != nil {
+				cases = append(cases, case_)
+			}
 		} else if child.Kind == cst.AttributesNode {
 			c.error(child.Children[0], "Enums cannot have attributes")
 		}
 	}
 
-	return ast.NewEnum(node, name, type_, cases)
+	if e := ast.NewEnum(node, name, type_, cases); e != nil {
+		return e
+	}
+
+	return nil
 }
 
 func (c *converter) convertEnumCase(node cst.Node) *ast.EnumCase {
@@ -145,7 +171,7 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 
 			if varArgs {
 				flags |= ast.Variadic
-			} else {
+			} else if param != nil {
 				if flags&ast.Variadic != 0 && !reported {
 					c.error(child, "Variadic arguments can only appear at the end of the parameter list")
 					reported = true
@@ -156,7 +182,11 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 		} else if child.Kind.IsType() {
 			returns = c.convertType(child)
 		} else if child.Kind.IsStmt() {
-			body = append(body, c.convertStmt(child))
+			stmt := c.convertStmt(child)
+
+			if stmt != nil {
+				body = append(body, stmt)
+			}
 		} else if child.Kind == cst.AttributesNode {
 			attributes = c.convertAttributes(child)
 		}
@@ -181,7 +211,7 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 		}
 	}
 
-	if returns == nil {
+	if returns == nil && (attributes != nil || flags != 0 || name != nil || params != nil || body != nil) {
 		returns = ast.NewPrimitive(cst.Node{}, ast.Void, scanner.Token{})
 	}
 
@@ -204,7 +234,11 @@ func (c *converter) convertFuncParam(node cst.Node) (*ast.Param, bool) {
 		}
 	}
 
-	return ast.NewParam(node, name, type_), varArgs
+	if p := ast.NewParam(node, name, type_); p != nil {
+		return p, varArgs
+	}
+
+	return nil, varArgs
 }
 
 // Attributes
@@ -214,7 +248,11 @@ func (c *converter) convertAttributes(node cst.Node) []*ast.Attribute {
 
 	for _, child := range node.Children {
 		if child.Kind == cst.AttributeNode {
-			attributes = append(attributes, c.convertAttribute(child))
+			attribute := c.convertAttribute(child)
+
+			if attribute != nil {
+				attributes = append(attributes, attribute)
+			}
 		}
 	}
 
@@ -229,7 +267,11 @@ func (c *converter) convertAttribute(node cst.Node) *ast.Attribute {
 		if child.Kind == cst.IdentifierNode {
 			name = c.convertToken(child)
 		} else if child.Kind == cst.StringExprNode {
-			args = append(args, c.convertToken(child))
+			arg := c.convertToken(child)
+
+			if arg != nil {
+				args = append(args, arg)
+			}
 		}
 	}
 

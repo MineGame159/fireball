@@ -38,7 +38,11 @@ func (c *converter) convertExprStmt(node cst.Node) ast.Stmt {
 		}
 	}
 
-	return ast.NewExpression(node, expr)
+	if e := ast.NewExpression(node, expr); e != nil {
+		return e
+	}
+
+	return nil
 }
 
 func (c *converter) convertBlockStmt(node cst.Node) ast.Stmt {
@@ -46,11 +50,19 @@ func (c *converter) convertBlockStmt(node cst.Node) ast.Stmt {
 
 	for _, child := range node.Children {
 		if child.Kind.IsStmt() {
-			stmts = append(stmts, c.convertStmt(child))
+			stmt := c.convertStmt(child)
+
+			if stmt != nil {
+				stmts = append(stmts, stmt)
+			}
 		}
 	}
 
-	return ast.NewBlock(node, stmts)
+	if b := ast.NewBlock(node, stmts); b != nil {
+		return b
+	}
+
+	return nil
 }
 
 func (c *converter) convertVarStmt(node cst.Node) ast.Stmt {
@@ -68,7 +80,11 @@ func (c *converter) convertVarStmt(node cst.Node) ast.Stmt {
 		}
 	}
 
-	return ast.NewVar(node, name, type_, value)
+	if v := ast.NewVar(node, name, type_, value); v != nil {
+		return v
+	}
+
+	return nil
 }
 
 func (c *converter) convertIfStmt(node cst.Node) ast.Stmt {
@@ -88,7 +104,11 @@ func (c *converter) convertIfStmt(node cst.Node) ast.Stmt {
 		}
 	}
 
-	return ast.NewIf(node, condition, then, else_)
+	if i := ast.NewIf(node, condition, then, else_); i != nil {
+		return i
+	}
+
+	return nil
 }
 
 func (c *converter) convertForStmt(node cst.Node) ast.Stmt {
@@ -113,7 +133,11 @@ func (c *converter) convertForStmt(node cst.Node) ast.Stmt {
 		}
 	}
 
-	return ast.NewFor(node, initializer, condition, increment, body)
+	if f := ast.NewFor(node, initializer, condition, increment, body); f != nil {
+		return f
+	}
+
+	return nil
 }
 
 func (c *converter) convertReturnStmt(node cst.Node) ast.Stmt {
@@ -125,13 +149,25 @@ func (c *converter) convertReturnStmt(node cst.Node) ast.Stmt {
 		}
 	}
 
-	return ast.NewReturn(node, value)
+	if r := ast.NewReturn(node, value); r != nil {
+		return r
+	}
+
+	return nil
 }
 
 func (c *converter) convertBreakStmt(node cst.Node) ast.Stmt {
-	return ast.NewBreak(node)
+	if b := ast.NewBreak(node); b != nil {
+		return b
+	}
+
+	return nil
 }
 
 func (c *converter) convertContinueStmt(node cst.Node) ast.Stmt {
-	return ast.NewContinue(node)
+	if c := ast.NewContinue(node); c != nil {
+		return c
+	}
+
+	return nil
 }

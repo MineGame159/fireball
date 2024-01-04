@@ -26,9 +26,13 @@ func highlight(node ast.Node) []uint32 {
 
 	for _, decl := range node.(*ast.File).Decls {
 		if v, ok := decl.(*ast.Enum); ok {
-			h.enums.Add(v.Name.String())
+			if v.Name != nil {
+				h.enums.Add(v.Name.String())
+			}
 		} else if v, ok := decl.(*ast.Func); ok {
-			h.functions.Add(v.Name.String())
+			if v.Name != nil {
+				h.functions.Add(v.Name.String())
+			}
 		}
 	}
 
@@ -285,7 +289,7 @@ func newSemantic(line, column, length uint16, kind semanticKind) semantic {
 }
 
 func (h *highlighter) add(node ast.Node, kind semanticKind) {
-	if node.Cst() != nil && node.Cst().Range.Start.Column < 256 {
+	if !ast.IsNil(node) && node.Cst().Range.Start.Column < 256 {
 		range_ := node.Cst().Range
 		h.tokens = append(h.tokens, newSemantic(range_.Start.Line, range_.Start.Column, range_.End.Column-range_.Start.Column, kind))
 	}

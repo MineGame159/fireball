@@ -42,6 +42,10 @@ type Primitive struct {
 }
 
 func NewPrimitive(node cst.Node, kind PrimitiveKind, token scanner.Token) *Primitive {
+	if kind == 0 && token.IsEmpty() {
+		return nil
+	}
+
 	p := &Primitive{
 		cst:    node,
 		Kind:   kind,
@@ -100,6 +104,10 @@ type Pointer struct {
 }
 
 func NewPointer(node cst.Node, pointee Type) *Pointer {
+	if pointee == nil {
+		return nil
+	}
+
 	p := &Pointer{
 		cst:     node,
 		Pointee: pointee,
@@ -165,6 +173,10 @@ type Array struct {
 }
 
 func NewArray(node cst.Node, base Type, count uint32) *Array {
+	if base == nil {
+		return nil
+	}
+
 	a := &Array{
 		cst:   node,
 		Base:  base,
@@ -231,6 +243,10 @@ type Resolvable struct {
 }
 
 func NewResolvable(node cst.Node, name scanner.Token) *Resolvable {
+	if name.IsEmpty() {
+		return nil
+	}
+
 	r := &Resolvable{
 		cst:  node,
 		Name: name,

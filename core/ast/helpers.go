@@ -125,6 +125,14 @@ func (f *Func) Signature(paramNames bool) string {
 		signature.WriteString(PrintType(param.Type))
 	}
 
+	if f.IsVariadic() {
+		if len(f.Params) > 0 {
+			signature.WriteString(", ...")
+		} else {
+			signature.WriteString("...")
+		}
+	}
+
 	signature.WriteRune(')')
 
 	if !IsPrimitive(f.Returns, Void) {

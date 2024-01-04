@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"fireball/core/ast"
-	"fireball/core/cst"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
 )
@@ -43,7 +42,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	// Add this variable
 	if struct_ := decl.Method(); struct_ != nil {
 		name := scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}
-		c.addVariable(ast.NewToken(cst.Node{}, name), exprValue{v: function.GetParameter(0)})
+		c.addVariable(&ast.Token{Token_: name}, exprValue{v: function.GetParameter(0)})
 	}
 
 	// Copy parameters

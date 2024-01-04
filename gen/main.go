@@ -38,6 +38,10 @@ func genGroup(w *Writer, group Group) {
 	for _, node := range group.nodes {
 		genNode(w, node, group.name)
 	}
+
+	if group.name == "" {
+		genIsNil(w)
+	}
 }
 
 func genVisitor(w *Writer, group Group) {
@@ -113,59 +117,7 @@ func genNode(w *Writer, node Node, visitor string) {
 
 	// Constructor
 
-	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("func New%s(node cst.Node", node.name))
-
-	for _, field := range node.fields {
-		if !field.public {
-			sb.WriteString(fmt.Sprintf(", %s %s", name(strings.ToLower(field.name)), field.type_))
-		}
-	}
-
-	sb.WriteString(fmt.Sprintf(") *%s {", node.name))
-
-	w.write(sb.String())
-	w.write("%s := &%s{", this, node.name)
-
-	w.write("cst: node,")
-
-	for _, field := range node.fields {
-		if !field.public {
-			w.write("%s: %s,", name(field.name), name(strings.ToLower(field.name)))
-		}
-	}
-
-	w.write("}")
-	w.write("")
-	a := false
-
-	for _, field := range node.fields {
-		if !field.type_.node() || field.public {
-			continue
-		}
-
-		param := name(strings.ToLower(field.name))
-
-		if field.type_.array {
-			w.write("for _, child := range %s {", param)
-			w.write("child.SetParent(%s)", this)
-			w.write("}")
-		} else {
-			w.write("if %s != nil {", param)
-			w.write("%s.SetParent(%s)", param, this)
-			w.write("}")
-		}
-
-		a = true
-	}
-
-	if a {
-		w.write("")
-	}
-
-	w.write("return %s", this)
-	w.write("}")
-	w.write("")
+	genConstructor(w, node, this)
 
 	// Cst()
 
@@ -288,6 +240,157 @@ func genNode(w *Writer, node Node, visitor string) {
 		w.write("}")
 		w.write("")
 	}
+}
+
+func genConstructor(w *Writer, node Node, this string) {
+	sb := strings.Builder{}
+
+	// Parameters
+
+	sb.WriteString(fmt.Sprintf("func New%s(node cst.Node", node.name))
+
+	for _, field := range node.fields {
+		if !field.public {
+			sb.WriteString(fmt.Sprintf(", %s %s", name(strings.ToLower(field.name)), field.type_))
+		}
+	}
+
+	sb.WriteString(fmt.Sprintf(") *%s {", node.name))
+	w.write(sb.String())
+
+	// Check if the node will be empty and return nil
+
+	if node.name != "File" {
+		sb.Reset()
+
+		i := 0
+
+		for _, field := range node.fields {
+			if !field.public && (field.type_.node() || field.type_.name == "scanner.Token" || strings.HasSuffix(field.type_.name, "Kind") || strings.HasSuffix(field.type_.name, "Flags")) {
+				i++
+			}
+		}
+
+		if i > 0 {
+			sb.WriteString("if ")
+			i := 0
+
+			for _, field := range node.fields {
+				if field.public {
+					continue
+				}
+
+				if field.type_.node() {
+					if i > 0 {
+						sb.WriteString(" && ")
+					}
+
+					sb.WriteString(fmt.Sprintf("%s == nil", name(strings.ToLower(field.name))))
+					i++
+				} else if field.type_.name == "scanner.Token" {
+					if i > 0 {
+						sb.WriteString(" && ")
+					}
+
+					sb.WriteString(fmt.Sprintf("%s.IsEmpty()", name(strings.ToLower(field.name))))
+					i++
+				} else if strings.HasSuffix(field.type_.name, "Kind") || strings.HasSuffix(field.type_.name, "Flags") {
+					if i > 0 {
+						sb.WriteString(" && ")
+					}
+
+					sb.WriteString(fmt.Sprintf("%s == 0", name(strings.ToLower(field.name))))
+					i++
+				}
+			}
+
+			sb.WriteString(" {")
+
+			w.write(sb.String())
+			w.write("return nil")
+			w.write("}")
+			w.write("")
+		}
+	}
+
+	// Create node
+
+	w.write("%s := &%s{", this, node.name)
+
+	w.write("cst: node,")
+
+	for _, field := range node.fields {
+		if !field.public {
+			w.write("%s: %s,", name(field.name), name(strings.ToLower(field.name)))
+		}
+	}
+
+	w.write("}")
+	w.write("")
+
+	// Set parents
+
+	setParents := false
+
+	for _, field := range node.fields {
+		if !field.type_.node() || field.public {
+			continue
+		}
+
+		param := name(strings.ToLower(field.name))
+
+		if field.type_.array {
+			w.write("for _, child := range %s {", param)
+			w.write("child.SetParent(%s)", this)
+			w.write("}")
+		} else {
+			w.write("if %s != nil {", param)
+			w.write("%s.SetParent(%s)", param, this)
+			w.write("}")
+		}
+
+		setParents = true
+	}
+
+	if setParents {
+		w.write("")
+	}
+
+	// Return
+
+	w.write("return %s", this)
+	w.write("}")
+	w.write("")
+}
+
+func genIsNil(w *Writer) {
+	w.write("func IsNil(node Node) bool {")
+	w.write("if node == nil {")
+	w.write("return true")
+	w.write("}")
+	w.write("")
+	w.write("switch node := node.(type) {")
+
+	for _, group := range groups {
+		for _, node := range group.nodes {
+			w.depth--
+			w.write("case *%s:", node.name)
+			w.depth++
+
+			w.write("return node == nil")
+		}
+	}
+
+	w.write("")
+
+	w.depth--
+	w.write("default:")
+	w.depth++
+	w.write("panic(\"ast.IsNil() - Not implemented\")")
+
+	w.write("}")
+	w.write("}")
+	w.write("")
 }
 
 func name(name string) string {

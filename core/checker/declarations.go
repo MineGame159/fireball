@@ -2,7 +2,6 @@ package checker
 
 import (
 	"fireball/core/ast"
-	"fireball/core/cst"
 	"fireball/core/scanner"
 	"fireball/core/utils"
 	"strconv"
@@ -16,7 +15,7 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 
 	for _, field := range decl.StaticFields {
 		// Check name collision
-		if !fields.Add(field.Name.String()) {
+		if field.Name != nil && !fields.Add(field.Name.String()) {
 			c.error(field.Name, "Static field with the name '%s' already exists", field.Name)
 		}
 
@@ -31,7 +30,7 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 
 	for _, field := range decl.Fields {
 		// Check name collision
-		if !fields.Add(field.Name.String()) {
+		if field.Name != nil && !fields.Add(field.Name.String()) {
 			c.error(field.Name, "Field with the name '%s' already exists", field.Name)
 		}
 
@@ -45,7 +44,7 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 func (c *checker) VisitImpl(decl *ast.Impl) {
 	if decl.Type != nil {
 		c.pushScope()
-		c.addVariable(ast.NewToken(cst.Node{}, scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}), decl.Type)
+		c.addVariable(&ast.Token{Token_: scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}}, decl.Type)
 	}
 
 	decl.AcceptChildren(c)
@@ -103,6 +102,10 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		c.visitAttribute(decl, attribute)
 	}
 
+	if decl.Name == nil {
+		return
+	}
+
 	// Check flags
 	_, isImpl := decl.Parent().(*ast.Impl)
 
@@ -137,7 +140,9 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		if c.hasVariableInScope(param.Name) {
 			c.error(param.Name, "Parameter with the name '%s' already exists", param.Name)
 		} else {
-			c.addVariable(param.Name, param.Type).param = true
+			if v := c.addVariable(param.Name, param.Type); v != nil {
+				v.param = true
+			}
 		}
 	}
 

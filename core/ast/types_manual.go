@@ -17,6 +17,11 @@ func IsPrimitive(type_ Type, kind PrimitiveKind) bool {
 }
 
 func As[T Type](type_ Type) (T, bool) {
+	if type_ == nil {
+		var empty T
+		return empty, false
+	}
+
 	t, ok := type_.Resolved().(T)
 	return t, ok
 }

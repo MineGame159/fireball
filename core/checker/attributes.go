@@ -3,6 +3,10 @@ package checker
 import "fireball/core/ast"
 
 func (c *checker) visitAttribute(decl *ast.Func, attribute *ast.Attribute) {
+	if attribute.Name == nil {
+		return
+	}
+
 	switch attribute.Name.String() {
 	case "Extern":
 		if len(attribute.Args) > 1 {
@@ -33,8 +37,13 @@ func (c *checker) visitIntrinsic(decl *ast.Func, attribute *ast.Attribute) {
 	name := ""
 
 	if len(attribute.Args) > 0 {
-		token = attribute.Args[0]
-		name = attribute.Args[0].String()[1 : len(attribute.Args[0].String())-1]
+		arg := attribute.Args[0]
+		if arg == nil {
+			return
+		}
+
+		token = arg
+		name = arg.String()[1 : len(arg.String())-1]
 	} else {
 		token = decl.Name
 		name = decl.Name.String()
@@ -93,7 +102,7 @@ func isSimpleIntrinsic(decl *ast.Func, paramCount int, predicate simpleIntrinsic
 
 	for i, param := range decl.Params {
 		if i > 0 {
-			if !param.Type.Equals(decl.Params[0].Type) {
+			if param.Type == nil || !param.Type.Equals(decl.Params[0].Type) {
 				return false
 			}
 		}

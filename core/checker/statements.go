@@ -17,6 +17,10 @@ func (c *checker) VisitExpression(stmt *ast.Expression) {
 func (c *checker) VisitVar(stmt *ast.Var) {
 	stmt.AcceptChildren(c)
 
+	if stmt.Name == nil {
+		return
+	}
+
 	// Check initializer value
 	valueOk := true
 
@@ -67,14 +71,7 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 func (c *checker) VisitIf(stmt *ast.If) {
 	stmt.AcceptChildren(c)
 
-	// Check condition value
-	if stmt.Condition.Result().Kind != ast.ValueResultKind {
-		c.error(stmt.Condition, "Invalid value")
-	} else {
-		if !ast.IsPrimitive(stmt.Condition.Result().Type, ast.Bool) {
-			c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'", ast.PrintType(stmt.Condition.Result().Type))
-		}
-	}
+	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
 }
 
 func (c *checker) VisitFor(stmt *ast.For) {
@@ -88,15 +85,7 @@ func (c *checker) VisitFor(stmt *ast.For) {
 	c.popScope()
 
 	// Check condition value
-	if stmt.Condition != nil && stmt.Condition.Result().Kind != ast.InvalidResultKind {
-		if stmt.Condition.Result().Kind != ast.ValueResultKind {
-			c.error(stmt.Condition, "Invalid value")
-		} else {
-			if stmt.Condition != nil && !ast.IsPrimitive(stmt.Condition.Result().Type, ast.Bool) {
-				c.error(stmt.Condition, "Condition needs to be of type 'bool' but got '%s'", ast.PrintType(stmt.Condition.Result().Type))
-			}
-		}
-	}
+	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
 }
 
 func (c *checker) VisitReturn(stmt *ast.Return) {

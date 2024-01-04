@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"fireball/core/ast"
+	"fireball/core/cst"
 	"fireball/core/scanner"
 )
 
@@ -23,6 +24,14 @@ func asThroughPointer[T ast.Type](type_ ast.Type) (T, bool) {
 	}
 
 	return ast.As[T](type_)
+}
+
+func nodeCst(node ast.Node) *cst.Node {
+	if ast.IsNil(node) {
+		return nil
+	}
+
+	return node.Cst()
 }
 
 // Variable resolver

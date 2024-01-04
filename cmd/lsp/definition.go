@@ -108,7 +108,7 @@ func getDefinitionToken(resolver fuckoff.Resolver, token *ast.Token) []protocol.
 }
 
 func newDefinition(node ast.Node) []protocol.Location {
-	if node == nil || node.Cst() == nil {
+	if nodeCst(node) == nil {
 		return nil
 	}
 

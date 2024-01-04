@@ -45,6 +45,10 @@ type Paren struct {
 }
 
 func NewParen(node cst.Node, expr Expr) *Paren {
+	if expr == nil {
+		return nil
+	}
+
 	p := &Paren{
 		cst:  node,
 		Expr: expr,
@@ -113,6 +117,10 @@ type Unary struct {
 }
 
 func NewUnary(node cst.Node, prefix bool, operator *Token, value Expr) *Unary {
+	if operator == nil && value == nil {
+		return nil
+	}
+
 	u := &Unary{
 		cst:      node,
 		Prefix:   prefix,
@@ -189,6 +197,10 @@ type Binary struct {
 }
 
 func NewBinary(node cst.Node, left Expr, operator *Token, right Expr) *Binary {
+	if left == nil && operator == nil && right == nil {
+		return nil
+	}
+
 	b := &Binary{
 		cst:      node,
 		Left:     left,
@@ -271,6 +283,10 @@ type Logical struct {
 }
 
 func NewLogical(node cst.Node, left Expr, operator *Token, right Expr) *Logical {
+	if left == nil && operator == nil && right == nil {
+		return nil
+	}
+
 	l := &Logical{
 		cst:      node,
 		Left:     left,
@@ -353,6 +369,10 @@ type Assignment struct {
 }
 
 func NewAssignment(node cst.Node, assignee Expr, operator *Token, value Expr) *Assignment {
+	if assignee == nil && operator == nil && value == nil {
+		return nil
+	}
+
 	a := &Assignment{
 		cst:      node,
 		Assignee: assignee,
@@ -434,6 +454,10 @@ type Member struct {
 }
 
 func NewMember(node cst.Node, value Expr, name *Token) *Member {
+	if value == nil && name == nil {
+		return nil
+	}
+
 	m := &Member{
 		cst:   node,
 		Value: value,
@@ -508,6 +532,10 @@ type Index struct {
 }
 
 func NewIndex(node cst.Node, value Expr, index Expr) *Index {
+	if value == nil && index == nil {
+		return nil
+	}
+
 	i := &Index{
 		cst:   node,
 		Value: value,
@@ -582,6 +610,10 @@ type Cast struct {
 }
 
 func NewCast(node cst.Node, value Expr, target Type) *Cast {
+	if value == nil && target == nil {
+		return nil
+	}
+
 	c := &Cast{
 		cst:    node,
 		Value:  value,
@@ -656,6 +688,10 @@ type Call struct {
 }
 
 func NewCall(node cst.Node, callee Expr, args []Expr) *Call {
+	if callee == nil && args == nil {
+		return nil
+	}
+
 	c := &Call{
 		cst:    node,
 		Callee: callee,
@@ -730,6 +766,10 @@ type TypeCall struct {
 }
 
 func NewTypeCall(node cst.Node, callee *Token, arg Type) *TypeCall {
+	if callee == nil && arg == nil {
+		return nil
+	}
+
 	t := &TypeCall{
 		cst:    node,
 		Callee: callee,
@@ -805,6 +845,10 @@ type StructInitializer struct {
 }
 
 func NewStructInitializer(node cst.Node, new bool, type_ Type, fields []*InitField) *StructInitializer {
+	if type_ == nil && fields == nil {
+		return nil
+	}
+
 	s := &StructInitializer{
 		cst:    node,
 		New:    new,
@@ -879,6 +923,10 @@ type ArrayInitializer struct {
 }
 
 func NewArrayInitializer(node cst.Node, values []Expr) *ArrayInitializer {
+	if values == nil {
+		return nil
+	}
+
 	a := &ArrayInitializer{
 		cst:    node,
 		Values: values,
@@ -946,6 +994,10 @@ type AllocateArray struct {
 }
 
 func NewAllocateArray(node cst.Node, type_ Type, count Expr) *AllocateArray {
+	if type_ == nil && count == nil {
+		return nil
+	}
+
 	a := &AllocateArray{
 		cst:   node,
 		Type:  type_,
@@ -1020,6 +1072,10 @@ type Identifier struct {
 }
 
 func NewIdentifier(node cst.Node, name scanner.Token) *Identifier {
+	if name.IsEmpty() {
+		return nil
+	}
+
 	i := &Identifier{
 		cst:  node,
 		Name: name,
@@ -1079,6 +1135,10 @@ type Literal struct {
 }
 
 func NewLiteral(node cst.Node, token scanner.Token) *Literal {
+	if token.IsEmpty() {
+		return nil
+	}
+
 	l := &Literal{
 		cst:    node,
 		Token_: token,

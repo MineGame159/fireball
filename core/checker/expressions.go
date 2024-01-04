@@ -11,8 +11,10 @@ import (
 func (c *checker) VisitParen(expr *ast.Paren) {
 	expr.AcceptChildren(c)
 
-	*expr.Result() = *expr.Expr.Result()
-	expr.Result().Flags = 0
+	if expr.Expr != nil {
+		*expr.Result() = *expr.Expr.Result()
+		expr.Result().Flags = 0
+	}
 }
 
 func (c *checker) VisitLiteral(expr *ast.Literal) {
@@ -100,6 +102,10 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	expr.AcceptChildren(c)
 
+	if expr.Type == nil {
+		return
+	}
+
 	// Check struct
 	var struct_ *ast.Struct
 
@@ -122,6 +128,10 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	assignedFields := utils.NewSet[string]()
 
 	for _, initField := range expr.Fields {
+		if initField.Name == nil {
+			continue
+		}
+
 		// Check name collision
 		if !assignedFields.Add(initField.Name.String()) {
 			c.error(initField.Name, "Field with the name '%s' was already assigned", initField.Name)
@@ -135,17 +145,19 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 		}
 
 		// Check value result
-		if initField.Value.Result().Kind == ast.InvalidResultKind {
-			continue // Do not cascade errors
-		}
+		if initField.Value != nil {
+			if initField.Value.Result().Kind == ast.InvalidResultKind {
+				continue // Do not cascade errors
+			}
 
-		if initField.Value.Result().Kind != ast.ValueResultKind {
-			c.error(initField.Value, "Cannot assign this value to a field with type '%s'", field.Type)
-			continue
-		}
+			if initField.Value.Result().Kind != ast.ValueResultKind {
+				c.error(initField.Value, "Cannot assign this value to a field with type '%s'", field.Type)
+				continue
+			}
 
-		if !initField.Value.Result().Type.CanAssignTo(field.Type) {
-			c.error(initField.Value, "Expected a '%s' but got '%s'", ast.PrintType(field.Type), ast.PrintType(initField.Value.Result().Type))
+			if !initField.Value.Result().Type.CanAssignTo(field.Type) {
+				c.error(initField.Value, "Expected a '%s' but got '%s'", ast.PrintType(field.Type), ast.PrintType(initField.Value.Result().Type))
+			}
 		}
 	}
 
@@ -205,25 +217,44 @@ func (c *checker) VisitAllocateArray(expr *ast.AllocateArray) {
 
 	c.checkMalloc(expr)
 
-	if expr.Count.Result().Kind != ast.ValueResultKind {
-		c.error(expr.Count, "Invalid value")
-		expr.Result().SetInvalid()
+	// Check count
+	if expr.Count != nil {
+		if expr.Count.Result().Kind != ast.ValueResultKind {
+			c.error(expr.Count, "Invalid value")
+			expr.Result().SetInvalid()
 
-		return
+			return
+		}
+
+		if !ast.IsPrimitive(expr.Count.Result().Type, ast.I32) {
+			c.error(expr.Count, "Expected an 'i32' but got '%s'", ast.PrintType(expr.Count.Result().Type))
+			expr.Result().SetInvalid()
+
+			return
+		}
 	}
 
-	if !ast.IsPrimitive(expr.Count.Result().Type, ast.I32) {
-		c.error(expr.Count, "Expected an 'i32' but got '%s'", ast.PrintType(expr.Count.Result().Type))
-		expr.Result().SetInvalid()
+	// Set result
+	type_ := expr.Type
 
-		return
+	if type_ == nil {
+		type_ = &ast.Primitive{Kind: ast.Void}
 	}
 
-	expr.Result().SetValue(&ast.Pointer{Pointee: expr.Type}, 0)
+	expr.Result().SetValue(&ast.Pointer{Pointee: type_}, 0)
 }
 
 func (c *checker) VisitUnary(expr *ast.Unary) {
 	expr.AcceptChildren(c)
+
+	if expr.Operator == nil || expr.Value == nil {
+		if expr.Value != nil {
+			*expr.Result() = *expr.Value.Result()
+			expr.Result().Flags = 0
+		}
+
+		return
+	}
 
 	// Check value
 	result := expr.Value.Result()
@@ -236,17 +267,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		// Prefix
 		switch expr.Operator.Token().Kind {
 		case scanner.Bang:
-			if result.Kind != ast.ValueResultKind {
-				c.error(expr.Value, "Cannot negate this value")
-				expr.Result().SetInvalid()
-
-				return
-			}
-
-			if !ast.IsPrimitive(result.Type, ast.Bool) {
-				c.error(expr.Value, "Expected a 'bool' but got a '%s'", ast.PrintType(result.Type))
-			}
-
+			c.expectPrimitiveValue(expr.Value, ast.Bool)
 			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
 
 		case scanner.Minus:
@@ -354,6 +375,15 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 func (c *checker) VisitBinary(expr *ast.Binary) {
 	expr.AcceptChildren(c)
 
+	if expr.Left == nil || expr.Operator == nil || expr.Right == nil {
+		if expr.Left != nil {
+			*expr.Result() = *expr.Left.Result()
+			expr.Result().Flags = 0
+		}
+
+		return
+	}
+
 	if expr.Left.Result().Kind == ast.InvalidResultKind || expr.Right.Result().Kind == ast.InvalidResultKind {
 		return // // Do not cascade errors
 	}
@@ -458,45 +488,9 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 func (c *checker) VisitLogical(expr *ast.Logical) {
 	expr.AcceptChildren(c)
 
-	if expr.Left.Result().Kind == ast.InvalidResultKind || expr.Right.Result().Kind == ast.InvalidResultKind {
-		return // Do not cascade errors
-	}
-
-	// Check results
-	ok := true
-
-	if expr.Left.Result().Kind != ast.ValueResultKind {
-		c.error(expr.Left, "Invalid value")
-		ok = false
-	}
-
-	if expr.Right.Result().Kind != ast.ValueResultKind {
-		c.error(expr.Right, "Invalid value")
-		ok = false
-	}
-
-	if !ok {
-		expr.Result().SetInvalid()
-		return
-	}
-
-	// Check bool types
-	ok = true
-
-	if !ast.IsPrimitive(expr.Left.Result().Type, ast.Bool) {
-		c.error(expr.Left, "Expected a 'bool' but got a '%s'", ast.PrintType(expr.Left.Result().Type))
-		ok = false
-	}
-
-	if !ast.IsPrimitive(expr.Right.Result().Type, ast.Bool) {
-		c.error(expr.Right, "Expected a 'bool' but got a '%s'", ast.PrintType(expr.Right.Result().Type))
-		ok = false
-	}
-
-	if !ok {
-		expr.Result().SetInvalid()
-		return
-	}
+	// Check expressions
+	c.expectPrimitiveValue(expr.Left, ast.Bool)
+	c.expectPrimitiveValue(expr.Right, ast.Bool)
 
 	// Set type
 	expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
@@ -531,7 +525,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Variable
-	if variable := c.getVariable(expr); variable != nil {
+	if variable := c.getVariable(expr.String()); variable != nil {
 		variable.used = true
 
 		expr.Result().SetValue(variable.type_, ast.AssignableFlag|ast.AddressableFlag)
@@ -553,26 +547,25 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	expr.AcceptChildren(c)
 
-	if expr.Assignee.Result().Kind == ast.InvalidResultKind || expr.Value.Result().Kind == ast.InvalidResultKind {
-		return // Do not cascade errors
+	// Check assignee
+	if expr.Assignee == nil || expr.Assignee.Result().Kind == ast.InvalidResultKind {
+		expr.Result().SetInvalid()
+		return
 	}
-
-	// Check results
-	ok := true
 
 	if !expr.Assignee.Result().IsAssignable() {
 		c.error(expr.Assignee, "Cannot assign to this value")
-		ok = false
+	}
+
+	expr.Result().SetValue(expr.Assignee.Result().Type, 0)
+
+	// Check operator and value
+	if expr.Operator == nil || expr.Value == nil || expr.Value.Result().Kind == ast.InvalidResultKind {
+		return
 	}
 
 	if expr.Value.Result().Kind != ast.ValueResultKind {
 		c.error(expr.Value, "Invalid value")
-		ok = false
-	}
-
-	if !ok {
-		expr.Result().SetInvalid()
-		return
 	}
 
 	// Check type
@@ -580,9 +573,6 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 		// Equal
 		if !expr.Value.Result().Type.CanAssignTo(expr.Assignee.Result().Type) {
 			c.error(expr.Value, "Expected a '%s' but got '%s'", ast.PrintType(expr.Assignee.Result().Type), ast.PrintType(expr.Value.Result().Type))
-			expr.Result().SetInvalid()
-
-			return
 		}
 	} else {
 		if scanner.IsArithmetic(expr.Operator.Token().Kind) {
@@ -599,9 +589,6 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 
 			if !valid {
 				c.error(expr.Value, "Expected two equal number types")
-				expr.Result().SetInvalid()
-
-				return
 			}
 		} else if scanner.IsBitwise(expr.Operator.Token().Kind) {
 			// Bitwise
@@ -617,58 +604,49 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 
 			if !valid {
 				c.error(expr.Value, "Expected two equal integer types")
-				expr.Result().SetInvalid()
-
-				return
 			}
 		} else {
 			panic("checker.VisitAssignment() - Invalid operator")
 		}
 	}
-
-	// Set result
-	expr.Result().SetValue(expr.Value.Result().Type, 0)
 }
 
 func (c *checker) VisitCast(expr *ast.Cast) {
 	expr.AcceptChildren(c)
 
+	// Check nil and results
+	expr.Result().SetInvalid()
+
+	if expr.Value == nil || expr.Target == nil {
+		return
+	}
+
 	if expr.Value.Result().Kind == ast.InvalidResultKind {
-		return // // Do not cascade errors
+		return
 	}
 
 	if expr.Value.Result().Kind != ast.ValueResultKind {
 		c.error(expr.Value, "Cannot cast this value")
-		expr.Result().SetInvalid()
-
 		return
 	}
 
+	expr.Result().SetValue(expr.Target, 0)
+
+	// Check type
 	if ast.IsPrimitive(expr.Value.Result().Type, ast.Void) || ast.IsPrimitive(expr.Target, ast.Void) {
 		// void
 		c.error(expr, "Cannot cast to or from type 'void'")
-		expr.Result().SetInvalid()
-
-		return
 	} else if _, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
 		// enum to non integer
 		if to, ok := ast.As[*ast.Primitive](expr.Target); !ok || !ast.IsInteger(to.Kind) {
 			c.error(expr, "Can only cast enums to integers, not '%s'", ast.PrintType(to))
-			expr.Result().SetInvalid()
-
-			return
 		}
 	} else if _, ok := ast.As[*ast.Enum](expr.Target); ok {
 		// non integer to enum
 		if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); !ok || !ast.IsInteger(from.Kind) {
 			c.error(expr, "Can only cast to enums from integers, not '%s'", ast.PrintType(from))
-			expr.Result().SetInvalid()
-
-			return
 		}
 	}
-
-	expr.Result().SetValue(expr.Target, 0)
 }
 
 func (c *checker) VisitTypeCall(expr *ast.TypeCall) {
@@ -680,78 +658,61 @@ func (c *checker) VisitTypeCall(expr *ast.TypeCall) {
 func (c *checker) VisitCall(expr *ast.Call) {
 	expr.AcceptChildren(c)
 
-	if expr.Callee.Result().Kind == ast.InvalidResultKind {
-		return // Do not cascade errors
-	}
-
-	// Check results
-	ok := true
-	var function *ast.Func
-
-	if v, ok_ := expr.Callee.Result().Type.(*ast.Func); !ok_ {
-		c.error(expr.Callee, "Cannot call this value")
-		ok = false
-	} else {
-		function = v
-	}
-
-	for _, arg := range expr.Args {
-		if arg.Result().Kind != ast.InvalidResultKind && arg.Result().Kind != ast.ValueResultKind {
-			c.error(arg, "Invalid value")
-			ok = false
-		}
-	}
-
-	if !ok {
+	// Check callee
+	if expr.Callee == nil || expr.Callee.Result().Kind == ast.InvalidResultKind {
 		expr.Result().SetInvalid()
 		return
 	}
 
-	// Check arguments
-	ok = true
-	toCheck := min(len(function.Params), len(expr.Args))
+	var function *ast.Func
 
-	//     Check argument count
+	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok {
+		function = f
+	} else {
+		c.error(expr.Callee, "Cannot call this value")
+		expr.Result().SetInvalid()
+		return
+	}
+
+	expr.Result().SetValue(function.Returns, 0)
+
+	// Check argument count
 	if function.IsVariadic() {
 		if len(expr.Args) < len(function.Params) {
 			c.error(expr, "Got '%d' arguments but function takes at least '%d'", len(expr.Args), len(function.Params))
-			ok = false
 		}
 	} else {
 		if len(function.Params) != len(expr.Args) {
 			c.error(expr, "Got '%d' arguments but function only takes '%d'", len(expr.Args), len(function.Params))
-			ok = false
 		}
 	}
 
-	//     Check argument types
+	// Check argument types
+	toCheck := min(len(function.Params), len(expr.Args))
+
 	for i := 0; i < toCheck; i++ {
 		arg := expr.Args[i]
 		param := function.Params[i]
 
 		if arg.Result().Kind == ast.InvalidResultKind {
-			continue // Do not cascade errors
+			continue
+		}
+
+		if arg.Result().Kind != ast.ValueResultKind {
+			c.error(arg, "Invalid value")
+			continue
 		}
 
 		if !arg.Result().Type.CanAssignTo(param.Type) {
 			c.error(arg, "Argument with type '%s' cannot be assigned to a parameter with type '%s'", ast.PrintType(arg.Result().Type), ast.PrintType(param.Type))
-			ok = false
 		}
 	}
-
-	if !ok {
-		expr.Result().SetInvalid()
-		return
-	}
-
-	// Set result
-	expr.Result().SetValue(function.Returns, 0)
 }
 
 func (c *checker) VisitIndex(expr *ast.Index) {
 	expr.AcceptChildren(c)
 
-	if expr.Value.Result().Kind == ast.InvalidResultKind || expr.Index.Result().Kind == ast.InvalidResultKind {
+	if expr.Value == nil || expr.Value.Result().Kind == ast.InvalidResultKind || expr.Index.Result().Kind == ast.InvalidResultKind {
 		return // Do not cascade errors
 	}
 
@@ -776,22 +737,24 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	}
 
 	// Check index
-	if expr.Index.Result().Kind == ast.ValueResultKind {
-		ok2 := false
+	if expr.Index != nil {
+		if expr.Index.Result().Kind == ast.ValueResultKind {
+			ok2 := false
 
-		if v, ok := ast.As[*ast.Primitive](expr.Index.Result().Type); ok {
-			if ast.IsInteger(v.Kind) {
-				ok2 = true
+			if v, ok := ast.As[*ast.Primitive](expr.Index.Result().Type); ok {
+				if ast.IsInteger(v.Kind) {
+					ok2 = true
+				}
 			}
-		}
 
-		if !ok2 {
-			c.error(expr.Index, "Can only index using integer types, not '%s'", ast.PrintType(expr.Index.Result().Type))
+			if !ok2 {
+				c.error(expr.Index, "Can only index using integer types, not '%s'", ast.PrintType(expr.Index.Result().Type))
+				ok = false
+			}
+		} else {
+			c.error(expr.Index, "Invalid value")
 			ok = false
 		}
-	} else {
-		c.error(expr.Index, "Invalid value")
-		ok = false
 	}
 
 	// Check if value is not an array initializer
@@ -811,8 +774,9 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 func (c *checker) VisitMember(expr *ast.Member) {
 	expr.AcceptChildren(c)
 
-	if expr.Value.Result().Kind == ast.InvalidResultKind {
-		return // Do not cascade errors
+	if expr.Value == nil || expr.Name == nil || expr.Value.Result().Kind == ast.InvalidResultKind {
+		expr.Result().SetInvalid()
+		return
 	}
 
 	// Type result

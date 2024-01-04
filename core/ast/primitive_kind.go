@@ -5,7 +5,9 @@ import "math"
 type PrimitiveKind uint8
 
 const (
-	Void PrimitiveKind = iota
+	Unknown PrimitiveKind = iota
+
+	Void
 	Bool
 
 	U8
@@ -153,7 +155,8 @@ func (p PrimitiveKind) String() string {
 		return "f32"
 	case F64:
 		return "f64"
-	}
 
-	panic("ast.PrimitiveKind.String() - Not implemented")
+	default:
+		panic("ast.PrimitiveKind.String() - Not implemented")
+	}
 }

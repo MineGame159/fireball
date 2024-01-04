@@ -88,6 +88,10 @@ func (f *File) CollectTypesAndFunctions() {
 	for _, decl := range f.Ast.Decls {
 		if struct_, ok := decl.(*ast.Struct); ok {
 			// Struct
+			if struct_.Name == nil {
+				continue
+			}
+
 			if _, ok := typeMap[struct_.Name.String()]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,
@@ -99,6 +103,10 @@ func (f *File) CollectTypesAndFunctions() {
 			}
 		} else if enum, ok := decl.(*ast.Enum); ok {
 			// Enum
+			if enum.Name == nil {
+				continue
+			}
+
 			if enum.Type == nil {
 				minValue := int64(math.MaxInt64)
 				maxValue := int64(math.MinInt64)
@@ -135,6 +143,8 @@ func (f *File) CollectTypesAndFunctions() {
 				}
 
 				enum.ActualType = &ast.Primitive{Kind: kind}
+			} else {
+				enum.ActualType = enum.Type
 			}
 
 			if _, ok := typeMap[enum.Name.String()]; ok {
@@ -148,6 +158,10 @@ func (f *File) CollectTypesAndFunctions() {
 			}
 		} else if function, ok := decl.(*ast.Func); ok {
 			// Function
+			if function.Name == nil {
+				continue
+			}
+
 			if _, ok := functionMap[function.Name.String()]; ok {
 				f.Report(utils.Diagnostic{
 					Kind:    utils.ErrorKind,

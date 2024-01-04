@@ -57,10 +57,18 @@ func (c *converter) convertIdentifierType(node cst.Node) ast.Type {
 				kind = ast.F64
 
 			default:
-				return ast.NewResolvable(node, child.Token)
+				if r := ast.NewResolvable(node, child.Token); r != nil {
+					return r
+				}
+
+				return nil
 			}
 
-			return ast.NewPrimitive(node, kind, child.Token)
+			if p := ast.NewPrimitive(node, kind, child.Token); p != nil {
+				return p
+			}
+
+			return nil
 		}
 	}
 
@@ -76,7 +84,11 @@ func (c *converter) convertPointerType(node cst.Node) ast.Type {
 		}
 	}
 
-	return ast.NewPointer(node, pointee)
+	if p := ast.NewPointer(node, pointee); p != nil {
+		return p
+	}
+
+	return nil
 }
 
 func (c *converter) convertArrayType(node cst.Node) ast.Type {
@@ -92,7 +104,11 @@ func (c *converter) convertArrayType(node cst.Node) ast.Type {
 		}
 	}
 
-	return ast.NewArray(node, base, count)
+	if a := ast.NewArray(node, base, count); a != nil {
+		return a
+	}
+
+	return nil
 }
 
 func (c *converter) convertFuncType(node cst.Node) ast.Type {
@@ -108,7 +124,7 @@ func (c *converter) convertFuncType(node cst.Node) ast.Type {
 
 			if varArgs {
 				flags |= ast.Variadic
-			} else {
+			} else if param != nil {
 				if flags&ast.Variadic != 0 && !reported {
 					c.error(node.Children[i-2].Children[0], "Variadic arguments can only appear at the end of the parameter list")
 					reported = true
@@ -121,5 +137,9 @@ func (c *converter) convertFuncType(node cst.Node) ast.Type {
 		}
 	}
 
-	return ast.NewFunc(node, nil, flags, nil, params, returns, nil)
+	if f := ast.NewFunc(node, nil, flags, nil, params, returns, nil); f != nil {
+		return f
+	}
+
+	return nil
 }

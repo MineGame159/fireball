@@ -74,6 +74,10 @@ type Field struct {
 }
 
 func NewField(node cst.Node, name *Token, type_ Type) *Field {
+	if name == nil && type_ == nil {
+		return nil
+	}
+
 	f := &Field{
 		cst:  node,
 		Name: name,
@@ -138,6 +142,10 @@ type InitField struct {
 }
 
 func NewInitField(node cst.Node, name *Token, value Expr) *InitField {
+	if name == nil && value == nil {
+		return nil
+	}
+
 	i := &InitField{
 		cst:   node,
 		Name:  name,
@@ -203,6 +211,10 @@ type EnumCase struct {
 }
 
 func NewEnumCase(node cst.Node, name *Token, value *Token) *EnumCase {
+	if name == nil && value == nil {
+		return nil
+	}
+
 	e := &EnumCase{
 		cst:   node,
 		Name:  name,
@@ -267,6 +279,10 @@ type Param struct {
 }
 
 func NewParam(node cst.Node, name *Token, type_ Type) *Param {
+	if name == nil && type_ == nil {
+		return nil
+	}
+
 	p := &Param{
 		cst:  node,
 		Name: name,
@@ -331,6 +347,10 @@ type Attribute struct {
 }
 
 func NewAttribute(node cst.Node, name *Token, args []*Token) *Attribute {
+	if name == nil && args == nil {
+		return nil
+	}
+
 	a := &Attribute{
 		cst:  node,
 		Name: name,
@@ -394,6 +414,10 @@ type Token struct {
 }
 
 func NewToken(node cst.Node, token scanner.Token) *Token {
+	if token.IsEmpty() {
+		return nil
+	}
+
 	t := &Token{
 		cst:    node,
 		Token_: token,
@@ -431,4 +455,92 @@ func (t *Token) AcceptChildren(visitor Visitor) {
 
 func (t *Token) String() string {
 	return t.Token_.String()
+}
+
+func IsNil(node Node) bool {
+	if node == nil {
+		return true
+	}
+
+	switch node := node.(type) {
+	case *Primitive:
+		return node == nil
+	case *Pointer:
+		return node == nil
+	case *Array:
+		return node == nil
+	case *Resolvable:
+		return node == nil
+	case *Struct:
+		return node == nil
+	case *Enum:
+		return node == nil
+	case *Impl:
+		return node == nil
+	case *Func:
+		return node == nil
+	case *Expression:
+		return node == nil
+	case *Block:
+		return node == nil
+	case *Var:
+		return node == nil
+	case *If:
+		return node == nil
+	case *For:
+		return node == nil
+	case *Return:
+		return node == nil
+	case *Break:
+		return node == nil
+	case *Continue:
+		return node == nil
+	case *Paren:
+		return node == nil
+	case *Unary:
+		return node == nil
+	case *Binary:
+		return node == nil
+	case *Logical:
+		return node == nil
+	case *Assignment:
+		return node == nil
+	case *Member:
+		return node == nil
+	case *Index:
+		return node == nil
+	case *Cast:
+		return node == nil
+	case *Call:
+		return node == nil
+	case *TypeCall:
+		return node == nil
+	case *StructInitializer:
+		return node == nil
+	case *ArrayInitializer:
+		return node == nil
+	case *AllocateArray:
+		return node == nil
+	case *Identifier:
+		return node == nil
+	case *Literal:
+		return node == nil
+	case *File:
+		return node == nil
+	case *Field:
+		return node == nil
+	case *InitField:
+		return node == nil
+	case *EnumCase:
+		return node == nil
+	case *Param:
+		return node == nil
+	case *Attribute:
+		return node == nil
+	case *Token:
+		return node == nil
+
+	default:
+		panic("ast.IsNil() - Not implemented")
+	}
 }
