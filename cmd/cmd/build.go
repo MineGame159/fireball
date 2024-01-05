@@ -117,6 +117,10 @@ func buildProject() string {
 		c.AddLibrary("c")
 	}
 
+	for _, library := range project.Config.LinkLibraries {
+		c.AddLibrary(library)
+	}
+
 	output := filepath.Join(project.Path, "build", project.Config.Name)
 	err = c.Compile(output)
 

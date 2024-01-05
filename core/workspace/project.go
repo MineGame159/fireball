@@ -24,6 +24,8 @@ type Project struct {
 type Config struct {
 	Name string
 	Src  string
+
+	LinkLibraries []string
 }
 
 func NewProject(path string) (*Project, error) {
