@@ -27,7 +27,7 @@ func Resolve(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) 
 
 func (t *typeResolver) visitImpl(decl *ast.Impl) {
 	if decl.Struct != nil {
-		type_, _ := t.resolver.GetType(decl.Struct.Token().Lexeme)
+		type_ := t.resolver.GetType(decl.Struct.Token().Lexeme)
 
 		if s, ok := type_.(*ast.Struct); ok {
 			decl.Type = s
@@ -49,7 +49,7 @@ func (t *typeResolver) visitImpl(decl *ast.Impl) {
 
 func (t *typeResolver) visitType(type_ ast.Type) {
 	if resolvable, ok := type_.(*ast.Resolvable); ok {
-		if resolved, _ := t.resolver.GetType(resolvable.Token().Lexeme); resolved != nil {
+		if resolved := t.resolver.GetType(resolvable.Token().Lexeme); resolved != nil {
 			resolvable.Type = resolved
 		} else {
 			t.reporter.Report(utils.Diagnostic{

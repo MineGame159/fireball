@@ -192,10 +192,13 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 	}
 
 	// Resolve function from project
-	_, filePath := c.resolver.GetFunction(function.Name.String())
+	if f := c.resolver.GetFunction(function.Name.String()); f != nil {
 
-	if filePath == c.path {
-		panic("codegen.getFunction() - Local function not found in functions map")
+		filePath := ast.GetParent[*ast.File](f).Path
+
+		if filePath == c.path {
+			panic("codegen.getFunction() - Local function not found in functions map")
+		}
 	}
 
 	value := c.module.Declare(c.getType(function))
@@ -324,6 +327,9 @@ func (c *codegen) getType(type_ ast.Type) llvm.Type {
 			llvmType = c.module.Primitive("f32", 32, llvm.FloatEncoding)
 		case ast.F64:
 			llvmType = c.module.Primitive("f64", 64, llvm.FloatEncoding)
+
+		default:
+			panic("codegen.getType() - Not implemented")
 		}
 	} else if v, ok := ast.As[*ast.Array](type_); ok {
 		// Array

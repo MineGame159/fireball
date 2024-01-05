@@ -501,7 +501,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 
 	// Function / function pointer
 	if parentWantsFunction(expr) {
-		if f, _ := c.resolver.GetFunction(expr.String()); f != nil {
+		if f := c.resolver.GetFunction(expr.String()); f != nil {
 			expr.Result().SetFunction(f)
 			expr.Kind = ast.FunctionKind
 
@@ -510,7 +510,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Type
-	if t, _ := c.resolver.GetType(expr.String()); t != nil {
+	if t := c.resolver.GetType(expr.String()); t != nil {
 		expr.Result().SetType(t)
 
 		if _, ok := t.(*ast.Enum); ok {
@@ -786,7 +786,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
 				// Check if parent expression wants a function
 				if parentWantsFunction(expr) {
-					function, _ := c.resolver.GetMethod(v, expr.Name.String(), true)
+					function := c.resolver.GetMethod(v, expr.Name.String(), true)
 
 					if function == nil {
 						c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(v), expr.Name)
@@ -854,7 +854,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 		// Check if parent expression wants a function
 		if parentWantsFunction(expr) {
-			function, _ := c.resolver.GetMethod(s, expr.Name.String(), false)
+			function := c.resolver.GetMethod(s, expr.Name.String(), false)
 
 			if function != nil {
 				expr.Result().SetFunction(function)
@@ -901,7 +901,7 @@ func parentWantsFunction(expr ast.Expr) bool {
 }
 
 func (c *checker) checkMalloc(expr ast.Expr) {
-	function, _ := c.resolver.GetFunction("malloc")
+	function := c.resolver.GetFunction("malloc")
 
 	if function == nil {
 		c.error(expr, "Malloc function not found")

@@ -164,18 +164,22 @@ func (s *Struct) Align() uint32 {
 
 func (s *Struct) Equals(other Type) bool {
 	if s2, ok := As[*Struct](other); ok {
-		return slices.EqualFunc(s.Fields, s2.Fields, fieldEquals)
+		return tokensEquals(s.Name, s2.Name) && slices.EqualFunc(s.Fields, s2.Fields, fieldEquals)
 	}
 
 	return false
 }
 
 func fieldEquals(v1, v2 *Field) bool {
-	return v1.Name.String() == v2.Name.String() && typesEquals(v1.Type, v2.Type)
+	return tokensEquals(v1.Name, v2.Name) && typesEquals(v1.Type, v2.Type)
 }
 
 func (s *Struct) CanAssignTo(other Type) bool {
-	return s.Equals(other)
+	if s2, ok := As[*Struct](other); ok {
+		return slices.EqualFunc(s.Fields, s2.Fields, fieldEquals)
+	}
+
+	return false
 }
 
 func (s *Struct) Resolved() Type {
@@ -205,7 +209,7 @@ func (e *Enum) Equals(other Type) bool {
 }
 
 func enumCaseEquals(v1, v2 *EnumCase) bool {
-	return v1.Name.String() == v2.Name.String() && v1.ActualValue == v2.ActualValue
+	return tokensEquals(v1.Name, v2.Name) && v1.ActualValue == v2.ActualValue
 }
 
 func (e *Enum) CanAssignTo(other Type) bool {
@@ -232,17 +236,7 @@ func (f *Func) Align() uint32 {
 
 func (f *Func) Equals(other Type) bool {
 	if f2, ok := As[*Func](other); ok {
-		fName := ""
-		if f.Name != nil {
-			fName = f.Name.String()
-		}
-
-		f2Name := ""
-		if f2.Name != nil {
-			f2Name = f2.Name.String()
-		}
-
-		return fName == f2Name && typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
+		return tokensEquals(f.Name, f2.Name) && typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
 	}
 
 	return false
@@ -309,11 +303,15 @@ func (t *typePrinter) VisitResolvable(type_ *Resolvable) {
 }
 
 func (t *typePrinter) VisitStruct(type_ *Struct) {
-	t.str += type_.Name.String()
+	if type_.Name != nil {
+		t.str += type_.Name.String()
+	}
 }
 
 func (t *typePrinter) VisitEnum(type_ *Enum) {
-	t.str += type_.Name.String()
+	if type_.Name != nil {
+		t.str += type_.Name.String()
+	}
 }
 
 func (t *typePrinter) VisitFunc(type_ *Func) {
@@ -327,6 +325,10 @@ func (t *typePrinter) VisitNode(node Node) {
 }
 
 // Utils
+
+func tokensEquals(t1, t2 *Token) bool {
+	return (t1 == nil && t2 == nil) || (t1 != nil && t2 != nil && t1.String() == t2.String())
+}
 
 func typesEquals(t1, t2 Type) bool {
 	return (t1 == nil && t2 == nil) || (t1 != nil && t2 != nil && t1.Equals(t2))

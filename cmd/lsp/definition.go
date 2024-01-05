@@ -70,9 +70,9 @@ func getDefinitionToken(resolver fuckoff.Resolver, token *ast.Token) []protocol.
 	case *ast.Member:
 		if s, ok := asThroughPointer[*ast.Struct](parent.Value.Result().Type); ok {
 			if parentWantsFunction(parent) {
-				method, _ := resolver.GetMethod(s, token.String(), false)
+				method := resolver.GetMethod(s, token.String(), false)
 				if method == nil {
-					method, _ = resolver.GetMethod(s, token.String(), true)
+					method = resolver.GetMethod(s, token.String(), true)
 				}
 
 				if method != nil {

@@ -113,7 +113,7 @@ func (g *get) contains(node Node) bool {
 	range_ := node.Cst().Range
 
 	if g.pos.Line == range_.End.Line && g.pos.Column >= range_.End.Column && node.Token().IsEmpty() {
-		if node.Parent().Cst() != nil && (node.Parent().Cst().Range.End.Line > range_.End.Line || node.Parent().Cst().Range.End.Column == range_.End.Column) {
+		if node.Parent() != nil && node.Parent().Cst() != nil && (node.Parent().Cst().Range.End.Line > range_.End.Line || node.Parent().Cst().Range.End.Column == range_.End.Column) {
 			next := GetNextSibling(node)
 
 			if next == nil || (next.Cst() != nil && next.Cst().Range.Start.Line > g.pos.Line) {
@@ -160,7 +160,7 @@ func (g *getNextSibling) VisitNode(node Node) {
 // GetParent()
 
 func GetParent[T Node](node Node) T {
-	for node != nil {
+	for !IsNil(node) {
 		if n, ok := node.(T); ok {
 			return n
 		}

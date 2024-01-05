@@ -3,6 +3,7 @@ package cst2ast
 import (
 	"fireball/core/ast"
 	"fireball/core/cst"
+	"fireball/core/scanner"
 )
 
 func (c *converter) convertStmt(node cst.Node) ast.Stmt {
@@ -121,19 +122,24 @@ func (c *converter) convertForStmt(node cst.Node) ast.Stmt {
 	var increment ast.Expr
 	var body ast.Stmt
 
+	semicolons := 0
+
 	for _, child := range node.Children {
 		if child.Kind.IsStmt() {
-			if initializer == nil {
+			if semicolons == 0 {
 				initializer = c.convertStmt(child)
+				semicolons++
 			} else {
 				body = c.convertStmt(child)
 			}
 		} else if child.Kind.IsExpr() {
-			if condition == nil {
+			if semicolons < 2 {
 				condition = c.convertExpr(child)
 			} else {
 				increment = c.convertExpr(child)
 			}
+		} else if child.Token.Kind == scanner.Semicolon {
+			semicolons++
 		}
 	}
 

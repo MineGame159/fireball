@@ -36,7 +36,7 @@ func (i *Impl) GetMethod(name string, static bool) *Func {
 	}
 
 	for _, function := range i.Methods {
-		if function.Name.String() == name && function.Flags&Static == staticValue {
+		if function.Name != nil && function.Name.String() == name && function.Flags&Static == staticValue {
 			return function
 		}
 	}
@@ -57,7 +57,7 @@ func (e *Enum) GetCase(name string) *EnumCase {
 }
 
 func (f *Field) GetMangledName() string {
-	return fmt.Sprintf("fb$%s::%s", f.Parent, f.Name)
+	return fmt.Sprintf("fb$%s::%s", f.Parent(), f.Name)
 }
 
 // Func

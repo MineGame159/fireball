@@ -113,7 +113,7 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 
 	// Malloc
 	if expr.New {
-		mallocFunc, _ := c.resolver.GetFunction("malloc")
+		mallocFunc := c.resolver.GetFunction("malloc")
 		malloc := c.getFunction(mallocFunc)
 
 		pointer := c.block.Call(
@@ -152,7 +152,7 @@ func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 func (c *codegen) VisitAllocateArray(expr *ast.AllocateArray) {
 	count := c.loadExpr(expr.Count)
 
-	mallocFunc, _ := c.resolver.GetFunction("malloc")
+	mallocFunc := c.resolver.GetFunction("malloc")
 	malloc := c.getFunction(mallocFunc)
 
 	a, _ := ast.As[*ast.Primitive](expr.Count.Result().Type)
@@ -439,6 +439,12 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	if _, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
 		if _, ok := ast.As[*ast.Pointer](expr.Result().Type); ok {
 			// pointer to pointer
+			c.exprResult = value
+			return
+		}
+
+		if _, ok := ast.As[*ast.Func](expr.Result().Type); ok {
+			// pointer to function pointer
 			c.exprResult = value
 			return
 		}

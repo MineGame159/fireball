@@ -28,7 +28,7 @@ func (c *converter) convertExpr(node cst.Node) ast.Expr {
 		return c.convertAllocateArrayExpr(node)
 	case cst.IdentifierNode:
 		return c.convertIdentifierExpr(node)
-	case cst.BoolExprNode, cst.NumberExprNode, cst.CharacterExprNode, cst.StringExprNode:
+	case cst.NilExprNode, cst.BoolExprNode, cst.NumberExprNode, cst.CharacterExprNode, cst.StringExprNode:
 		return c.convertLiteral(node)
 
 	default:

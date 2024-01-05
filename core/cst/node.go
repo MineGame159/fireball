@@ -20,6 +20,18 @@ func (n Node) Leaf() bool {
 	return n.Token.Lexeme != ""
 }
 
+func (n Node) Count(kind scanner.TokenKind) int {
+	count := 0
+
+	for _, child := range n.Children {
+		if child.Token.Kind == kind {
+			count++
+		}
+	}
+
+	return count
+}
+
 func (n Node) Contains(kind scanner.TokenKind) bool {
 	for _, child := range n.Children {
 		if child.Token.Kind == kind {
@@ -89,6 +101,7 @@ const (
 	StructFieldExprNode
 	ArrayExprNode
 	AllocateArrayExprNode
+	NilExprNode
 	BoolExprNode
 	NumberExprNode
 	CharacterExprNode
@@ -107,6 +120,8 @@ func NodeKindFromToken(token scanner.Token) NodeKind {
 	case scanner.Identifier:
 		return IdentifierNode
 
+	case scanner.Nil:
+		return NilExprNode
 	case scanner.True, scanner.False:
 		return BoolExprNode
 	case scanner.Number, scanner.Hex, scanner.Binary:
@@ -207,6 +222,8 @@ func (n NodeKind) String() string {
 		return "Array"
 	case AllocateArrayExprNode:
 		return "Allocate array"
+	case NilExprNode:
+		return "Nil"
 	case BoolExprNode:
 		return "Bool"
 	case NumberExprNode:

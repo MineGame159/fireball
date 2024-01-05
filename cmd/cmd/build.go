@@ -87,7 +87,7 @@ func buildProject() string {
 		path = filepath.Join(project.Path, "build", path[:len(path)-3]+".ll")
 
 		irFile, _ := os.Create(path)
-		codegen.Emit(file.Path, project, file.Ast, irFile)
+		codegen.Emit(file.AbsolutePath(), project, file.Ast, irFile)
 		_ = irFile.Close()
 
 		irPaths = append(irPaths, path)
@@ -148,7 +148,7 @@ func generateEntrypoint(project *workspace.Project, path string) error {
 	m := llvm.NewModule()
 	m.Source("__entrypoint")
 
-	function, _ := project.GetFunction("main")
+	function := project.GetFunction("main")
 
 	void := m.Void()
 	i32 := m.Primitive("i32", 32, llvm.SignedEncoding)

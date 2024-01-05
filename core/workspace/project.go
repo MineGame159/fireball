@@ -139,40 +139,40 @@ func (p *Project) LoadFiles() error {
 	return nil
 }
 
-func (p *Project) GetType(name string) (ast.Type, string) {
+func (p *Project) GetType(name string) ast.Type {
 	for _, file := range p.Files {
 		if v, ok := file.Types[name]; ok {
-			return v, file.Path
+			return v
 		}
 	}
 
-	return nil, ""
+	return nil
 }
 
-func (p *Project) GetFunction(name string) (*ast.Func, string) {
+func (p *Project) GetFunction(name string) *ast.Func {
 	for _, file := range p.Files {
 		if v, ok := file.Functions[name]; ok {
-			return v, file.Path
+			return v
 		}
 	}
 
-	return nil, ""
+	return nil
 }
 
-func (p *Project) GetMethod(type_ ast.Type, name string, static bool) (*ast.Func, string) {
+func (p *Project) GetMethod(type_ ast.Type, name string, static bool) *ast.Func {
 	for _, file := range p.Files {
 		for _, decl := range file.Ast.Decls {
 			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(type_) {
 				function := impl.GetMethod(name, static)
 
 				if function != nil {
-					return function, file.Path
+					return function
 				}
 			}
 		}
 	}
 
-	return nil, ""
+	return nil
 }
 
 func (p *Project) GetMethods(type_ ast.Type, static bool) []*ast.Func {
