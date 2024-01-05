@@ -57,7 +57,13 @@ func (e *Enum) GetCase(name string) *EnumCase {
 }
 
 func (f *Field) GetMangledName() string {
-	return fmt.Sprintf("fb$%s::%s", f.Parent(), f.Name)
+	parent := ""
+
+	if s, ok := f.Parent().(*Struct); ok && s.Name != nil {
+		parent = s.Name.String()
+	}
+
+	return fmt.Sprintf("fb$%s::%s", parent, f.Name)
 }
 
 // Func
