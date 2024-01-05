@@ -202,9 +202,12 @@ func getGlobalCompletions(resolver fuckoff.Resolver, c *completions, functions b
 	c.add(protocol.CompletionItemKindStruct, "f32", "")
 	c.add(protocol.CompletionItemKindStruct, "f64", "")
 
-	// True, false
+	// Builtin identifiers
 	c.add(protocol.CompletionItemKindKeyword, "true", "bool")
 	c.add(protocol.CompletionItemKindKeyword, "false", "bool")
+
+	c.add(protocol.CompletionItemKindFunction, "sizeof", "(<type>) u32")
+	c.add(protocol.CompletionItemKindFunction, "alignof", "(<type>) u32")
 
 	// Language defined types and functions
 	for _, file := range resolver.GetFileNodes() {
@@ -262,21 +265,11 @@ func isAfterCst(pos core.Pos, node ast.Node, kind scanner.TokenKind, sameLine bo
 
 func isInFunctionBody(pos core.Pos, node ast.Node) bool {
 	function := ast.GetParent[*ast.Func](node)
-	if function == nil || function.Cst() == nil {
+	if function == nil {
 		return false
 	}
 
-	left := function.Cst().Get(scanner.LeftBrace)
-	if left == nil {
-		return false
-	}
-
-	right := function.Cst().Get(scanner.RightBrace)
-	if right == nil {
-		return false
-	}
-
-	return core.Range{Start: left.Range.Start, End: right.Range.End}.Contains(pos)
+	return isBetween(pos, function, scanner.LeftBrace, scanner.RightBrace)
 }
 
 func printType(type_ ast.Type) string {

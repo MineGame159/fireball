@@ -137,11 +137,6 @@ func (h *handler) Rename(ctx context.Context, params *protocol.RenameParams) (re
 }
 
 //goland:noinspection GoUnusedParameter
-func (h *handler) SignatureHelp(ctx context.Context, params *protocol.SignatureHelpParams) (result *protocol.SignatureHelp, err error) {
-	return nil, errors.New("not implemented")
-}
-
-//goland:noinspection GoUnusedParameter
 func (h *handler) TypeDefinition(ctx context.Context, params *protocol.TypeDefinitionParams) (result []protocol.Location, err error) {
 	return nil, errors.New("not implemented")
 }

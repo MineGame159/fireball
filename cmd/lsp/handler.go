@@ -117,6 +117,10 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 				ResolveProvider:   false,
 				TriggerCharacters: []string{" ", ".", ":", "=", "*", "&", ">", "<", "!"},
 			},
+			SignatureHelpProvider: &protocol.SignatureHelpOptions{
+				TriggerCharacters:   []string{"("},
+				RetriggerCharacters: []string{","},
+			},
 
 			Workspace: &protocol.ServerCapabilitiesWorkspace{
 				FileOperations: &protocol.ServerCapabilitiesWorkspaceFileOperations{
@@ -429,7 +433,7 @@ func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParam
 	return getDefinition(file.Project, file.Ast, pos), nil
 }
 
-func (h *handler) Completion(ctx context.Context, params *protocol.CompletionParams) (result *protocol.CompletionList, err error) {
+func (h *handler) Completion(_ context.Context, params *protocol.CompletionParams) (result *protocol.CompletionList, err error) {
 	defer stop(start(h, "Completion"))
 
 	// Get document
@@ -448,6 +452,27 @@ func (h *handler) Completion(ctx context.Context, params *protocol.CompletionPar
 
 	// Get completions
 	return getCompletions(file.Project, file.Ast, pos), nil
+}
+
+func (h *handler) SignatureHelp(_ context.Context, params *protocol.SignatureHelpParams) (result *protocol.SignatureHelp, err error) {
+	defer stop(start(h, "SignatureHelp"))
+
+	// Get document
+	file := h.getFile(params.TextDocument.URI)
+	if file == nil {
+		return nil, nil
+	}
+
+	file.EnsureChecked()
+
+	// Get position
+	pos := core.Pos{
+		Line:   uint16(params.Position.Line + 1),
+		Column: uint16(params.Position.Character),
+	}
+
+	// Get signature help
+	return getSignatureHelp(file.Ast, pos), nil
 }
 
 // Utils

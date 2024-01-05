@@ -27,6 +27,33 @@ func asThroughPointer[T ast.Type](type_ ast.Type) (T, bool) {
 	return ast.As[T](type_)
 }
 
+func getNodeUnderPos(node ast.Node, pos core.Pos) ast.Node {
+	leaf := ast.GetLeaf(node, pos)
+	if leaf != nil {
+		return leaf
+	}
+
+	return ast.Get(node, pos)
+}
+
+func isBetween(pos core.Pos, node ast.Node, start, end scanner.TokenKind) bool {
+	if node.Cst() == nil {
+		return false
+	}
+
+	left := node.Cst().Get(start)
+	if left == nil {
+		return false
+	}
+
+	right := node.Cst().Get(end)
+	if right == nil {
+		return pos.IsAfter(left.Range.Start)
+	}
+
+	return core.Range{Start: left.Range.End, End: right.Range.Start}.Contains(pos)
+}
+
 func nodeCst(node ast.Node) *cst.Node {
 	if ast.IsNil(node) {
 		return nil

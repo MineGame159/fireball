@@ -22,6 +22,10 @@ enum Animal {
     Cat,
 }
 
+func add(x i32, y i32) i32 {
+    return x + y;
+}
+
 func main() {
     LibC.printf("Size: %d\n", sizeof(Foo));
     LibC.printf("Align: %d\n", alignof(Foo));
@@ -34,6 +38,8 @@ func main() {
 
         LibC.printf("Number: %d\n\n", animal);
     }
+
+    add(1, sizeof(Vec2));
 
     LibC.printf("Foo.bar: %d\n", Foo.bar);
     Foo.setBar(5);
