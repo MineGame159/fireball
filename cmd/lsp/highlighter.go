@@ -206,7 +206,11 @@ func (h *highlighter) VisitMember(expr *ast.Member) {
 	} else if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
 		h.add(expr.Name, enumMemberKind)
 	} else {
-		h.add(expr.Name, propertyKind)
+		if _, ok := ast.As[*ast.Func](expr.Result().Type); ok {
+			h.add(expr.Name, functionKind)
+		} else {
+			h.add(expr.Name, propertyKind)
+		}
 	}
 
 	expr.AcceptChildren(h)

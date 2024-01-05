@@ -64,6 +64,17 @@ func getHoverToken(resolver fuckoff.Resolver, token *ast.Token) *protocol.Hover 
 					method = resolver.GetMethod(s, token.String(), true)
 				}
 
+				if method == nil {
+					_, field := s.GetStaticField(token.String())
+					if field == nil {
+						_, field = s.GetField(token.String())
+					}
+
+					if f, ok := ast.As[*ast.Func](field.Type); ok {
+						method = f
+					}
+				}
+
 				if method != nil {
 					return newHover(token, method.Signature(true))
 				}

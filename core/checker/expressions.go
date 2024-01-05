@@ -789,10 +789,17 @@ func (c *checker) VisitMember(expr *ast.Member) {
 					function := c.resolver.GetMethod(v, expr.Name.String(), true)
 
 					if function == nil {
-						c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(v), expr.Name)
-						expr.Result().SetInvalid()
+						_, field := v.GetStaticField(expr.Name.String())
 
-						return
+						if f, ok := ast.As[*ast.Func](field.Type); ok {
+							expr.Result().SetValue(f, ast.AssignableFlag|ast.AddressableFlag)
+							return
+						} else {
+							c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(v), expr.Name)
+							expr.Result().SetInvalid()
+
+							return
+						}
 					}
 
 					expr.Result().SetFunction(function)
@@ -856,13 +863,21 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		if parentWantsFunction(expr) {
 			function := c.resolver.GetMethod(s, expr.Name.String(), false)
 
-			if function != nil {
-				expr.Result().SetFunction(function)
-			} else {
-				c.error(expr.Name, "Struct '%s' does not contain method '%s'", ast.PrintType(s), expr.Name)
-				expr.Result().SetInvalid()
+			if function == nil {
+				_, field := s.GetField(expr.Name.String())
+
+				if f, ok := ast.As[*ast.Func](field.Type); ok {
+					expr.Result().SetValue(f, ast.AssignableFlag|ast.AddressableFlag)
+					return
+				} else {
+					c.error(expr.Name, "Struct '%s' does not contain method '%s'", ast.PrintType(s), expr.Name)
+					expr.Result().SetInvalid()
+
+					return
+				}
 			}
 
+			expr.Result().SetFunction(function)
 			return
 		}
 

@@ -75,25 +75,32 @@ func getDefinitionToken(resolver fuckoff.Resolver, token *ast.Token) []protocol.
 					method = resolver.GetMethod(s, token.String(), true)
 				}
 
-				if method != nil {
-					return newDefinition(method)
+				if method == nil {
+					_, field := s.GetStaticField(token.String())
+					if field == nil {
+						_, field = s.GetField(token.String())
+					}
+
+					if field != nil {
+						if _, ok := ast.As[*ast.Func](field.Type); ok {
+							return newDefinition(field)
+						}
+					}
 				}
+
+				return newDefinition(method)
 			} else {
 				_, field := s.GetField(token.String())
 				if field == nil {
 					_, field = s.GetStaticField(token.String())
 				}
 
-				if field != nil {
-					return newDefinition(field)
-				}
+				return newDefinition(field)
 			}
 		} else if e, ok := ast.As[*ast.Enum](parent.Value.Result().Type); ok {
 			case_ := e.GetCase(token.String())
 
-			if case_ != nil {
-				return newDefinition(case_)
-			}
+			return newDefinition(case_)
 		}
 
 	case *ast.InitField:
