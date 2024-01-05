@@ -40,6 +40,18 @@ func (n Node) ContainsAny(kinds []scanner.TokenKind) bool {
 	return false
 }
 
+func (n Node) Get(kind scanner.TokenKind) *Node {
+	for i := range n.Children {
+		child := &n.Children[i]
+
+		if child.Token.Kind == kind {
+			return child
+		}
+	}
+
+	return nil
+}
+
 const (
 	UnknownNode NodeKind = iota
 	FileNode

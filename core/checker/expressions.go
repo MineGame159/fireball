@@ -712,7 +712,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 func (c *checker) VisitIndex(expr *ast.Index) {
 	expr.AcceptChildren(c)
 
-	if expr.Value == nil || expr.Value.Result().Kind == ast.InvalidResultKind || expr.Index.Result().Kind == ast.InvalidResultKind {
+	if expr.Value == nil || expr.Index == nil || expr.Value.Result().Kind == ast.InvalidResultKind || expr.Index.Result().Kind == ast.InvalidResultKind {
 		return // Do not cascade errors
 	}
 

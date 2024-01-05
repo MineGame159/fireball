@@ -1,13 +1,21 @@
 package core
 
-type Range struct {
-	Start Pos
-	End   Pos
-}
-
 type Pos struct {
 	Line   uint16
 	Column uint16
+}
+
+func (p Pos) IsAfter(after Pos) bool {
+	if p.Line == after.Line {
+		return p.Column > after.Column
+	}
+
+	return p.Line > after.Line
+}
+
+type Range struct {
+	Start Pos
+	End   Pos
 }
 
 func (r Range) Valid() bool {

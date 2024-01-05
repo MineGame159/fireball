@@ -113,6 +113,10 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 			InlayHintProvider:       true,
 			WorkspaceSymbolProvider: true,
 			DefinitionProvider:      true,
+			CompletionProvider: &protocol.CompletionOptions{
+				ResolveProvider:   false,
+				TriggerCharacters: []string{" ", ".", ":", "=", "*", "&", ">", "<", "!"},
+			},
 
 			Workspace: &protocol.ServerCapabilitiesWorkspace{
 				FileOperations: &protocol.ServerCapabilitiesWorkspaceFileOperations{
@@ -423,6 +427,27 @@ func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParam
 
 	// Get declaration
 	return getDefinition(file.Project, file.Ast, pos), nil
+}
+
+func (h *handler) Completion(ctx context.Context, params *protocol.CompletionParams) (result *protocol.CompletionList, err error) {
+	defer stop(start(h, "Completion"))
+
+	// Get document
+	file := h.getFile(params.TextDocument.URI)
+	if file == nil {
+		return nil, nil
+	}
+
+	file.EnsureChecked()
+
+	// Get position
+	pos := core.Pos{
+		Line:   uint16(params.Position.Line + 1),
+		Column: uint16(params.Position.Character),
+	}
+
+	// Get completions
+	return getCompletions(file.Project, file.Ast, pos), nil
 }
 
 // Utils

@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/cst"
 	"fireball/core/scanner"
@@ -42,7 +43,8 @@ type scope struct {
 }
 
 type variableResolver struct {
-	target ast.Node
+	target             core.Pos
+	targetVariableName ast.Node
 
 	scopes    []scope
 	variables []*ast.Var
@@ -58,7 +60,7 @@ func (v *variableResolver) VisitNode(node ast.Node) {
 	}
 
 	// Check target
-	if node == v.target {
+	if node == v.targetVariableName || (node.Cst() != nil && node.Cst().Range.Start.IsAfter(v.target)) {
 		v.done = true
 		v.checkScope()
 		return
@@ -88,7 +90,7 @@ func (v *variableResolver) VisitNode(node ast.Node) {
 
 	node.AcceptChildren(v)
 
-	if pop {
+	if pop && !v.done {
 		v.popScope()
 	}
 }
@@ -97,7 +99,7 @@ func (v *variableResolver) checkScope() {
 	for i := len(v.variables) - 1; i >= 0; i-- {
 		variable := v.variables[i]
 
-		if variable.Name.String() == v.target.String() {
+		if v.targetVariableName != nil && v.variable == nil && variable.Name.String() == v.targetVariableName.String() {
 			v.variable = variable
 			break
 		}

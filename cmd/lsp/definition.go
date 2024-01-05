@@ -15,7 +15,7 @@ func getDefinition(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) []pro
 	// Get definition based on the leaf node
 	switch node := node.(type) {
 	case *ast.Identifier:
-		return getDefinitionIdentifier(node)
+		return getDefinitionIdentifier(pos, node)
 
 	case *ast.Resolvable:
 		return newDefinition(node.Resolved())
@@ -27,7 +27,7 @@ func getDefinition(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) []pro
 	return nil
 }
 
-func getDefinitionIdentifier(identifier *ast.Identifier) []protocol.Location {
+func getDefinitionIdentifier(pos core.Pos, identifier *ast.Identifier) []protocol.Location {
 	switch identifier.Kind {
 	case ast.StructKind, ast.EnumKind:
 		return newDefinition(identifier.Result().Type)
@@ -53,7 +53,7 @@ func getDefinitionIdentifier(identifier *ast.Identifier) []protocol.Location {
 			return nil
 		}
 
-		resolver := variableResolver{target: identifier}
+		resolver := variableResolver{target: pos, targetVariableName: identifier}
 		resolver.VisitNode(function)
 
 		if resolver.variable != nil {

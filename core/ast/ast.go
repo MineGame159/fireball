@@ -27,7 +27,7 @@ type Visitor interface {
 // GetLeaf()
 
 func GetLeaf(node Node, pos core.Pos) Node {
-	g := get{
+	g := getLeaf{
 		pos: pos,
 	}
 
@@ -35,23 +35,21 @@ func GetLeaf(node Node, pos core.Pos) Node {
 	return g.node
 }
 
-type get struct {
+type getLeaf struct {
 	pos  core.Pos
 	node Node
 }
 
-func (g *get) VisitNode(node Node) {
+func (g *getLeaf) VisitNode(node Node) {
 	// Propagate node up the tree
 	if g.node != nil {
 		return
 	}
 
 	// Check if node contains target position
-	contains := node.Cst().Range.Contains(g.pos)
-
-	if node.Cst() == nil || contains {
+	if node.Cst() == nil || node.Cst().Range.Contains(g.pos) {
 		// Check if node is a leaf node
-		if !node.Token().IsEmpty() && contains {
+		if !node.Token().IsEmpty() && node.Cst() != nil && node.Cst().Range.Contains(g.pos) {
 			g.node = node
 			return
 		}
@@ -63,6 +61,99 @@ func (g *get) VisitNode(node Node) {
 		if g.node != nil {
 			return
 		}
+	}
+}
+
+// Get()
+
+func Get(node Node, pos core.Pos) Node {
+	g := get{
+		pos: pos,
+	}
+
+	g.VisitNode(node)
+	return g.node
+}
+
+type get struct {
+	pos  core.Pos
+	node Node
+
+	hasChild bool
+}
+
+func (g *get) VisitNode(node Node) {
+	// Propagate node up the tree
+	if g.node != nil {
+		return
+	}
+
+	// Check if node contains target position
+	if node.Cst() == nil || g.contains(node) {
+		// Children
+		node.AcceptChildren(g)
+
+		// Propagate node up the tree
+		if g.node != nil {
+			return
+		}
+
+		// Set node if we are going back up the tree without a found node and the pos is inside the current range
+		if g.contains(node) {
+			g.node = node
+			return
+		}
+	}
+}
+
+func (g *get) contains(node Node) bool {
+	if node.Cst() == nil {
+		return false
+	}
+	range_ := node.Cst().Range
+
+	if g.pos.Line == range_.End.Line && g.pos.Column >= range_.End.Column && node.Token().IsEmpty() {
+		if node.Parent().Cst() != nil && (node.Parent().Cst().Range.End.Line > range_.End.Line || node.Parent().Cst().Range.End.Column == range_.End.Column) {
+			next := GetNextSibling(node)
+
+			if next == nil || (next.Cst() != nil && next.Cst().Range.Start.Line > g.pos.Line) {
+				return true
+			}
+		}
+	}
+
+	return range_.Contains(g.pos)
+}
+
+// GetNextSibling()
+
+func GetNextSibling(node Node) Node {
+	for node.Parent() != nil {
+		g := getNextSibling{target: node}
+		node.Parent().AcceptChildren(&g)
+
+		if g.next != nil {
+			return g.next
+		}
+
+		node = node.Parent()
+	}
+
+	return nil
+}
+
+type getNextSibling struct {
+	target Node
+
+	seenTarget bool
+	next       Node
+}
+
+func (g *getNextSibling) VisitNode(node Node) {
+	if node == g.target {
+		g.seenTarget = true
+	} else if g.seenTarget && g.next == nil {
+		g.next = node
 	}
 }
 

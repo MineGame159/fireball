@@ -27,7 +27,13 @@ func main() {
     LibC.printf("Align: %d\n", alignof(Foo));
     LibC.printf("\n");
 
-    var animal = Animal.Dog;
+    var animal = Animal.Cat;
+
+    if (true) {
+        var animal = 5;
+
+        LibC.printf("Number: %d\n\n", animal);
+    }
 
     LibC.printf("Foo.bar: %d\n", Foo.bar);
     Foo.setBar(5);

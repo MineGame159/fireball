@@ -10,4 +10,7 @@ type Resolver interface {
 	GetFunction(name string) (*ast.Func, string)
 
 	GetMethod(type_ ast.Type, name string, static bool) (*ast.Func, string)
+	GetMethods(type_ ast.Type, static bool) []*ast.Func
+
+	GetFileNodes() []*ast.File
 }

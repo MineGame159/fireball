@@ -61,7 +61,7 @@ func parseBlockStmt(p *parser) Node {
 	if p.consume(scanner.LeftBrace) {
 		return p.end()
 	}
-	if p.repeat(parseStmt, canStartStmt...) {
+	if p.repeatSync(parseStmt, scanner.RightBrace, canStartStmt...) {
 		return p.end()
 	}
 	if p.consume(scanner.RightBrace) {

@@ -70,7 +70,7 @@ func (p *Pointer) Align() uint32 {
 
 func (p *Pointer) Equals(other Type) bool {
 	if p2, ok := As[*Pointer](other); ok {
-		return p.Pointee.Equals(p2.Pointee)
+		return typesEquals(p.Pointee, p2.Pointee)
 	}
 
 	return false
@@ -78,7 +78,7 @@ func (p *Pointer) Equals(other Type) bool {
 
 func (p *Pointer) CanAssignTo(other Type) bool {
 	if p2, ok := As[*Pointer](other); ok {
-		return IsPrimitive(p2.Pointee, Void) || p.Pointee.Equals(p2.Pointee)
+		return IsPrimitive(p2.Pointee, Void) || typesEquals(p.Pointee, p2.Pointee)
 	}
 
 	return false
@@ -96,7 +96,7 @@ func (a *Array) Align() uint32 {
 
 func (a *Array) Equals(other Type) bool {
 	if a2, ok := As[*Array](other); ok {
-		return a.Base.Equals(a2.Base) && a.Count == a2.Count
+		return typesEquals(a.Base, a2.Base) && a.Count == a2.Count
 	}
 
 	return false
@@ -171,7 +171,7 @@ func (s *Struct) Equals(other Type) bool {
 }
 
 func fieldEquals(v1, v2 *Field) bool {
-	return v1.Name.Token().Lexeme == v2.Name.Token().Lexeme && v1.Type.Equals(v2.Type)
+	return v1.Name.String() == v2.Name.String() && typesEquals(v1.Type, v2.Type)
 }
 
 func (s *Struct) CanAssignTo(other Type) bool {
@@ -198,14 +198,14 @@ func (e *Enum) Align() uint32 {
 
 func (e *Enum) Equals(other Type) bool {
 	if e2, ok := As[*Enum](other); ok {
-		return e.ActualType.Equals(e2.ActualType) && slices.EqualFunc(e.Cases, e2.Cases, enumCaseEquals)
+		return typesEquals(e.ActualType, e2.ActualType) && slices.EqualFunc(e.Cases, e2.Cases, enumCaseEquals)
 	}
 
 	return false
 }
 
 func enumCaseEquals(v1, v2 *EnumCase) bool {
-	return v1.Name.Token().Lexeme == v2.Name.Token().Lexeme && v1.ActualValue == v2.ActualValue
+	return v1.Name.String() == v2.Name.String() && v1.ActualValue == v2.ActualValue
 }
 
 func (e *Enum) CanAssignTo(other Type) bool {
@@ -242,19 +242,19 @@ func (f *Func) Equals(other Type) bool {
 			f2Name = f2.Name.String()
 		}
 
-		return fName == f2Name && f.Returns.Equals(f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
+		return fName == f2Name && typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
 	}
 
 	return false
 }
 
 func paramEquals(v1, v2 *Param) bool {
-	return v1.Type.Equals(v2.Type)
+	return typesEquals(v1.Type, v2.Type)
 }
 
 func (f *Func) CanAssignTo(other Type) bool {
 	if f2, ok := As[*Func](other); ok {
-		return f.Returns.Equals(f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
+		return typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
 	}
 
 	return false
@@ -324,4 +324,10 @@ func (t *typePrinter) VisitNode(node Node) {
 	if type_, ok := node.(Type); ok {
 		type_.AcceptType(t)
 	}
+}
+
+// Utils
+
+func typesEquals(t1, t2 Type) bool {
+	return (t1 == nil && t2 == nil) || (t1 != nil && t2 != nil && t1.Equals(t2))
 }

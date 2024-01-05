@@ -42,11 +42,6 @@ func (h *handler) ColorPresentation(ctx context.Context, params *protocol.ColorP
 }
 
 //goland:noinspection GoUnusedParameter
-func (h *handler) Completion(ctx context.Context, params *protocol.CompletionParams) (result *protocol.CompletionList, err error) {
-	return nil, errors.New("not implemented")
-}
-
-//goland:noinspection GoUnusedParameter
 func (h *handler) CompletionResolve(ctx context.Context, params *protocol.CompletionItem) (result *protocol.CompletionItem, err error) {
 	return nil, errors.New("not implemented")
 }

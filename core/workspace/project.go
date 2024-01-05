@@ -173,6 +173,39 @@ func (p *Project) GetMethod(type_ ast.Type, name string, static bool) (*ast.Func
 	return nil, ""
 }
 
+func (p *Project) GetMethods(type_ ast.Type, static bool) []*ast.Func {
+	var methods []*ast.Func
+
+	staticValue := ast.FuncFlags(0)
+	if static {
+		staticValue = 1
+	}
+
+	for _, file := range p.Files {
+		for _, decl := range file.Ast.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(type_) {
+				for _, method := range impl.Methods {
+					if method.Flags&ast.Static == staticValue {
+						methods = append(methods, method)
+					}
+				}
+			}
+		}
+	}
+
+	return methods
+}
+
+func (p *Project) GetFileNodes() []*ast.File {
+	nodes := make([]*ast.File, 0, len(p.Files))
+
+	for _, file := range p.Files {
+		nodes = append(nodes, file.Ast)
+	}
+
+	return nodes
+}
+
 func (p *Project) GetOrCreateFile(path string) *File {
 	if file, ok := p.Files[path]; ok {
 		return file
