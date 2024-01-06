@@ -712,12 +712,11 @@ func (c *checker) VisitCall(expr *ast.Call) {
 func (c *checker) VisitIndex(expr *ast.Index) {
 	expr.AcceptChildren(c)
 
-	if expr.Value == nil || expr.Index == nil || expr.Value.Result().Kind == ast.InvalidResultKind || expr.Index.Result().Kind == ast.InvalidResultKind {
+	if expr.Value == nil || expr.Value.Result().Kind == ast.InvalidResultKind {
 		return // Do not cascade errors
 	}
 
 	// Check value
-	ok := true
 	var base ast.Type
 
 	if expr.Value.Result().Kind == ast.ValueResultKind {
@@ -729,15 +728,19 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 
 		if base == nil {
 			c.error(expr.Value, "Can only index into array and pointer types, not '%s'", ast.PrintType(expr.Value.Result().Type))
-			ok = false
 		}
 	} else {
 		c.error(expr.Value, "Invalid value")
-		ok = false
+	}
+
+	if base != nil {
+		expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag)
+	} else {
+		expr.Result().SetInvalid()
 	}
 
 	// Check index
-	if expr.Index != nil {
+	if expr.Index != nil && expr.Index.Result().Kind != ast.InvalidResultKind {
 		if expr.Index.Result().Kind == ast.ValueResultKind {
 			ok2 := false
 
@@ -749,25 +752,15 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 
 			if !ok2 {
 				c.error(expr.Index, "Can only index using integer types, not '%s'", ast.PrintType(expr.Index.Result().Type))
-				ok = false
 			}
 		} else {
 			c.error(expr.Index, "Invalid value")
-			ok = false
 		}
 	}
 
 	// Check if value is not an array initializer
 	if _, ok := expr.Value.(*ast.ArrayInitializer); ok {
 		c.error(expr.Value, "Cannot index into a temporary array created directly from an array initializer")
-		ok = false
-	}
-
-	// Set result
-	if ok {
-		expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag)
-	} else {
-		expr.Result().SetInvalid()
 	}
 }
 
