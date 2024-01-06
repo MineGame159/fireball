@@ -12,6 +12,9 @@ type Scanner struct {
 
 	line   uint16
 	column uint16
+
+	startLine   uint16
+	startColumn uint16
 }
 
 func NewScanner(text string) *Scanner {
@@ -24,8 +27,11 @@ func NewScanner(text string) *Scanner {
 }
 
 func (s *Scanner) Next() PositionedToken {
-	s.skipWhitespace()
-	s.startI = s.currentI
+	if token := s.skipWhitespace(); !token.IsEmpty() {
+		return token
+	}
+
+	s.start()
 
 	if s.isAtEnd() {
 		return s.make(Eof)
@@ -339,10 +345,10 @@ func (s *Scanner) match(expected uint8) bool {
 	return true
 }
 
-func (s *Scanner) skipWhitespace() {
+func (s *Scanner) skipWhitespace() PositionedToken {
 	for {
 		if s.isAtEnd() {
-			return
+			return PositionedToken{}
 		}
 
 		c := s.peek()
@@ -358,10 +364,16 @@ func (s *Scanner) skipWhitespace() {
 
 		case '/':
 			if s.peekNext() == '/' {
+				s.start()
+
 				for !s.isAtEnd() && s.peek() != '\n' {
 					s.advance()
 				}
+
+				return s.make(Comment)
 			} else if s.peekNext() == '*' {
+				s.start()
+
 				s.advance()
 				s.advance()
 
@@ -381,12 +393,14 @@ func (s *Scanner) skipWhitespace() {
 						s.advance()
 					}
 				}
+
+				return s.make(Comment)
 			} else {
-				return
+				return PositionedToken{}
 			}
 
 		default:
-			return
+			return PositionedToken{}
 		}
 	}
 }
@@ -419,18 +433,23 @@ func (s *Scanner) isAtEnd() bool {
 }
 
 func (s *Scanner) make(kind TokenKind) PositionedToken {
-	lexeme := s.text[s.startI:s.currentI]
-
 	return PositionedToken{
 		Token: Token{
 			Kind:   kind,
-			Lexeme: lexeme,
+			Lexeme: s.text[s.startI:s.currentI],
 		},
 		Pos: core.Pos{
-			Line:   s.line,
-			Column: s.column - uint16(len(lexeme)),
+			Line:   s.startLine,
+			Column: s.startColumn,
 		},
 	}
+}
+
+func (s *Scanner) start() {
+	s.startI = s.currentI
+
+	s.startLine = s.line
+	s.startColumn = s.column
 }
 
 func (s *Scanner) error(msg string) PositionedToken {

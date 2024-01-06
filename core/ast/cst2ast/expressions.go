@@ -60,7 +60,7 @@ func (c *converter) convertUnaryExpr(node cst.Node) ast.Expr {
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
 			value = c.convertExpr(child)
-		} else {
+		} else if child.Kind == cst.MiscNode {
 			operator = c.convertToken(child)
 
 			if value == nil {
@@ -95,7 +95,7 @@ func (c *converter) convertBinaryExpr(node cst.Node) ast.Expr {
 			} else {
 				right = c.convertExpr(child)
 			}
-		} else {
+		} else if child.Kind == cst.MiscNode {
 			operator = c.convertToken(child)
 		}
 	}

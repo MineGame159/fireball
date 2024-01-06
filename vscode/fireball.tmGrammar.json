@@ -137,6 +137,12 @@
         },
         {
           "include": "#attribute-name"
+        },
+        {
+          "include": "#lineComment"
+        },
+        {
+          "include": "#blockComment"
         }
       ]
     },

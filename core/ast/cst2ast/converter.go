@@ -18,10 +18,12 @@ func Convert(reporter utils.Reporter, path string, node cst.Node) *ast.File {
 	var decls []ast.Decl
 
 	for _, child := range node.Children {
-		decl := c.convertDecl(child)
+		if child.Kind.IsDecl() {
+			decl := c.convertDecl(child)
 
-		if decl != nil {
-			decls = append(decls, decl)
+			if decl != nil {
+				decls = append(decls, decl)
+			}
 		}
 	}
 

@@ -53,6 +53,7 @@ func (p *parser) begin(kind NodeKind) {
 }
 
 func (p *parser) child(parseFn func(p *parser) Node) bool {
+	p.comments()
 	return p.childAdd(parseFn(p))
 }
 
@@ -114,6 +115,12 @@ func (p *parser) end() Node {
 }
 
 // Syntax
+
+func (p *parser) comments() {
+	for p.next.Kind == scanner.Comment {
+		p.advanceAddChild()
+	}
+}
 
 func (p *parser) consume(kind scanner.TokenKind) bool {
 	if p.peek() != kind {
@@ -192,18 +199,22 @@ outer:
 // Tokens
 
 func (p *parser) peek() scanner.TokenKind {
+	p.comments()
 	return p.next.Kind
 }
 
 func (p *parser) peekIs(kinds []scanner.TokenKind) bool {
+	p.comments()
 	return slices.Contains(kinds, p.peek())
 }
 
 func (p *parser) peek2() scanner.TokenKind {
+	p.comments()
 	return p.next2.Kind
 }
 
 func (p *parser) peek2Is(kinds []scanner.TokenKind) bool {
+	p.comments()
 	return slices.Contains(kinds, p.peek2())
 }
 

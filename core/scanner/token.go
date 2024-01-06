@@ -85,6 +85,8 @@ const (
 	String
 	Identifier
 
+	Comment
+
 	Eof
 )
 
@@ -183,6 +185,9 @@ func IsBitwise(kind TokenKind) bool {
 
 func TokenKindStr(kind TokenKind) string {
 	switch kind {
+	case Error:
+		return "<error>"
+
 	case LeftParen:
 		return "'('"
 	case RightParen:
@@ -328,8 +333,9 @@ func TokenKindStr(kind TokenKind) string {
 	case Identifier:
 		return "identifier"
 
-	case Error:
-		return "<error>"
+	case Comment:
+		return "<comment>"
+
 	case Eof:
 		return "<eof>"
 

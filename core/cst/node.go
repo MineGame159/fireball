@@ -113,6 +113,7 @@ const (
 
 	KeywordNode
 	IdentifierNode
+	CommentNode
 	MiscNode
 )
 
@@ -132,6 +133,9 @@ func NodeKindFromToken(token scanner.Token) NodeKind {
 	case scanner.String:
 		return StringExprNode
 
+	case scanner.Comment:
+		return CommentNode
+
 	default:
 		if scanner.IsKeyword(token.Kind) {
 			return KeywordNode
@@ -143,6 +147,16 @@ func NodeKindFromToken(token scanner.Token) NodeKind {
 
 func (n NodeKind) IsType() bool {
 	return n >= IdentifierTypeNode && n <= FuncTypeNode
+}
+
+func (n NodeKind) IsDecl() bool {
+	switch n {
+	case StructNode, ImplNode, EnumNode, FuncNode:
+		return true
+
+	default:
+		return false
+	}
 }
 
 func (n NodeKind) IsStmt() bool {
@@ -245,6 +259,8 @@ func (n NodeKind) String() string {
 		return "Keyword"
 	case IdentifierNode:
 		return "Identifier"
+	case CommentNode:
+		return "Comment"
 	case MiscNode:
 		return "Misc"
 
