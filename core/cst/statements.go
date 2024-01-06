@@ -215,7 +215,12 @@ func parseReturnStmt(p *parser) Node {
 func parseBreakStmt(p *parser) Node {
 	p.begin(BreakStmtNode)
 
-	p.consume(scanner.Break)
+	if p.consume(scanner.Break) {
+		return p.end()
+	}
+	if p.consume(scanner.Semicolon) {
+		return p.end()
+	}
 
 	return p.end()
 }
@@ -223,7 +228,12 @@ func parseBreakStmt(p *parser) Node {
 func parseContinueStmt(p *parser) Node {
 	p.begin(ContinueStmtNode)
 
-	p.consume(scanner.Continue)
+	if p.consume(scanner.Continue) {
+		return p.end()
+	}
+	if p.consume(scanner.Semicolon) {
+		return p.end()
+	}
 
 	return p.end()
 }
