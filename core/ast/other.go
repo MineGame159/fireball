@@ -598,6 +598,8 @@ func IsNil(node Node) bool {
 		return node == nil
 	case *If:
 		return node == nil
+	case *While:
+		return node == nil
 	case *For:
 		return node == nil
 	case *Return:

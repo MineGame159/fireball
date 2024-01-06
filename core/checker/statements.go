@@ -74,6 +74,15 @@ func (c *checker) VisitIf(stmt *ast.If) {
 	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
 }
 
+func (c *checker) VisitWhile(stmt *ast.While) {
+	c.loopDepth++
+	stmt.AcceptChildren(c)
+	c.loopDepth--
+
+	// Check condition value
+	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
+}
+
 func (c *checker) VisitFor(stmt *ast.For) {
 	// Visit children
 	c.pushScope()

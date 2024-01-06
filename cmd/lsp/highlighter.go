@@ -103,6 +103,10 @@ func (h *highlighter) VisitIf(stmt *ast.If) {
 	stmt.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitWhile(stmt *ast.While) {
+	stmt.AcceptChildren(h)
+}
+
 func (h *highlighter) VisitFor(stmt *ast.For) {
 	stmt.AcceptChildren(h)
 }

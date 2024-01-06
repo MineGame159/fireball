@@ -65,6 +65,35 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	c.beginBlock(end)
 }
 
+func (c *codegen) VisitWhile(stmt *ast.While) {
+	// Get blocks
+	prevLoopStart := c.loopStart
+	prevLoopEnd := c.loopEnd
+
+	c.loopStart = c.function.Block("while.start")
+	body := c.function.Block("while.body")
+	c.loopEnd = c.function.Block("while.end")
+
+	c.block.Br(nil, c.loopStart, nil)
+
+	// Condition
+	c.beginBlock(c.loopStart)
+	condition := c.acceptExpr(stmt.Condition)
+	c.block.Br(condition.v, body, c.loopEnd)
+
+	// Body
+	c.beginBlock(body)
+	c.acceptStmt(stmt.Body)
+	c.block.Br(nil, c.loopStart, nil)
+
+	// End
+	c.beginBlock(c.loopEnd)
+
+	// Reset basic block names
+	c.loopStart = prevLoopStart
+	c.loopEnd = prevLoopEnd
+}
+
 func (c *codegen) VisitFor(stmt *ast.For) {
 	// Get blocks
 	prevLoopStart := c.loopStart

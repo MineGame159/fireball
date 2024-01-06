@@ -110,6 +110,11 @@ var statements = Group{
 			field("else", type_("Stmt")),
 		),
 		node(
+			"While",
+			field("condition", type_("Expr")),
+			field("body", type_("Stmt")),
+		),
+		node(
 			"For",
 			field("initializer", type_("Stmt")),
 			field("condition", type_("Expr")),

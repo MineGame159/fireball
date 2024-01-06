@@ -12,6 +12,7 @@ type StmtVisitor interface {
 	VisitBlock(stmt *Block)
 	VisitVar(stmt *Var)
 	VisitIf(stmt *If)
+	VisitWhile(stmt *While)
 	VisitFor(stmt *For)
 	VisitReturn(stmt *Return)
 	VisitBreak(stmt *Break)
@@ -385,6 +386,95 @@ func (i *If) String() string {
 
 func (i *If) AcceptStmt(visitor StmtVisitor) {
 	visitor.VisitIf(i)
+}
+
+// While
+
+type While struct {
+	cst    cst.Node
+	parent Node
+
+	Condition Expr
+	Body      Stmt
+}
+
+func NewWhile(node cst.Node, condition Expr, body Stmt) *While {
+	if condition == nil && body == nil {
+		return nil
+	}
+
+	w := &While{
+		cst:       node,
+		Condition: condition,
+		Body:      body,
+	}
+
+	if condition != nil {
+		condition.SetParent(w)
+	}
+	if body != nil {
+		body.SetParent(w)
+	}
+
+	return w
+}
+
+func (w *While) Cst() *cst.Node {
+	if w.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &w.cst
+}
+
+func (w *While) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (w *While) Parent() Node {
+	return w.parent
+}
+
+func (w *While) SetParent(parent Node) {
+	if parent != nil && w.parent != nil {
+		panic("ast.While.SetParent() - Parent is already set")
+	}
+
+	w.parent = parent
+}
+
+func (w *While) AcceptChildren(visitor Visitor) {
+	if w.Condition != nil {
+		visitor.VisitNode(w.Condition)
+	}
+	if w.Body != nil {
+		visitor.VisitNode(w.Body)
+	}
+}
+
+func (w *While) Clone() Node {
+	w2 := &While{
+		cst: w.cst,
+	}
+
+	if w.Condition != nil {
+		w2.Condition = w.Condition.Clone().(Expr)
+		w2.Condition.SetParent(w2)
+	}
+	if w.Body != nil {
+		w2.Body = w.Body.Clone().(Stmt)
+		w2.Body.SetParent(w2)
+	}
+
+	return w2
+}
+
+func (w *While) String() string {
+	return ""
+}
+
+func (w *While) AcceptStmt(visitor StmtVisitor) {
+	visitor.VisitWhile(w)
 }
 
 // For

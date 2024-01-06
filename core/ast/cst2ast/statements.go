@@ -16,6 +16,8 @@ func (c *converter) convertStmt(node cst.Node) ast.Stmt {
 		return c.convertVarStmt(node)
 	case cst.IfStmtNode:
 		return c.convertIfStmt(node)
+	case cst.WhileStmtNode:
+		return c.convertWhileStmt(node)
 	case cst.ForStmtNode:
 		return c.convertForStmt(node)
 	case cst.ReturnStmtNode:
@@ -111,6 +113,25 @@ func (c *converter) convertIfStmt(node cst.Node) ast.Stmt {
 
 	if i := ast.NewIf(node, condition, then, else_); i != nil {
 		return i
+	}
+
+	return nil
+}
+
+func (c *converter) convertWhileStmt(node cst.Node) ast.Stmt {
+	var condition ast.Expr
+	var body ast.Stmt
+
+	for _, child := range node.Children {
+		if child.Kind.IsExpr() {
+			condition = c.convertExpr(child)
+		} else if child.Kind.IsStmt() {
+			body = c.convertStmt(child)
+		}
+	}
+
+	if w := ast.NewWhile(node, condition, body); w != nil {
+		return w
 	}
 
 	return nil

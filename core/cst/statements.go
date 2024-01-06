@@ -6,6 +6,7 @@ var canStartStmt = []scanner.TokenKind{
 	scanner.LeftBrace,
 	scanner.Var,
 	scanner.If,
+	scanner.While,
 	scanner.For,
 	scanner.Return,
 	scanner.Break,
@@ -28,6 +29,8 @@ func parseStmt(p *parser) Node {
 		return parseVarStmt(p)
 	case scanner.If:
 		return parseIfStmt(p)
+	case scanner.While:
+		return parseWhileStmt(p)
 	case scanner.For:
 		return parseForStmt(p)
 	case scanner.Return:
@@ -119,6 +122,28 @@ func parseIfStmt(p *parser) Node {
 		if p.child(parseStmt) {
 			return p.end()
 		}
+	}
+
+	return p.end()
+}
+
+func parseWhileStmt(p *parser) Node {
+	p.begin(WhileStmtNode)
+
+	if p.consume(scanner.While) {
+		return p.end()
+	}
+	if p.consume(scanner.LeftParen) {
+		return p.end()
+	}
+	if p.child(parseExpr) {
+		return p.end()
+	}
+	if p.consume(scanner.RightParen) {
+		return p.end()
+	}
+	if p.child(parseStmt) {
+		return p.end()
 	}
 
 	return p.end()

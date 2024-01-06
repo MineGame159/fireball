@@ -86,6 +86,7 @@ const (
 	BlockStmtNode
 	VarStmtNode
 	IfStmtNode
+	WhileStmtNode
 	ForStmtNode
 	ReturnStmtNode
 	BreakStmtNode
@@ -191,6 +192,8 @@ func (n NodeKind) String() string {
 		return "Block"
 	case VarStmtNode:
 		return "Variable"
+	case WhileStmtNode:
+		return "While"
 	case IfStmtNode:
 		return "if"
 	case ForStmtNode:
