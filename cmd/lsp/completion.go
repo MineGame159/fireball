@@ -27,6 +27,7 @@ func getCompletions(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *pro
 				}
 
 			default:
+				getStmtCompletions(&c, parent)
 				getIdentifierCompletions(resolver, &c, pos, leaf)
 			}
 		} else {
@@ -55,6 +56,7 @@ func getCompletions(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *pro
 				}
 
 			default:
+				getStmtCompletions(&c, node)
 				getIdentifierCompletions(resolver, &c, pos, node)
 			}
 		} else {
@@ -184,6 +186,31 @@ func getIdentifierCompletions(resolver fuckoff.Resolver, c *completions, pos cor
 	}
 }
 
+func getStmtCompletions(c *completions, node ast.Node) {
+	ok := false
+
+	switch node := node.(type) {
+	case *ast.Func:
+		ok = true
+
+	case *ast.Expression:
+		switch node.Parent().(type) {
+		case *ast.Func, *ast.Block:
+			ok = true
+		}
+	}
+
+	if ok {
+		c.add(protocol.CompletionItemKindKeyword, "var", "")
+		c.add(protocol.CompletionItemKindSnippet, "if", "")
+		c.add(protocol.CompletionItemKindSnippet, "while", "")
+		c.add(protocol.CompletionItemKindSnippet, "for", "")
+		c.add(protocol.CompletionItemKindKeyword, "return", "")
+		c.add(protocol.CompletionItemKindKeyword, "break", "")
+		c.add(protocol.CompletionItemKindKeyword, "continue", "")
+	}
+}
+
 func getGlobalCompletions(resolver fuckoff.Resolver, c *completions, functions bool) {
 	// Primitive types
 	c.add(protocol.CompletionItemKindStruct, "void", "")
@@ -292,17 +319,33 @@ func (c *completions) addNode(kind protocol.CompletionItemKind, name ast.Node, d
 }
 
 func (c *completions) add(kind protocol.CompletionItemKind, name, detail string) {
-	characters := commitCharacters
-	if kind == protocol.CompletionItemKindFunction || kind == protocol.CompletionItemKindMethod {
-		characters = commitCharactersFunction
-	}
-
-	c.items = append(c.items, protocol.CompletionItem{
+	item := protocol.CompletionItem{
 		Kind:             kind,
 		Label:            name,
 		Detail:           detail,
-		CommitCharacters: characters,
-	})
+		CommitCharacters: commitCharacters,
+	}
+
+	switch kind {
+	case protocol.CompletionItemKindFunction, protocol.CompletionItemKindMethod:
+		item.CommitCharacters = commitCharactersFunction
+
+		item.InsertText = name + "($1)"
+		item.InsertTextFormat = protocol.InsertTextFormatSnippet
+
+	case protocol.CompletionItemKindSnippet:
+		switch name {
+		case "if", "while":
+			item.InsertText = name + " ($1)"
+			item.InsertTextFormat = protocol.InsertTextFormatSnippet
+
+		case "for":
+			item.InsertText = "for ($1; $2; $3)"
+			item.InsertTextFormat = protocol.InsertTextFormatSnippet
+		}
+	}
+
+	c.items = append(c.items, item)
 }
 
 func (c *completions) get() *protocol.CompletionList {
