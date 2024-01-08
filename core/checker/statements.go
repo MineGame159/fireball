@@ -59,7 +59,7 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 	if c.hasVariableInScope(stmt.Name) {
 		c.error(stmt.Name, "Variable with the name '%s' already exists in the current scope", stmt.Name)
 	} else {
-		c.addVariable(stmt.Name, stmt.ActualType)
+		c.addVariable(stmt.Name, stmt.ActualType, stmt)
 	}
 
 	// Check void type

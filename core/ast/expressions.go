@@ -1296,7 +1296,6 @@ type Identifier struct {
 	parent Node
 
 	Name scanner.Token
-	Kind IdentifierKind
 
 	result ExprResult
 }
@@ -1345,7 +1344,6 @@ func (i *Identifier) Clone() Node {
 	i2 := &Identifier{
 		cst:  i.cst,
 		Name: i.Name,
-		Kind: i.Kind,
 	}
 
 	return i2

@@ -59,9 +59,7 @@ func (a *annotator) visitVar(stmt *ast.Var) {
 
 func (a *annotator) visitCall(expr *ast.Call) {
 	if false {
-		if expr.Callee.Result().Kind == ast.FunctionResultKind {
-			function := expr.Callee.Result().Function
-
+		if function, ok := expr.Callee.Result().Type.(*ast.Func); ok {
 			for i, arg := range expr.Args {
 				if i >= len(function.Params) {
 					break

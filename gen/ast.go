@@ -208,7 +208,6 @@ var expressions = Group{
 		node(
 			"Identifier",
 			field("name", type_("scanner.Token")),
-			field("Kind", type_("IdentifierKind")),
 		),
 		node(
 			"Literal",

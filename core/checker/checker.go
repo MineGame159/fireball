@@ -30,6 +30,8 @@ type variable struct {
 	name  *ast.Token
 	type_ ast.Type
 
+	node ast.Node
+
 	param bool
 	used  bool
 }
@@ -70,7 +72,7 @@ func (c *checker) getVariable(name string) *variable {
 	return nil
 }
 
-func (c *checker) addVariable(name *ast.Token, type_ ast.Type) *variable {
+func (c *checker) addVariable(name *ast.Token, type_ ast.Type, node ast.Node) *variable {
 	if name == nil || type_ == nil {
 		return nil
 	}
@@ -78,6 +80,7 @@ func (c *checker) addVariable(name *ast.Token, type_ ast.Type) *variable {
 	c.variables = append(c.variables, variable{
 		name:  name,
 		type_: type_,
+		node:  node,
 	})
 
 	c.peekScope().variableCount++

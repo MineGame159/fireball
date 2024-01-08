@@ -158,26 +158,7 @@ func (h *highlighter) VisitLogical(expr *ast.Logical) {
 }
 
 func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
-	var kind semanticKind
-
-	switch expr.Kind {
-	case ast.FunctionKind:
-		kind = functionKind
-
-	case ast.StructKind:
-		kind = classKind
-
-	case ast.EnumKind:
-		kind = enumKind
-
-	case ast.VariableKind:
-		kind = variableKind
-
-	case ast.ParameterKind:
-		kind = parameterKind
-	}
-
-	h.add(expr, kind)
+	h.visitExprResult(expr, expr.Result())
 
 	expr.AcceptChildren(h)
 }
@@ -205,19 +186,35 @@ func (h *highlighter) VisitIndex(expr *ast.Index) {
 }
 
 func (h *highlighter) VisitMember(expr *ast.Member) {
-	if expr.Result().Kind == ast.FunctionResultKind {
-		h.add(expr.Name, functionKind)
-	} else if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
-		h.add(expr.Name, enumMemberKind)
-	} else {
-		if _, ok := ast.As[*ast.Func](expr.Result().Type); ok {
-			h.add(expr.Name, functionKind)
-		} else {
-			h.add(expr.Name, propertyKind)
-		}
-	}
+	h.visitExprResult(expr.Name, expr.Result())
 
 	expr.AcceptChildren(h)
+}
+
+func (h *highlighter) visitExprResult(node ast.Node, result *ast.ExprResult) {
+	//goland:noinspection GoSwitchMissingCasesForIotaConsts
+	switch result.Kind {
+	case ast.TypeResultKind:
+		switch result.Type.(type) {
+		case *ast.Struct:
+			h.add(node, classKind)
+		case *ast.Enum:
+			h.add(node, enumKind)
+		}
+
+	case ast.ValueResultKind:
+		switch result.Value().(type) {
+		case *ast.Field:
+			h.add(node, propertyKind)
+		case *ast.Param:
+			h.add(node, parameterKind)
+		case *ast.Var:
+			h.add(node, variableKind)
+		}
+
+	case ast.CallableResultKind:
+		h.add(node, functionKind)
+	}
 }
 
 // Types

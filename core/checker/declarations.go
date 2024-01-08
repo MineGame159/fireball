@@ -44,7 +44,7 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 func (c *checker) VisitImpl(decl *ast.Impl) {
 	if decl.Type != nil {
 		c.pushScope()
-		c.addVariable(&ast.Token{Token_: scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}}, decl.Type)
+		c.addVariable(&ast.Token{Token_: scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}}, decl.Type, nil)
 	}
 
 	decl.AcceptChildren(c)
@@ -140,7 +140,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		if c.hasVariableInScope(param.Name) {
 			c.error(param.Name, "Parameter with the name '%s' already exists", param.Name)
 		} else {
-			if v := c.addVariable(param.Name, param.Type); v != nil {
+			if v := c.addVariable(param.Name, param.Type, param); v != nil {
 				v.param = true
 			}
 		}

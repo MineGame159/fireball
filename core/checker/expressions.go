@@ -92,10 +92,10 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 		panic("checker.VisitLiteral() - Not implemented")
 	}
 
-	expr.Result().SetValue(&ast.Primitive{Kind: kind}, 0)
+	expr.Result().SetValue(&ast.Primitive{Kind: kind}, 0, nil)
 
 	if pointer {
-		expr.Result().SetValue(&ast.Pointer{Pointee: expr.Result().Type}, 0)
+		expr.Result().SetValue(&ast.Pointer{Pointee: expr.Result().Type}, 0, nil)
 	}
 }
 
@@ -119,9 +119,9 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	}
 
 	if expr.New {
-		expr.Result().SetValue(&ast.Pointer{Pointee: struct_}, 0)
+		expr.Result().SetValue(&ast.Pointer{Pointee: struct_}, 0, nil)
 	} else {
-		expr.Result().SetValue(struct_, 0)
+		expr.Result().SetValue(struct_, 0, nil)
 	}
 
 	// Check fields
@@ -206,7 +206,7 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 	}
 
 	if ok {
-		expr.Result().SetValue(&ast.Array{Base: type_, Count: uint32(len(expr.Values))}, 0)
+		expr.Result().SetValue(&ast.Array{Base: type_, Count: uint32(len(expr.Values))}, 0, nil)
 	} else {
 		expr.Result().SetInvalid()
 	}
@@ -241,7 +241,7 @@ func (c *checker) VisitAllocateArray(expr *ast.AllocateArray) {
 		type_ = &ast.Primitive{Kind: ast.Void}
 	}
 
-	expr.Result().SetValue(&ast.Pointer{Pointee: type_}, 0)
+	expr.Result().SetValue(&ast.Pointer{Pointee: type_}, 0, nil)
 }
 
 func (c *checker) VisitUnary(expr *ast.Unary) {
@@ -268,7 +268,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 		switch expr.Operator.Token().Kind {
 		case scanner.Bang:
 			c.expectPrimitiveValue(expr.Value, ast.Bool)
-			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
+			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
 
 		case scanner.Minus:
 			if result.Kind != ast.ValueResultKind {
@@ -280,7 +280,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 
 			if v, ok := ast.As[*ast.Primitive](result.Type); ok {
 				if ast.IsFloating(v.Kind) || ast.IsSigned(v.Kind) {
-					expr.Result().SetValue(result.Type, 0)
+					expr.Result().SetValue(result.Type, 0, nil)
 					return
 				}
 			}
@@ -290,7 +290,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 
 		case scanner.Ampersand:
 			if result.IsAddressable() {
-				expr.Result().SetValue(&ast.Pointer{Pointee: result.Type}, 0)
+				expr.Result().SetValue(&ast.Pointer{Pointee: result.Type}, 0, nil)
 			} else {
 				c.error(expr.Value, "Cannot take address of this expression")
 				expr.Result().SetInvalid()
@@ -305,7 +305,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			}
 
 			if p, ok := ast.As[*ast.Pointer](result.Type); ok {
-				expr.Result().SetValue(p.Pointee, ast.AssignableFlag)
+				expr.Result().SetValue(p.Pointee, ast.AssignableFlag, nil)
 			} else {
 				c.error(expr.Value, "Can only dereference pointer types, not '%s'", ast.PrintType(result.Type))
 				expr.Result().SetInvalid()
@@ -326,22 +326,14 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 				return
 			}
 
-			expr.Result().SetValue(result.Type, 0)
+			expr.Result().SetValue(result.Type, 0, nil)
 
 		case scanner.FuncPtr:
-			if result.Kind == ast.FunctionResultKind {
-				if result.Function.Method() != nil {
-					c.error(expr.Value, "Cannot take address of a non-static method")
-					expr.Result().SetInvalid()
-
-					return
-				}
-
-				expr.Result().SetValue(expr.Value.Result().Function, 0)
-			} else {
-				c.error(expr.Value, "Cannot take address of this function")
-				expr.Result().SetInvalid()
+			if f, ok := result.Callable().(*ast.Func); ok && f.Method() != nil {
+				c.error(expr.Value, "Cannot take address of a non-static method")
 			}
+
+			expr.Result().SetValue(result.Type, 0, nil)
 
 		default:
 			panic("checker.VisitUnary() - Invalid unary prefix operator")
@@ -364,7 +356,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 				return
 			}
 
-			expr.Result().SetValue(result.Type, 0)
+			expr.Result().SetValue(result.Type, 0, nil)
 
 		default:
 			panic("checker.VisitUnary() - Invalid unary postfix operator")
@@ -415,7 +407,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		if left, ok := ast.As[*ast.Primitive](leftType); ok {
 			if right, ok := ast.As[*ast.Primitive](rightType); ok {
 				if ast.IsNumber(left.Kind) && ast.IsNumber(right.Kind) && left.Equals(right) {
-					expr.Result().SetValue(leftType, 0)
+					expr.Result().SetValue(leftType, 0, nil)
 					return
 				}
 			}
@@ -450,7 +442,7 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 			c.error(expr, "Cannot check equality for '%s' and '%s'", ast.PrintType(leftType), ast.PrintType(rightType))
 			expr.Result().SetInvalid()
 		} else {
-			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
+			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
 		}
 	} else if scanner.IsComparison(expr.Operator.Token().Kind) {
 		// Comparison
@@ -465,13 +457,13 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 			}
 		}
 
-		expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
+		expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
 	} else if scanner.IsBitwise(expr.Operator.Token().Kind) {
 		// Bitwise
 		if left, ok := ast.As[*ast.Primitive](leftType); ok {
 			if right, ok := ast.As[*ast.Primitive](rightType); ok {
 				if left.Equals(right) && ast.IsInteger(left.Kind) {
-					expr.Result().SetValue(leftType, 0)
+					expr.Result().SetValue(leftType, 0, nil)
 					return
 				}
 			}
@@ -493,7 +485,7 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 	c.expectPrimitiveValue(expr.Right, ast.Bool)
 
 	// Set type
-	expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0)
+	expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
 }
 
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
@@ -501,26 +493,32 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 
 	// Function / function pointer
 	if parentWantsFunction(expr) {
+		// Function
 		if f := c.resolver.GetFunction(expr.String()); f != nil {
-			expr.Result().SetFunction(f)
-			expr.Kind = ast.FunctionKind
-
+			expr.Result().SetCallable(f, f)
 			return
 		}
+
+		// Variable
+		if variable := c.getVariable(expr.String()); variable != nil {
+			if f, ok := ast.As[*ast.Func](variable.type_); ok {
+				variable.used = true
+
+				expr.Result().SetCallable(f, variable.node)
+				return
+			}
+		}
+
+		// Error
+		c.error(expr, "Unknown function")
+		expr.Result().SetInvalid()
+
+		return
 	}
 
 	// Type
 	if t := c.resolver.GetType(expr.String()); t != nil {
 		expr.Result().SetType(t)
-
-		if _, ok := t.(*ast.Enum); ok {
-			expr.Kind = ast.EnumKind
-		} else if _, ok := t.(*ast.Struct); ok {
-			expr.Kind = ast.StructKind
-		} else {
-			panic("checker.VisitIdentifier() - Invalid type")
-		}
-
 		return
 	}
 
@@ -528,14 +526,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	if variable := c.getVariable(expr.String()); variable != nil {
 		variable.used = true
 
-		expr.Result().SetValue(variable.type_, ast.AssignableFlag|ast.AddressableFlag)
-
-		if variable.param {
-			expr.Kind = ast.ParameterKind
-		} else {
-			expr.Kind = ast.VariableKind
-		}
-
+		expr.Result().SetValue(variable.type_, ast.AssignableFlag|ast.AddressableFlag, variable.node)
 		return
 	}
 
@@ -557,7 +548,7 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 		c.error(expr.Assignee, "Cannot assign to this value")
 	}
 
-	expr.Result().SetValue(expr.Assignee.Result().Type, 0)
+	expr.Result().SetValue(expr.Assignee.Result().Type, 0, nil)
 
 	// Check operator and value
 	if expr.Operator == nil || expr.Value == nil || expr.Value.Result().Kind == ast.InvalidResultKind {
@@ -630,7 +621,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 		return
 	}
 
-	expr.Result().SetValue(expr.Target, 0)
+	expr.Result().SetValue(expr.Target, 0, nil)
 
 	// Check type
 	if ast.IsPrimitive(expr.Value.Result().Type, ast.Void) || ast.IsPrimitive(expr.Target, ast.Void) {
@@ -652,7 +643,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 func (c *checker) VisitTypeCall(expr *ast.TypeCall) {
 	expr.AcceptChildren(c)
 
-	expr.Result().SetValue(&ast.Primitive{Kind: ast.I32}, 0)
+	expr.Result().SetValue(&ast.Primitive{Kind: ast.I32}, 0, nil)
 }
 
 func (c *checker) VisitCall(expr *ast.Call) {
@@ -674,7 +665,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 		return
 	}
 
-	expr.Result().SetValue(function.Returns, 0)
+	expr.Result().SetValue(function.Returns, 0, nil)
 
 	// Check argument count
 	if function.IsVariadic() {
@@ -734,7 +725,7 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 	}
 
 	if base != nil {
-		expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag)
+		expr.Result().SetValue(base, ast.AssignableFlag|ast.AddressableFlag, nil)
 	} else {
 		expr.Result().SetInvalid()
 	}
@@ -767,75 +758,66 @@ func (c *checker) VisitIndex(expr *ast.Index) {
 func (c *checker) VisitMember(expr *ast.Member) {
 	expr.AcceptChildren(c)
 
+	expr.Result().SetInvalid()
+
 	if expr.Value == nil || expr.Name == nil || expr.Value.Result().Kind == ast.InvalidResultKind {
-		expr.Result().SetInvalid()
 		return
 	}
 
-	// Type result
-	if expr.Value.Result().Kind == ast.TypeResultKind {
-		// Struct
-		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.StructKind {
-			if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
-				// Check if parent expression wants a function
-				if parentWantsFunction(expr) {
-					function := c.resolver.GetMethod(v, expr.Name.String(), true)
+	switch expr.Value.Result().Kind {
+	case ast.TypeResultKind:
+		switch t := expr.Value.Result().Type.(type) {
+		case *ast.Struct:
+			// Callable
+			if parentWantsFunction(expr) {
+				function := c.resolver.GetMethod(t, expr.Name.String(), true)
 
-					if function == nil {
-						_, field := v.GetStaticField(expr.Name.String())
+				if function == nil {
+					_, field := t.GetStaticField(expr.Name.String())
 
-						if field != nil {
-							if f, ok := ast.As[*ast.Func](field.Type); ok {
-								expr.Result().SetValue(f, ast.AssignableFlag|ast.AddressableFlag)
-								return
-							}
+					if field != nil {
+						if f, ok := ast.As[*ast.Func](field.Type); ok {
+							expr.Result().SetCallable(f, field)
+							return
 						}
-
-						c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(v), expr.Name)
-						expr.Result().SetInvalid()
-
-						return
 					}
 
-					expr.Result().SetFunction(function)
+					c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(t), expr.Name)
 					return
 				}
 
-				// Check static field
-				_, field := v.GetStaticField(expr.Name.String())
-
-				if field == nil {
-					c.error(expr.Name, "Struct '%s' does not contain static field '%s'", ast.PrintType(v), expr.Name)
-					expr.Result().SetInvalid()
-
-					return
-				}
-
-				expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag)
+				expr.Result().SetCallable(function, function)
 				return
 			}
-		}
 
-		// Enum
-		if i, ok := expr.Value.(*ast.Identifier); ok && i.Kind == ast.EnumKind {
-			if v, ok := expr.Value.Result().Type.(*ast.Enum); ok {
-				if case_ := v.GetCase(expr.Name.String()); case_ == nil {
-					c.error(expr.Name, "Enum '%s' does not contain case '%s'", ast.PrintType(v), expr.Name)
-				}
+			// Field
+			_, field := t.GetStaticField(expr.Name.String())
 
-				expr.Result().SetValue(v, 0)
+			if field == nil {
+				c.error(expr.Name, "Struct '%s' does not contain static field '%s'", ast.PrintType(t), expr.Name)
 				return
 			}
+
+			expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag, field)
+			return
+
+		case *ast.Enum:
+			case_ := t.GetCase(expr.Name.String())
+
+			if case_ == nil {
+				c.error(expr.Name, "Enum '%s' does not contain case '%s'", ast.PrintType(t), expr.Name)
+				return
+			}
+
+			expr.Result().SetValue(t, 0, case_)
+			return
+
+		default:
+			c.error(expr.Value, "Invalid type")
+			return
 		}
 
-		c.error(expr.Name, "Invalid member")
-		expr.Result().SetInvalid()
-
-		return
-	}
-
-	// Value result
-	if expr.Value.Result().Kind == ast.ValueResultKind {
+	case ast.ValueResultKind:
 		// Get struct
 		var s *ast.Struct
 
@@ -849,12 +831,10 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 		if s == nil {
 			c.error(expr.Value, "Only structs and pointers to structs can have members, not '%s'", ast.PrintType(expr.Value.Result().Type))
-			expr.Result().SetInvalid()
-
 			return
 		}
 
-		// Check if parent expression wants a function
+		// Callable
 		if parentWantsFunction(expr) {
 			function := c.resolver.GetMethod(s, expr.Name.String(), false)
 
@@ -863,38 +843,34 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 				if field != nil {
 					if f, ok := ast.As[*ast.Func](field.Type); ok {
-						expr.Result().SetValue(f, ast.AssignableFlag|ast.AddressableFlag)
+						expr.Result().SetCallable(f, field)
 						return
 					}
 				}
 
-				c.error(expr.Name, "Struct '%s' does not contain method '%s'", ast.PrintType(s), expr.Name)
-				expr.Result().SetInvalid()
-
+				c.error(expr.Name, "Struct '%s' does not contain method with the name '%s'", ast.PrintType(s), expr.Name)
 				return
 			}
 
-			expr.Result().SetFunction(function)
+			expr.Result().SetCallable(function, function)
 			return
 		}
 
-		// Check field
+		// Field
 		_, field := s.GetField(expr.Name.String())
 
 		if field == nil {
-			c.error(expr.Name, "Struct '%s' does not contain field '%s'.", ast.PrintType(s), expr.Name)
-			expr.Result().SetInvalid()
-
+			c.error(expr.Name, "Struct '%s' does not contain field '%s'", ast.PrintType(s), expr.Name)
 			return
 		}
 
-		expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag)
+		expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag, field)
+		return
+
+	default:
+		c.error(expr.Value, "Invalid value")
 		return
 	}
-
-	// Invalid result
-	c.error(expr.Value, "Invalid value")
-	expr.Result().SetInvalid()
 }
 
 // Utils

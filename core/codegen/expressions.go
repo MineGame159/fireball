@@ -363,22 +363,29 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 }
 
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
-	switch expr.Kind {
-	case ast.FunctionKind:
-		c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
-		return
+	switch expr.Result().Kind {
+	case ast.TypeResultKind:
+		// Nothing
 
-	case ast.StructKind, ast.EnumKind:
-		return
-
-	case ast.VariableKind, ast.ParameterKind:
+	case ast.ValueResultKind:
 		if v := c.getVariable(expr.Name); v != nil {
 			c.exprResult = v.value
-			return
 		}
-	}
 
-	panic("codegen.VisitIdentifier() - Invalid identifier")
+	case ast.CallableResultKind:
+		switch node := expr.Result().Callable().(type) {
+		case *ast.Func:
+			c.exprResult = c.getFunction(node)
+
+		case *ast.Var, *ast.Param:
+			if v := c.getVariable(expr.Name); v != nil {
+				c.exprResult = v.value
+			}
+		}
+
+	default:
+		panic("codegen.VisitIdentifier() - Not implemented")
+	}
 }
 
 func (c *codegen) VisitAssignment(expr *ast.Assignment) {
@@ -545,7 +552,11 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	// Get type
 	callee := c.acceptExpr(expr.Callee)
 
-	function := expr.Callee.Result().Function
+	var function *ast.Func
+
+	if f, ok := expr.Callee.Result().Callable().(*ast.Func); ok {
+		function = f
+	}
 
 	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok && function == nil {
 		function = f
@@ -631,112 +642,101 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 func (c *codegen) VisitMember(expr *ast.Member) {
 	value := c.acceptExpr(expr.Value)
 
-	if expr.Value.Result().Kind == ast.TypeResultKind {
-		// Type
-
-		if v, ok := ast.As[*ast.Struct](expr.Value.Result().Type); ok {
-			// Struct
-			switch expr.Result().Kind {
-			case ast.ValueResultKind:
-				_, field := v.GetStaticField(expr.Name.String())
-				c.exprResult = c.getStaticVariable(field)
-
-			case ast.FunctionResultKind:
-				c.exprResult = c.getFunction(expr.Result().Function)
-
-			default:
-				panic("codegen.VisitMember() - Type, Struct - Invalid result kind")
-			}
-		} else if v, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
-			// Enum
-			case_ := v.GetCase(expr.Name.String())
-
+	switch expr.Result().Kind {
+	case ast.ValueResultKind:
+		switch node := expr.Result().Value().(type) {
+		case *ast.EnumCase:
 			c.exprResult = exprValue{
 				v: c.function.Literal(
-					c.getType(v.ActualType),
-					llvm.Literal{Signed: case_.ActualValue, Unsigned: uint64(case_.ActualValue)},
+					c.getType(node.Parent().(*ast.Enum).ActualType),
+					llvm.Literal{Signed: node.ActualValue, Unsigned: uint64(node.ActualValue)},
 				),
 			}
-		} else {
-			panic("codegen.VisitMember() - Invalid type")
-		}
-	} else {
-		// Member
 
-		// Get struct and load the value if it is a pointer
-		var s *ast.Struct
+		case *ast.Field:
+			if node.IsStatic() {
+				c.exprResult = c.getStaticVariable(node)
+			} else {
+				value, s := c.memberLoad(expr.Value.Result().Type, value)
 
-		if v, ok := ast.As[*ast.Struct](expr.Value.Result().Type); ok {
-			s = v
-		} else if v, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
-			if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
-				s = v
+				if value.addressable {
+					i32Type_ := ast.Primitive{Kind: ast.I32}
+					i32Type := c.getType(&i32Type_)
 
-				load := c.block.Load(value.v)
-				load.SetAlign(v.Align())
+					t := ast.Pointer{Pointee: node.Type}
 
-				value = exprValue{
-					v:           load,
-					addressable: true,
+					result := c.block.GetElementPtr(
+						value.v,
+						[]llvm.Value{
+							c.function.Literal(i32Type, llvm.Literal{Signed: 0}),
+							c.function.Literal(i32Type, llvm.Literal{Signed: int64(node.Index())}),
+						},
+						c.getType(&t),
+						c.getType(s),
+					)
+
+					result.SetLocation(expr.Cst())
+
+					c.exprResult = exprValue{
+						v:           result,
+						addressable: true,
+					}
+				} else {
+					result := c.block.ExtractValue(value.v, node.Index())
+					result.SetLocation(expr.Cst())
+
+					c.exprResult = exprValue{
+						v: result,
+					}
 				}
 			}
 		}
 
-		if s == nil {
-			log.Fatalln("Invalid member value")
-		}
+	case ast.CallableResultKind:
+		switch node := expr.Result().Callable().(type) {
+		case *ast.Func:
+			value, _ := c.memberLoad(expr.Value.Result().Type, value)
 
-		// Method
-		if expr.Result().Kind == ast.FunctionResultKind {
-			if !value.addressable {
-				pointer := c.allocas[expr]
-
-				store := c.block.Store(pointer.v, value.v)
-				store.SetAlign(expr.Result().Function.Returns.Align())
-
-				value = pointer
-			}
-
-			c.exprResult = c.getFunction(expr.Result().Function)
+			c.exprResult = c.getFunction(node)
 			c.this = value
 
-			return
+		case *ast.Field:
+			if node.IsStatic() {
+				c.exprResult = c.getStaticVariable(node)
+			} else {
+				value, _ := c.memberLoad(expr.Value.Result().Type, value)
+
+				c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
+				c.this = value
+			}
+
+		default:
+			panic("codegen.VisitMember() - Callable not implemented")
 		}
 
-		// Field
-		i, field := s.GetField(expr.Name.String())
+	default:
+		panic("codegen.VisitMember() - Result kind not implemented")
+	}
+}
 
-		if value.addressable {
-			i32Type_ := ast.Primitive{Kind: ast.I32}
-			i32Type := c.getType(&i32Type_)
+func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.Struct) {
+	if s, ok := ast.As[*ast.Struct](type_); ok {
+		return value, s
+	}
 
-			t := ast.Pointer{Pointee: field.Type}
+	if v, ok := ast.As[*ast.Pointer](type_); ok {
+		if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
+			load := c.block.Load(value.v)
+			load.SetAlign(v.Align())
 
-			result := c.block.GetElementPtr(
-				value.v,
-				[]llvm.Value{
-					c.function.Literal(i32Type, llvm.Literal{Signed: 0}),
-					c.function.Literal(i32Type, llvm.Literal{Signed: int64(i)}),
-				},
-				c.getType(&t),
-				c.getType(s),
-			)
-
-			result.SetLocation(expr.Cst())
-
-			c.exprResult = exprValue{
-				v:           result,
+			return exprValue{
+				v:           load,
 				addressable: true,
-			}
-		} else {
-			result := c.block.ExtractValue(value.v, i)
-			result.SetLocation(expr.Cst())
-
-			c.exprResult = exprValue{
-				v: result,
-			}
+			}, v
 		}
 	}
+
+	panic("codegen.memberLoad() - Not implemented")
 }
 
 // Utils

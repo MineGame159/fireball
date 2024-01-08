@@ -389,7 +389,7 @@ func (h *handler) Hover(_ context.Context, params *protocol.HoverParams) (result
 	}
 
 	// Get hover
-	return getHover(file.Project, file.Ast, pos), nil
+	return getHover(file.Ast, pos), nil
 }
 
 func (h *handler) Symbols(_ context.Context, _ *protocol.WorkspaceSymbolParams) (result []protocol.SymbolInformation, err error) {
@@ -430,7 +430,7 @@ func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParam
 	}
 
 	// Get declaration
-	return getDefinition(file.Project, file.Ast, pos), nil
+	return getDefinition(file.Ast, pos), nil
 }
 
 func (h *handler) Completion(_ context.Context, params *protocol.CompletionParams) (result *protocol.CompletionList, err error) {

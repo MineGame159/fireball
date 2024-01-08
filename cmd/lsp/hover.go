@@ -3,13 +3,12 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/fuckoff"
 	"github.com/MineGame159/protocol"
 	"strconv"
 	"strings"
 )
 
-func getHover(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *protocol.Hover {
+func getHover(node ast.Node, pos core.Pos) *protocol.Hover {
 	// Get node under cursor
 	node = ast.GetLeaf(node, pos)
 	if node == nil || node.Cst() == nil {
@@ -35,13 +34,13 @@ func getHover(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *protocol.
 		}
 
 	case *ast.Token:
-		return getHoverToken(resolver, node)
+		return getHoverToken(node)
 	}
 
 	return nil
 }
 
-func getHoverToken(resolver fuckoff.Resolver, token *ast.Token) *protocol.Hover {
+func getHoverToken(token *ast.Token) *protocol.Hover {
 	// Switch based on the token's parent node
 	switch parent := token.Parent().(type) {
 	case *ast.Field:
@@ -57,44 +56,7 @@ func getHoverToken(resolver fuckoff.Resolver, token *ast.Token) *protocol.Hover 
 		return newHover(token, ast.PrintType(parent.ActualType))
 
 	case *ast.Member:
-		if s, ok := asThroughPointer[*ast.Struct](parent.Value.Result().Type); ok {
-			if parentWantsFunction(parent) {
-				method := resolver.GetMethod(s, token.String(), false)
-				if method == nil {
-					method = resolver.GetMethod(s, token.String(), true)
-				}
-
-				if method == nil {
-					_, field := s.GetStaticField(token.String())
-					if field == nil {
-						_, field = s.GetField(token.String())
-					}
-
-					if f, ok := ast.As[*ast.Func](field.Type); ok {
-						method = f
-					}
-				}
-
-				if method != nil {
-					return newHover(token, method.Signature(true))
-				}
-			} else {
-				_, field := s.GetField(token.String())
-				if field == nil {
-					_, field = s.GetStaticField(token.String())
-				}
-
-				if field != nil {
-					return newHover(token, ast.PrintType(field.Type))
-				}
-			}
-		} else if e, ok := ast.As[*ast.Enum](parent.Value.Result().Type); ok {
-			case_ := e.GetCase(token.String())
-
-			if case_ != nil {
-				return newHover(token, strconv.FormatInt(case_.ActualValue, 10))
-			}
-		}
+		return newHover(token, ast.PrintTypeOptions(parent.Result().Type, ast.TypePrintOptions{ParamNames: true}))
 
 	case *ast.TypeCall:
 		if parent.Callee == nil || parent.Arg == nil {

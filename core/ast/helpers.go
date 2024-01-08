@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fireball/core/scanner"
 	"fmt"
 	"strings"
 )
@@ -54,6 +55,36 @@ func (e *Enum) GetCase(name string) *EnumCase {
 	}
 
 	return nil
+}
+
+// Field
+
+func (f *Field) IsStatic() bool {
+	if f.Cst() != nil {
+		return f.Cst().Contains(scanner.Static)
+	}
+
+	return false
+}
+
+func (f *Field) Index() int {
+	if f.IsStatic() {
+		for i, field := range f.Parent().(*Struct).StaticFields {
+			if field == f {
+				return i
+			}
+		}
+
+		panic("ast.Field.Index() - Static field not found")
+	}
+
+	for i, field := range f.Parent().(*Struct).Fields {
+		if field == f {
+			return i
+		}
+	}
+
+	panic("ast.Field.Index() - Field not found")
 }
 
 func (f *Field) GetMangledName() string {

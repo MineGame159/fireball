@@ -193,7 +193,6 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 
 	// Resolve function from project
 	if f := c.resolver.GetFunction(function.Name.String()); f != nil {
-
 		filePath := ast.GetParent[*ast.File](f).Path
 
 		if filePath == c.path {
@@ -236,7 +235,7 @@ func (a *allocaFinder) VisitNode(node ast.Node) {
 
 	case *ast.Call:
 		if callNeedsTempVariable(node) {
-			returns := node.Callee.Result().Function.Returns
+			returns := node.Callee.Result().Type.(*ast.Func).Returns
 
 			pointer := a.c.block.Alloca(a.c.getType(returns))
 			pointer.SetAlign(returns.Align())
@@ -248,7 +247,7 @@ func (a *allocaFinder) VisitNode(node ast.Node) {
 		}
 
 	case *ast.Member:
-		if node.Value.Result().Kind != ast.TypeResultKind && node.Result().Kind == ast.FunctionResultKind && !node.Value.Result().IsAddressable() {
+		if node.Value.Result().Kind != ast.TypeResultKind && node.Result().Kind == ast.CallableResultKind && !node.Value.Result().IsAddressable() {
 			type_ := node.Value.Result().Type
 
 			pointer := a.c.block.Alloca(a.c.getType(type_))
@@ -265,7 +264,7 @@ func (a *allocaFinder) VisitNode(node ast.Node) {
 }
 
 func callNeedsTempVariable(expr *ast.Call) bool {
-	function := expr.Callee.Result().Function
+	function := expr.Callee.Result().Type.(*ast.Func)
 
 	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok && function == nil {
 		function = f
