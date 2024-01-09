@@ -229,6 +229,8 @@ func (h *highlighter) visitExprResult(node ast.Node, result *ast.ExprResult) {
 			h.add(node, parameterKind)
 		case *ast.Var:
 			h.add(node, variableKind)
+		case *ast.EnumCase:
+			h.add(node, enumMemberKind)
 		}
 
 	case ast.CallableResultKind:

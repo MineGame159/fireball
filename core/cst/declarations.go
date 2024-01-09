@@ -221,7 +221,7 @@ func parseEnumCase(p *parser) Node {
 		return p.end()
 	}
 	if p.optional(scanner.Equal) {
-		if p.consume(scanner.Number) {
+		if p.consume(scanner.Number, scanner.Hex, scanner.Binary) {
 			return p.end()
 		}
 	}

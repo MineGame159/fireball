@@ -7,16 +7,8 @@ import (
 	"fireball/core/scanner"
 )
 
-func parentWantsFunction(node ast.Node) bool {
-	if call, ok := node.Parent().(*ast.Call); ok {
-		return call.Callee == node
-	}
-
-	if unary, ok := node.Parent().(*ast.Unary); ok {
-		return unary.Prefix && unary.Operator.Token().Kind == scanner.FuncPtr
-	}
-
-	return false
+func printType(type_ ast.Type) string {
+	return ast.PrintTypeOptions(type_, ast.TypePrintOptions{ParamNames: true})
 }
 
 func asThroughPointer[T ast.Type](type_ ast.Type) (T, bool) {

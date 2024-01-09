@@ -74,7 +74,20 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 			lastValue++
 			case_.ActualValue = lastValue
 		} else {
-			value, err := strconv.ParseInt(case_.Value.String(), 10, 64)
+			var value int64
+			var err error
+
+			switch case_.Value.Token().Kind {
+			case scanner.Number:
+				value, err = strconv.ParseInt(case_.Value.String(), 10, 64)
+			case scanner.Hex:
+				value, err = strconv.ParseInt(case_.Value.String()[2:], 16, 64)
+			case scanner.Binary:
+				value, err = strconv.ParseInt(case_.Value.String()[2:], 2, 64)
+
+			default:
+				panic("checker.VisitEnum() - Not implemented")
+			}
 
 			if err == nil {
 				lastValue = value

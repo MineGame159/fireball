@@ -348,10 +348,6 @@ func isInFunctionBody(pos core.Pos, node ast.Node) bool {
 	return isBetween(pos, function, scanner.LeftBrace, scanner.RightBrace)
 }
 
-func printType(type_ ast.Type) string {
-	return ast.PrintTypeOptions(type_, ast.TypePrintOptions{ParamNames: true})
-}
-
 // Completions
 
 type completions struct {

@@ -18,7 +18,7 @@ func getHover(node ast.Node, pos core.Pos) *protocol.Hover {
 	// Switch based on the leaf node
 	switch node := node.(type) {
 	case *ast.Identifier:
-		return newHover(node, ast.PrintTypeOptions(node.Result().Type, ast.TypePrintOptions{ParamNames: true}))
+		return getHoverExprResult(node.Result(), node)
 
 	case *ast.Literal:
 		if strings.HasPrefix(node.String(), "0x") || strings.HasPrefix(node.String(), "0X") {
@@ -44,19 +44,19 @@ func getHoverToken(token *ast.Token) *protocol.Hover {
 	// Switch based on the token's parent node
 	switch parent := token.Parent().(type) {
 	case *ast.Field:
-		return newHover(token, ast.PrintType(parent.Type))
+		return newHover(token, printType(parent.Type))
 
 	case *ast.EnumCase:
 		return newHover(token, strconv.FormatInt(parent.ActualValue, 10))
 
 	case *ast.Param:
-		return newHover(token, ast.PrintType(parent.Type))
+		return newHover(token, printType(parent.Type))
 
 	case *ast.Var:
-		return newHover(token, ast.PrintType(parent.ActualType))
+		return newHover(token, printType(parent.ActualType))
 
 	case *ast.Member:
-		return newHover(token, ast.PrintTypeOptions(parent.Result().Type, ast.TypePrintOptions{ParamNames: true}))
+		return getHoverExprResult(parent.Result(), token)
 
 	case *ast.TypeCall:
 		if parent.Callee == nil || parent.Arg == nil {
@@ -82,6 +82,16 @@ func getHoverToken(token *ast.Token) *protocol.Hover {
 	}
 
 	return nil
+}
+
+func getHoverExprResult(result *ast.ExprResult, node ast.Node) *protocol.Hover {
+	if result.Kind == ast.ValueResultKind {
+		if case_, ok := result.Value().(*ast.EnumCase); ok {
+			return newHover(node, strconv.FormatInt(case_.ActualValue, 10))
+		}
+	}
+
+	return newHover(node, printType(result.Type))
 }
 
 func newHover(node ast.Node, text string) *protocol.Hover {

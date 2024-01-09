@@ -5,6 +5,7 @@ import (
 	"fireball/core/scanner"
 	"fireball/core/utils"
 	"slices"
+	"strings"
 )
 
 type nodeInfo struct {
@@ -122,14 +123,33 @@ func (p *parser) comments() {
 	}
 }
 
-func (p *parser) consume(kind scanner.TokenKind) bool {
-	if p.peek() != kind {
-		p.error("Expected a " + scanner.TokenKindStr(kind))
-		return true
+func (p *parser) consume(kinds ...scanner.TokenKind) bool {
+	for _, kind := range kinds {
+		if p.peek() == kind {
+			p.advanceAddChild()
+			return false
+		}
 	}
 
-	p.advanceAddChild()
-	return false
+	if len(kinds) == 1 {
+		p.error("Expected a " + scanner.TokenKindStr(kinds[0]))
+	} else {
+		sb := strings.Builder{}
+		sb.WriteString("Expected one of [")
+
+		for i, kind := range kinds {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+
+			sb.WriteString(scanner.TokenKindStr(kind))
+		}
+
+		sb.WriteRune(']')
+		p.error(sb.String())
+	}
+
+	return true
 }
 
 func (p *parser) optional(kind scanner.TokenKind) bool {
