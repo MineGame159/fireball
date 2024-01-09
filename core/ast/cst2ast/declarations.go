@@ -8,6 +8,15 @@ import (
 
 func (c *converter) convertDecl(node cst.Node) ast.Decl {
 	switch node.Kind {
+	case cst.NamespaceNode:
+		if namespace := c.convertNamespace(node); namespace != nil {
+			return namespace
+		}
+
+		return nil
+	case cst.UsingNode:
+		return c.convertUsing(node)
+
 	case cst.StructNode:
 		return c.convertStructDecl(node)
 	case cst.ImplNode:
@@ -24,6 +33,56 @@ func (c *converter) convertDecl(node cst.Node) ast.Decl {
 	default:
 		panic("cst2ast.convertDecl() - Not implemented")
 	}
+}
+
+// Namespace
+
+func (c *converter) convertNamespace(node cst.Node) *ast.Namespace {
+	var name *ast.NamespaceName
+
+	for _, child := range node.Children {
+		if child.Kind == cst.NamespaceNameNode {
+			name = c.convertNamespaceName(child)
+		} else if child.Kind == cst.AttributesNode {
+			c.error(child.Children[0], "Namespaces cannot have attributes")
+		}
+	}
+
+	return ast.NewNamespace(node, name)
+}
+
+func (c *converter) convertUsing(node cst.Node) ast.Decl {
+	var name *ast.NamespaceName
+
+	for _, child := range node.Children {
+		if child.Kind == cst.NamespaceNameNode {
+			name = c.convertNamespaceName(child)
+		} else if child.Kind == cst.AttributesNode {
+			c.error(child.Children[0], "Using cannot have attributes")
+		}
+	}
+
+	if u := ast.NewUsing(node, name); u != nil {
+		return u
+	}
+
+	return nil
+}
+
+func (c *converter) convertNamespaceName(node cst.Node) *ast.NamespaceName {
+	var parts []*ast.Token
+
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			part := c.convertToken(child)
+
+			if part != nil {
+				parts = append(parts, part)
+			}
+		}
+	}
+
+	return ast.NewNamespaceName(node, parts)
 }
 
 // Struct

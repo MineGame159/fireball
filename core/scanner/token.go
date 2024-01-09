@@ -74,6 +74,8 @@ const (
 	Continue
 	Break
 	Return
+	Namespace
+	Using
 	Struct
 	Impl
 	Enum
@@ -313,6 +315,10 @@ func TokenKindStr(kind TokenKind) string {
 		return "'break'"
 	case Return:
 		return "'return'"
+	case Namespace:
+		return "'namespace'"
+	case Using:
+		return "'using'"
 	case Struct:
 		return "'struct'"
 	case Impl:

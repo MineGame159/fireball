@@ -2,7 +2,6 @@ package checker
 
 import (
 	"fireball/core/ast"
-	"fireball/core/fuckoff"
 	"fireball/core/utils"
 	"fmt"
 )
@@ -18,7 +17,7 @@ type checker struct {
 	typeExpr ast.Expr
 
 	reporter utils.Reporter
-	resolver fuckoff.Resolver
+	resolver *ast.CombinedResolver
 }
 
 type scope struct {
@@ -36,14 +35,24 @@ type variable struct {
 	used  bool
 }
 
-func Check(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) {
+func Check(reporter utils.Reporter, root ast.RootResolver, file *ast.File) {
 	c := &checker{
 		reporter: reporter,
-		resolver: resolver,
+		resolver: ast.NewCombinedResolver(root),
 	}
 
-	reset(c, node)
-	c.VisitNode(node)
+	for _, decl := range file.Decls {
+		if using, ok := decl.(*ast.Using); ok {
+			if resolver := root.GetResolver(using.Name); resolver != nil {
+				c.resolver.Add(resolver)
+			} else {
+				c.error(using.Name, "Unknown namespace")
+			}
+		}
+	}
+
+	reset(c, file)
+	c.VisitNode(file)
 }
 
 // Scope / Variables
@@ -143,10 +152,8 @@ func (c *checker) VisitNode(node ast.Node) {
 	switch node := node.(type) {
 	case ast.Decl:
 		node.AcceptDecl(c)
-
 	case ast.Stmt:
 		node.AcceptStmt(c)
-
 	case ast.Expr:
 		node.AcceptExpr(c)
 
@@ -158,6 +165,10 @@ func (c *checker) VisitNode(node ast.Node) {
 // Diagnostics
 
 func (c *checker) error(node ast.Node, format string, args ...any) {
+	if ast.IsNil(node) {
+		return
+	}
+
 	c.reporter.Report(utils.Diagnostic{
 		Kind:    utils.ErrorKind,
 		Range:   node.Cst().Range,

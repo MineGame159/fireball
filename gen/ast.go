@@ -51,6 +51,14 @@ var declarations = Group{
 
 	nodes: []Node{
 		node(
+			"Namespace",
+			field("name", type_("NamespaceName")),
+		),
+		node(
+			"Using",
+			field("name", type_("NamespaceName")),
+		),
+		node(
 			"Struct",
 			field("name", type_("Token")),
 			field("fields", array("Field")),
@@ -226,7 +234,12 @@ var other = Group{
 		node(
 			"File",
 			field("path", type_("string")),
+			field("namespace", type_("Namespace")),
 			field("decls", array("Decl")),
+		),
+		node(
+			"NamespaceName",
+			field("parts", array("Token")),
 		),
 		node(
 			"Field",

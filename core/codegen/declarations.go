@@ -6,6 +6,12 @@ import (
 	"fireball/core/scanner"
 )
 
+func (c *codegen) VisitNamespace(_ *ast.Namespace) {
+}
+
+func (c *codegen) VisitUsing(_ *ast.Using) {
+}
+
 func (c *codegen) VisitStruct(_ *ast.Struct) {
 }
 

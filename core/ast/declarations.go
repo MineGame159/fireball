@@ -8,6 +8,8 @@ import (
 // Visitor
 
 type DeclVisitor interface {
+	VisitNamespace(decl *Namespace)
+	VisitUsing(decl *Using)
 	VisitStruct(decl *Struct)
 	VisitEnum(decl *Enum)
 	VisitImpl(decl *Impl)
@@ -18,6 +20,160 @@ type Decl interface {
 	Node
 
 	AcceptDecl(visitor DeclVisitor)
+}
+
+// Namespace
+
+type Namespace struct {
+	cst    cst.Node
+	parent Node
+
+	Name *NamespaceName
+}
+
+func NewNamespace(node cst.Node, name *NamespaceName) *Namespace {
+	if name == nil {
+		return nil
+	}
+
+	n := &Namespace{
+		cst:  node,
+		Name: name,
+	}
+
+	if name != nil {
+		name.SetParent(n)
+	}
+
+	return n
+}
+
+func (n *Namespace) Cst() *cst.Node {
+	if n.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &n.cst
+}
+
+func (n *Namespace) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (n *Namespace) Parent() Node {
+	return n.parent
+}
+
+func (n *Namespace) SetParent(parent Node) {
+	if parent != nil && n.parent != nil {
+		panic("ast.Namespace.SetParent() - Parent is already set")
+	}
+
+	n.parent = parent
+}
+
+func (n *Namespace) AcceptChildren(visitor Visitor) {
+	if n.Name != nil {
+		visitor.VisitNode(n.Name)
+	}
+}
+
+func (n *Namespace) Clone() Node {
+	n2 := &Namespace{
+		cst: n.cst,
+	}
+
+	if n.Name != nil {
+		n2.Name = n.Name.Clone().(*NamespaceName)
+		n2.Name.SetParent(n2)
+	}
+
+	return n2
+}
+
+func (n *Namespace) String() string {
+	return ""
+}
+
+func (n *Namespace) AcceptDecl(visitor DeclVisitor) {
+	visitor.VisitNamespace(n)
+}
+
+// Using
+
+type Using struct {
+	cst    cst.Node
+	parent Node
+
+	Name *NamespaceName
+}
+
+func NewUsing(node cst.Node, name *NamespaceName) *Using {
+	if name == nil {
+		return nil
+	}
+
+	u := &Using{
+		cst:  node,
+		Name: name,
+	}
+
+	if name != nil {
+		name.SetParent(u)
+	}
+
+	return u
+}
+
+func (u *Using) Cst() *cst.Node {
+	if u.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &u.cst
+}
+
+func (u *Using) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (u *Using) Parent() Node {
+	return u.parent
+}
+
+func (u *Using) SetParent(parent Node) {
+	if parent != nil && u.parent != nil {
+		panic("ast.Using.SetParent() - Parent is already set")
+	}
+
+	u.parent = parent
+}
+
+func (u *Using) AcceptChildren(visitor Visitor) {
+	if u.Name != nil {
+		visitor.VisitNode(u.Name)
+	}
+}
+
+func (u *Using) Clone() Node {
+	u2 := &Using{
+		cst: u.cst,
+	}
+
+	if u.Name != nil {
+		u2.Name = u.Name.Clone().(*NamespaceName)
+		u2.Name.SetParent(u2)
+	}
+
+	return u2
+}
+
+func (u *Using) String() string {
+	return ""
+}
+
+func (u *Using) AcceptDecl(visitor DeclVisitor) {
+	visitor.VisitUsing(u)
 }
 
 // Struct

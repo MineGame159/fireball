@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// Struct
+
 func (s *Struct) GetStaticField(name string) (int, *Field) {
 	for i := range s.StaticFields {
 		field := s.StaticFields[i]
@@ -30,6 +32,8 @@ func (s *Struct) GetField(name string) (int, *Field) {
 	return 0, nil
 }
 
+// Impl
+
 func (i *Impl) GetMethod(name string, static bool) *Func {
 	staticValue := FuncFlags(0)
 	if static {
@@ -44,6 +48,8 @@ func (i *Impl) GetMethod(name string, static bool) *Func {
 
 	return nil
 }
+
+// Enum
 
 func (e *Enum) GetCase(name string) *EnumCase {
 	for i := range e.Cases {

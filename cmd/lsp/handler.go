@@ -101,6 +101,7 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 						protocol.SemanticTokenEnum,
 						protocol.SemanticTokenProperty,
 						protocol.SemanticTokenEnumMember,
+						protocol.SemanticTokenNamespace,
 					},
 					TokenModifiers: []protocol.SemanticTokenModifiers{},
 				},
@@ -208,6 +209,38 @@ func (h *handler) DidCreateFiles(ctx context.Context, params *protocol.CreateFil
 		err = h.publishDiagnostics(ctx, project)
 		if err != nil {
 			return err
+		}
+
+		// Apply default namespace edit
+		namespace := strings.Builder{}
+		namespace.WriteString("namespace ")
+		namespace.WriteString(project.Config.Namespace.String())
+
+		relative, _ = filepath.Rel(filepath.Join(project.Path, project.Config.Src), file.AbsolutePath())
+		folder, _ := filepath.Split(relative)
+		folders := strings.Split(folder, string(filepath.Separator))
+
+		for _, folder := range folders {
+			if folder != "" {
+				namespace.WriteRune('.')
+				namespace.WriteString(strings.ToUpper(folder[:1]) + folder[1:])
+			}
+		}
+
+		namespace.WriteString(";")
+		_, err = h.client.ApplyEdit(ctx, &protocol.ApplyWorkspaceEditParams{
+			Label: "Default namespace",
+			Edit: protocol.WorkspaceEdit{
+				Changes: map[protocol.DocumentURI][]protocol.TextEdit{
+					uri_: {protocol.TextEdit{
+						Range:   protocol.Range{},
+						NewText: namespace.String(),
+					}},
+				},
+			},
+		})
+		if err != nil {
+			h.logger.Error(err.Error())
 		}
 	}
 

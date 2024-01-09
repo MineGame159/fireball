@@ -3,7 +3,6 @@ package codegen
 import (
 	"fireball/core/architecture"
 	"fireball/core/ast"
-	"fireball/core/fuckoff"
 	"fireball/core/llvm"
 	"fireball/core/scanner"
 	"io"
@@ -11,7 +10,7 @@ import (
 
 type codegen struct {
 	path     string
-	resolver fuckoff.Resolver
+	resolver *ast.CombinedResolver
 
 	types []typePair
 
@@ -55,11 +54,11 @@ type variable struct {
 	value exprValue
 }
 
-func Emit(path string, resolver fuckoff.Resolver, file *ast.File, writer io.Writer) {
+func Emit(path string, root ast.RootResolver, file *ast.File, writer io.Writer) {
 	// Init codegen
 	c := &codegen{
 		path:     path,
-		resolver: resolver,
+		resolver: ast.NewCombinedResolver(root),
 
 		staticVariables: make(map[*ast.Field]exprValue),
 		functions:       make(map[*ast.Func]llvm.Value),
@@ -73,6 +72,11 @@ func Emit(path string, resolver fuckoff.Resolver, file *ast.File, writer io.Writ
 	// Find some declarations
 	for _, decl := range file.Decls {
 		switch decl := decl.(type) {
+		case *ast.Using:
+			if resolver := root.GetResolver(decl.Name); resolver != nil {
+				c.resolver.Add(resolver)
+			}
+
 		case *ast.Struct:
 			for i := range decl.StaticFields {
 				c.createStaticVariable(decl.StaticFields[i], false)
@@ -250,12 +254,14 @@ func (a *allocaFinder) VisitNode(node ast.Node) {
 		if node.Value.Result().Kind != ast.TypeResultKind && node.Result().Kind == ast.CallableResultKind && !node.Value.Result().IsAddressable() {
 			type_ := node.Value.Result().Type
 
-			pointer := a.c.block.Alloca(a.c.getType(type_))
-			pointer.SetAlign(type_.Align())
+			if type_ != nil {
+				pointer := a.c.block.Alloca(a.c.getType(type_))
+				pointer.SetAlign(type_.Align())
 
-			a.c.allocas[node] = exprValue{
-				v:           pointer,
-				addressable: true,
+				a.c.allocas[node] = exprValue{
+					v:           pointer,
+					addressable: true,
+				}
 			}
 		}
 	}

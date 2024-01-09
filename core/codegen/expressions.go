@@ -364,7 +364,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 
 func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 	switch expr.Result().Kind {
-	case ast.TypeResultKind:
+	case ast.TypeResultKind, ast.ResolverResultKind:
 		// Nothing
 
 	case ast.ValueResultKind:
@@ -643,6 +643,9 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	value := c.acceptExpr(expr.Value)
 
 	switch expr.Result().Kind {
+	case ast.TypeResultKind, ast.ResolverResultKind:
+		// Nothing
+
 	case ast.ValueResultKind:
 		switch node := expr.Result().Value().(type) {
 		case *ast.EnumCase:
@@ -695,7 +698,18 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	case ast.CallableResultKind:
 		switch node := expr.Result().Callable().(type) {
 		case *ast.Func:
-			value, _ := c.memberLoad(expr.Value.Result().Type, value)
+			if expr.Value.Result().Type != nil {
+				value, _ = c.memberLoad(expr.Value.Result().Type, value)
+			}
+
+			if node.Method() != nil && !value.addressable {
+				pointer := c.allocas[expr]
+
+				store := c.block.Store(pointer.v, value.v)
+				store.SetAlign(node.Align())
+
+				value = pointer
+			}
 
 			c.exprResult = c.getFunction(node)
 			c.this = value

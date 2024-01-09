@@ -5,6 +5,7 @@ type ExprResultKind = uint8
 const (
 	InvalidResultKind ExprResultKind = iota
 	TypeResultKind
+	ResolverResultKind
 	ValueResultKind
 	CallableResultKind
 )
@@ -47,6 +48,27 @@ func (e *ExprResult) SetType(type_ Type) {
 		Kind: TypeResultKind,
 		Type: type_.Resolved(),
 	}
+}
+
+// Resolver
+
+func (e *ExprResult) SetResolver(resolver Resolver) {
+	*e = ExprResult{
+		Kind: ResolverResultKind,
+		data: resolver,
+	}
+}
+
+func (e *ExprResult) Resolver() Resolver {
+	if e.Kind != ResolverResultKind {
+		panic("expr.ExprResolver.Resolver() - Result is not a resolver")
+	}
+
+	if e.data == nil {
+		return nil
+	}
+
+	return e.data.(Resolver)
 }
 
 // Value

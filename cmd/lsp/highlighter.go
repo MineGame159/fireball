@@ -43,6 +43,22 @@ func highlight(node ast.Node) []uint32 {
 
 // Declarations
 
+func (h *highlighter) VisitNamespace(decl *ast.Namespace) {
+	if decl.Name != nil {
+		for _, part := range decl.Name.Parts {
+			h.add(part, namespaceKind)
+		}
+	}
+}
+
+func (h *highlighter) VisitUsing(decl *ast.Using) {
+	if decl.Name != nil {
+		for _, part := range decl.Name.Parts {
+			h.add(part, namespaceKind)
+		}
+	}
+}
+
 func (h *highlighter) VisitStruct(decl *ast.Struct) {
 	h.add(decl.Name, classKind)
 
@@ -202,6 +218,9 @@ func (h *highlighter) visitExprResult(node ast.Node, result *ast.ExprResult) {
 			h.add(node, enumKind)
 		}
 
+	case ast.ResolverResultKind:
+		h.add(node, namespaceKind)
+
 	case ast.ValueResultKind:
 		switch result.Value().(type) {
 		case *ast.Field:
@@ -244,10 +263,8 @@ func (h *highlighter) VisitNode(node ast.Node) {
 	switch node := node.(type) {
 	case ast.Decl:
 		node.AcceptDecl(h)
-
 	case ast.Stmt:
 		node.AcceptStmt(h)
-
 	case ast.Expr:
 		node.AcceptExpr(h)
 
@@ -272,24 +289,23 @@ const (
 	enumKind
 	propertyKind
 	enumMemberKind
+	namespaceKind
 )
 
 type semantic struct {
 	line   uint16
 	column uint8
 
-	// length - 0b00011111
-	// kind   - 0b11100000
-	lengthKind uint8
+	length uint8
+	kind   semanticKind
 }
 
 func newSemantic(line, column, length uint16, kind semanticKind) semantic {
-	length = min(length, 31)
-
 	return semantic{
-		line:       line - 1,
-		column:     uint8(column),
-		lengthKind: (uint8(length) & 0b00011111) | ((uint8(kind) << 5) & 0b11100000),
+		line:   line - 1,
+		column: uint8(column),
+		length: uint8(length),
+		kind:   kind,
 	}
 }
 
@@ -329,8 +345,8 @@ func (h *highlighter) data() []uint32 {
 
 		data[j+0] = uint32(token.line - lastLine)
 		data[j+1] = uint32(token.column - lastColumn)
-		data[j+2] = uint32(token.lengthKind & 0b00011111)
-		data[j+3] = uint32((token.lengthKind & 0b11100000) >> 5)
+		data[j+2] = uint32(token.length)
+		data[j+3] = uint32(token.kind)
 		data[j+4] = uint32(0)
 
 		lastLine = token.line

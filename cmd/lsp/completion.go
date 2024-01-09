@@ -3,18 +3,32 @@ package lsp
 import (
 	"fireball/core"
 	"fireball/core/ast"
-	"fireball/core/fuckoff"
 	"fireball/core/scanner"
 	"fireball/core/utils"
+	"fireball/core/workspace"
 	"github.com/MineGame159/protocol"
 	"strconv"
 )
 
-func getCompletions(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *protocol.CompletionList {
+func getCompletions(project *workspace.Project, file *ast.File, pos core.Pos) *protocol.CompletionList {
+	baseResolver := project.GetResolverFile(file)
+	if baseResolver == nil {
+		return nil
+	}
+
 	c := completions{}
+	resolver := ast.NewCombinedResolver(baseResolver)
+
+	for _, decl := range file.Decls {
+		if using, ok := decl.(*ast.Using); ok {
+			if r := baseResolver.GetResolver(using.Name); r != nil {
+				resolver.Add(r)
+			}
+		}
+	}
 
 	// Leaf
-	leaf := ast.GetLeaf(node, pos)
+	leaf := ast.GetLeaf(file, pos)
 
 	if leaf != nil {
 		if isInFunctionBody(pos, leaf) {
@@ -31,11 +45,11 @@ func getCompletions(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *pro
 				getIdentifierCompletions(resolver, &c, pos, leaf)
 			}
 		} else {
-			getTypeCompletions(resolver, &c, pos, leaf.Parent())
+			getTypeCompletions(project.GetResolverRoot(), resolver, &c, pos, leaf.Parent())
 		}
 	} else {
 		// Non leaf
-		node = ast.Get(node, pos)
+		node := ast.Get(file, pos)
 
 		if isInFunctionBody(pos, node) {
 			switch node := node.(type) {
@@ -60,7 +74,7 @@ func getCompletions(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *pro
 				getIdentifierCompletions(resolver, &c, pos, node)
 			}
 		} else {
-			getTypeCompletions(resolver, &c, pos, node)
+			getTypeCompletions(project.GetResolverRoot(), resolver, &c, pos, node)
 		}
 	}
 
@@ -68,8 +82,11 @@ func getCompletions(resolver fuckoff.Resolver, node ast.Node, pos core.Pos) *pro
 	return c.get()
 }
 
-func getTypeCompletions(resolver fuckoff.Resolver, c *completions, pos core.Pos, node ast.Node) {
+func getTypeCompletions(root ast.RootResolver, resolver ast.Resolver, c *completions, pos core.Pos, node ast.Node) {
 	switch node := node.(type) {
+	case *ast.NamespaceName:
+		getNamespaceCompletions(root, c, pos, node)
+
 	case *ast.Struct:
 		for _, field := range node.Fields {
 			if field.Type == nil && isAfterNode(pos, field.Name) {
@@ -115,31 +132,57 @@ func getTypeCompletions(resolver fuckoff.Resolver, c *completions, pos core.Pos,
 	}
 }
 
-func getMemberCompletions(resolver fuckoff.Resolver, c *completions, member *ast.Member) {
-	if s, ok := asThroughPointer[*ast.Struct](member.Value.Result().Type); ok {
-		fields := s.Fields
-		static := false
+func getNamespaceCompletions(root ast.RootResolver, c *completions, pos core.Pos, node *ast.NamespaceName) {
+	var resolver ast.Resolver = root
 
-		if member.Value.Result().Kind == ast.TypeResultKind {
-			fields = s.StaticFields
-			static = true
+	for _, part := range node.Parts {
+		if part.Cst().Range.Contains(pos) {
+			break
 		}
 
-		for _, field := range fields {
-			c.addNode(protocol.CompletionItemKindField, field.Name, printType(field.Type))
-		}
+		resolver = root.GetChild(part.String())
+	}
 
-		for _, method := range resolver.GetMethods(s, static) {
-			c.addNode(protocol.CompletionItemKindMethod, method.Name, printType(method))
-		}
-	} else if e, ok := asThroughPointer[*ast.Enum](member.Value.Result().Type); ok {
-		for _, case_ := range e.Cases {
-			c.addNode(protocol.CompletionItemKindEnumMember, case_.Name, strconv.FormatInt(case_.ActualValue, 10))
+	if resolver != nil {
+		for _, child := range resolver.GetChildren() {
+			c.add(protocol.CompletionItemKindModule, child, "")
 		}
 	}
 }
 
-func getIdentifierCompletions(resolver fuckoff.Resolver, c *completions, pos core.Pos, node ast.Node) {
+func getMemberCompletions(resolver ast.Resolver, c *completions, member *ast.Member) {
+	//goland:noinspection GoSwitchMissingCasesForIotaConsts
+	switch member.Value.Result().Kind {
+	case ast.ResolverResultKind:
+		resolver := member.Value.Result().Resolver()
+		getResolverCompletions(c, resolver, true)
+
+	case ast.TypeResultKind:
+		if s, ok := asThroughPointer[*ast.Struct](member.Value.Result().Type); ok {
+			fields := s.Fields
+			static := false
+
+			if member.Value.Result().Kind == ast.TypeResultKind {
+				fields = s.StaticFields
+				static = true
+			}
+
+			for _, field := range fields {
+				c.addNode(protocol.CompletionItemKindField, field.Name, printType(field.Type))
+			}
+
+			for _, method := range resolver.GetMethods(s, static) {
+				c.addNode(protocol.CompletionItemKindMethod, method.Name, printType(method))
+			}
+		} else if e, ok := asThroughPointer[*ast.Enum](member.Value.Result().Type); ok {
+			for _, case_ := range e.Cases {
+				c.addNode(protocol.CompletionItemKindEnumMember, case_.Name, strconv.FormatInt(case_.ActualValue, 10))
+			}
+		}
+	}
+}
+
+func getIdentifierCompletions(resolver ast.Resolver, c *completions, pos core.Pos, node ast.Node) {
 	// Types and global functions
 	getGlobalCompletions(resolver, c, true)
 
@@ -211,7 +254,7 @@ func getStmtCompletions(c *completions, node ast.Node) {
 	}
 }
 
-func getGlobalCompletions(resolver fuckoff.Resolver, c *completions, functions bool) {
+func getGlobalCompletions(resolver ast.Resolver, c *completions, functions bool) {
 	// Primitive types
 	c.add(protocol.CompletionItemKindStruct, "void", "")
 	c.add(protocol.CompletionItemKindStruct, "bool", "")
@@ -237,19 +280,25 @@ func getGlobalCompletions(resolver fuckoff.Resolver, c *completions, functions b
 	c.add(protocol.CompletionItemKindFunction, "alignof", "(<type>) u32")
 
 	// Language defined types and functions
-	for _, file := range resolver.GetFileNodes() {
-		for _, decl := range file.Decls {
-			switch decl := decl.(type) {
-			case *ast.Struct:
-				c.addNode(protocol.CompletionItemKindStruct, decl.Name, "")
+	getResolverCompletions(c, resolver, functions)
+}
 
-			case *ast.Enum:
-				c.addNode(protocol.CompletionItemKindEnum, decl.Name, "")
+func getResolverCompletions(c *completions, resolver ast.Resolver, functions bool) {
+	for _, child := range resolver.GetChildren() {
+		c.add(protocol.CompletionItemKindModule, child, "")
+	}
 
-			case *ast.Func:
-				if functions {
-					c.addNode(protocol.CompletionItemKindFunction, decl.Name, printType(decl))
-				}
+	for _, node := range resolver.GetSymbols() {
+		switch node := node.(type) {
+		case *ast.Struct:
+			c.addNode(protocol.CompletionItemKindStruct, node.Name, "")
+
+		case *ast.Enum:
+			c.addNode(protocol.CompletionItemKindEnum, node.Name, "")
+
+		case *ast.Func:
+			if functions {
+				c.addNode(protocol.CompletionItemKindFunction, node.Name, printType(node))
 			}
 		}
 	}

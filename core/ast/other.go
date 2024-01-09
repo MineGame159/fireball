@@ -11,17 +11,22 @@ type File struct {
 	cst    cst.Node
 	parent Node
 
-	Path  string
-	Decls []Decl
+	Path      string
+	Namespace *Namespace
+	Decls     []Decl
 }
 
-func NewFile(node cst.Node, path string, decls []Decl) *File {
+func NewFile(node cst.Node, path string, namespace *Namespace, decls []Decl) *File {
 	f := &File{
-		cst:   node,
-		Path:  path,
-		Decls: decls,
+		cst:       node,
+		Path:      path,
+		Namespace: namespace,
+		Decls:     decls,
 	}
 
+	if namespace != nil {
+		namespace.SetParent(f)
+	}
 	for _, child := range decls {
 		child.SetParent(f)
 	}
@@ -54,6 +59,9 @@ func (f *File) SetParent(parent Node) {
 }
 
 func (f *File) AcceptChildren(visitor Visitor) {
+	if f.Namespace != nil {
+		visitor.VisitNode(f.Namespace)
+	}
 	for _, child := range f.Decls {
 		visitor.VisitNode(child)
 	}
@@ -65,6 +73,10 @@ func (f *File) Clone() Node {
 		Path: f.Path,
 	}
 
+	if f.Namespace != nil {
+		f2.Namespace = f.Namespace.Clone().(*Namespace)
+		f2.Namespace.SetParent(f2)
+	}
 	f2.Decls = make([]Decl, len(f.Decls))
 	for i, child := range f2.Decls {
 		f2.Decls[i] = child.Clone().(Decl)
@@ -75,6 +87,80 @@ func (f *File) Clone() Node {
 }
 
 func (f *File) String() string {
+	return ""
+}
+
+// NamespaceName
+
+type NamespaceName struct {
+	cst    cst.Node
+	parent Node
+
+	Parts []*Token
+}
+
+func NewNamespaceName(node cst.Node, parts []*Token) *NamespaceName {
+	if parts == nil {
+		return nil
+	}
+
+	n := &NamespaceName{
+		cst:   node,
+		Parts: parts,
+	}
+
+	for _, child := range parts {
+		child.SetParent(n)
+	}
+
+	return n
+}
+
+func (n *NamespaceName) Cst() *cst.Node {
+	if n.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &n.cst
+}
+
+func (n *NamespaceName) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (n *NamespaceName) Parent() Node {
+	return n.parent
+}
+
+func (n *NamespaceName) SetParent(parent Node) {
+	if parent != nil && n.parent != nil {
+		panic("ast.NamespaceName.SetParent() - Parent is already set")
+	}
+
+	n.parent = parent
+}
+
+func (n *NamespaceName) AcceptChildren(visitor Visitor) {
+	for _, child := range n.Parts {
+		visitor.VisitNode(child)
+	}
+}
+
+func (n *NamespaceName) Clone() Node {
+	n2 := &NamespaceName{
+		cst: n.cst,
+	}
+
+	n2.Parts = make([]*Token, len(n.Parts))
+	for i, child := range n2.Parts {
+		n2.Parts[i] = child.Clone().(*Token)
+		n2.Parts[i].SetParent(n2)
+	}
+
+	return n2
+}
+
+func (n *NamespaceName) String() string {
 	return ""
 }
 
@@ -582,6 +668,10 @@ func IsNil(node Node) bool {
 		return node == nil
 	case *Resolvable:
 		return node == nil
+	case *Namespace:
+		return node == nil
+	case *Using:
+		return node == nil
 	case *Struct:
 		return node == nil
 	case *Enum:
@@ -639,6 +729,8 @@ func IsNil(node Node) bool {
 	case *Literal:
 		return node == nil
 	case *File:
+		return node == nil
+	case *NamespaceName:
 		return node == nil
 	case *Field:
 		return node == nil

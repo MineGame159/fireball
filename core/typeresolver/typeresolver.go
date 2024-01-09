@@ -2,7 +2,6 @@ package typeresolver
 
 import (
 	"fireball/core/ast"
-	"fireball/core/fuckoff"
 	"fireball/core/utils"
 	"fmt"
 )
@@ -11,10 +10,10 @@ type typeResolver struct {
 	expr ast.Expr
 
 	reporter utils.Reporter
-	resolver fuckoff.Resolver
+	resolver ast.Resolver
 }
 
-func Resolve(reporter utils.Reporter, resolver fuckoff.Resolver, node ast.Node) {
+func Resolve(reporter utils.Reporter, resolver ast.Resolver, node ast.Node) {
 	r := typeResolver{
 		reporter: reporter,
 		resolver: resolver,

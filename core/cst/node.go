@@ -74,6 +74,9 @@ const (
 	FuncTypeNode
 	FuncTypeParamNode
 
+	NamespaceNode
+	UsingNode
+	NamespaceNameNode
 	StructNode
 	StructFieldNode
 	ImplNode
@@ -151,7 +154,7 @@ func (n NodeKind) IsType() bool {
 
 func (n NodeKind) IsDecl() bool {
 	switch n {
-	case StructNode, ImplNode, EnumNode, FuncNode:
+	case NamespaceNode, UsingNode, StructNode, ImplNode, EnumNode, FuncNode:
 		return true
 
 	default:
@@ -185,6 +188,12 @@ func (n NodeKind) String() string {
 	case FuncTypeParamNode:
 		return "Function type param"
 
+	case NamespaceNode:
+		return "Namespace"
+	case UsingNode:
+		return "Using"
+	case NamespaceNameNode:
+		return "Namespace name"
 	case StructNode:
 		return "Struct"
 	case StructFieldNode:

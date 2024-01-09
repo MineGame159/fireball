@@ -186,7 +186,11 @@ func (c *converter) convertCallExpr(node cst.Node) ast.Expr {
 			if callee == nil {
 				callee = c.convertExpr(child)
 			} else {
-				args = append(args, c.convertExpr(child))
+				arg := c.convertExpr(child)
+
+				if arg != nil {
+					args = append(args, arg)
+				}
 			}
 		}
 	}

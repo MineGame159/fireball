@@ -195,7 +195,14 @@ func (s *Scanner) identifierKind() TokenKind {
 			}
 		}
 	case 'n':
-		return s.checkKeyword(1, "il", Nil)
+		if s.currentI-s.startI > 1 {
+			switch s.text[s.startI+1] {
+			case 'a':
+				return s.checkKeyword(2, "mespace", Namespace)
+			case 'i':
+				return s.checkKeyword(2, "l", Nil)
+			}
+		}
 	case 'r':
 		return s.checkKeyword(1, "eturn", Return)
 	case 's':
@@ -214,6 +221,8 @@ func (s *Scanner) identifierKind() TokenKind {
 		}
 	case 't':
 		return s.checkKeyword(1, "rue", True)
+	case 'u':
+		return s.checkKeyword(1, "sing", Using)
 	case 'v':
 		return s.checkKeyword(1, "ar", Var)
 	case 'w':

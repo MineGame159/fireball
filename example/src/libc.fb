@@ -1,12 +1,10 @@
-struct LibC {}
+namespace Example.LibC;
 
-impl LibC {
-    #[Extern]
-    static func printf(format *u8, ...) void
+#[Extern]
+func printf(format *u8, ...) void
 
-    #[Extern]
-    static func malloc(size u64) *void
+#[Extern]
+func malloc(size u64) *void
 
-    #[Extern]
-    static func free(ptr *void) void
-}
+#[Extern]
+func free(ptr *void) void

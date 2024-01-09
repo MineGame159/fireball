@@ -3,6 +3,9 @@ package cst
 import "fireball/core/scanner"
 
 var canStartDecl = []scanner.TokenKind{
+	scanner.Namespace,
+	scanner.Using,
+
 	scanner.Struct,
 	scanner.Impl,
 	scanner.Enum,
@@ -22,6 +25,11 @@ func parseDecl(p *parser) Node {
 	}
 
 	switch p.peek() {
+	case scanner.Namespace:
+		return parseNamespace(p, attributes)
+	case scanner.Using:
+		return parseUsing(p, attributes)
+
 	case scanner.Struct:
 		return parseStruct(p, attributes)
 	case scanner.Impl:
@@ -34,6 +42,66 @@ func parseDecl(p *parser) Node {
 	default:
 		return p.error("Cannot start a declaration")
 	}
+}
+
+// Namespace
+
+func parseNamespace(p *parser, attributes Node) Node {
+	p.begin(NamespaceNode)
+
+	p.childAdd(attributes)
+	if p.consume(scanner.Namespace) {
+		return p.end()
+	}
+	if p.child(parseNamespaceName) {
+		return p.end()
+	}
+	if p.consume(scanner.Semicolon) {
+		return p.end()
+	}
+
+	return p.end()
+}
+
+func parseUsing(p *parser, attributes Node) Node {
+	p.begin(UsingNode)
+
+	p.childAdd(attributes)
+	if p.consume(scanner.Using) {
+		return p.end()
+	}
+	if p.child(parseNamespaceName) {
+		return p.end()
+	}
+	if p.consume(scanner.Semicolon) {
+		return p.end()
+	}
+
+	return p.end()
+}
+
+func parseNamespaceName(p *parser) Node {
+	p.begin(NamespaceNameNode)
+
+	if p.child(parseNamespacePart) {
+		return p.end()
+	}
+	for p.optional(scanner.Dot) {
+		if p.child(parseNamespacePart) {
+			return p.end()
+		}
+	}
+
+	return p.end()
+}
+
+func parseNamespacePart(p *parser) Node {
+	if p.peek() != scanner.Identifier {
+		p.error("Expected a " + scanner.TokenKindStr(scanner.Identifier))
+		return Node{}
+	}
+
+	return p.advanceGetLeaf()
 }
 
 // Struct

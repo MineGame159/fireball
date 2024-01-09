@@ -4,11 +4,18 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/utils"
+	"math"
 	"strconv"
 )
 
+func (c *checker) VisitNamespace(_ *ast.Namespace) {}
+
+func (c *checker) VisitUsing(_ *ast.Using) {}
+
 func (c *checker) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(c)
+
+	c.checkNameCollision(decl, decl.Name)
 
 	// Check static fields
 	fields := utils.NewSet[string]()
@@ -57,6 +64,8 @@ func (c *checker) VisitImpl(decl *ast.Impl) {
 func (c *checker) VisitEnum(decl *ast.Enum) {
 	decl.AcceptChildren(c)
 
+	c.checkNameCollision(decl, decl.Name)
+
 	// Set case values
 	lastValue := int64(-1)
 
@@ -79,6 +88,47 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 		}
 	}
 
+	// Find type
+	if decl.Type == nil {
+		minValue := int64(math.MaxInt64)
+		maxValue := int64(math.MinInt64)
+
+		for _, case_ := range decl.Cases {
+			minValue = min(minValue, case_.ActualValue)
+			maxValue = max(maxValue, case_.ActualValue)
+		}
+
+		var kind ast.PrimitiveKind
+
+		if minValue >= 0 {
+			// Unsigned
+			if maxValue <= math.MaxUint8 {
+				kind = ast.U8
+			} else if maxValue <= math.MaxUint16 {
+				kind = ast.U16
+			} else if maxValue <= math.MaxUint32 {
+				kind = ast.U32
+			} else {
+				kind = ast.U64
+			}
+		} else {
+			// Signed
+			if minValue >= math.MinInt8 && maxValue <= math.MaxInt8 {
+				kind = ast.I8
+			} else if minValue >= math.MinInt16 && maxValue <= math.MaxInt16 {
+				kind = ast.I16
+			} else if minValue >= math.MinInt32 && maxValue <= math.MaxInt32 {
+				kind = ast.I32
+			} else {
+				kind = ast.I64
+			}
+		}
+
+		decl.ActualType = &ast.Primitive{Kind: kind}
+	} else {
+		decl.ActualType = decl.Type
+	}
+
 	// Check type
 	if decl.Type != nil {
 		if v, ok := ast.As[*ast.Primitive](decl.Type); !ok || !ast.IsInteger(v.Kind) {
@@ -97,6 +147,10 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 }
 
 func (c *checker) VisitFunc(decl *ast.Func) {
+	if decl.Method() == nil {
+		c.checkNameCollision(decl, decl.Name)
+	}
+
 	// Check attributes
 	for _, attribute := range decl.Attributes {
 		c.visitAttribute(decl, attribute)
@@ -174,6 +228,45 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 		if !valid {
 			c.error(decl.Name, "Function needs to return a '%s' value", ast.PrintType(decl.Returns))
+		}
+	}
+}
+
+// Utils
+
+func (c *checker) checkNameCollision(decl ast.Decl, name *ast.Token) {
+	if name == nil {
+		return
+	}
+
+	// Children
+	for _, child := range c.resolver.GetChildren() {
+		if child == name.String() {
+			c.error(name, "Declaration with this name already exists")
+			return
+		}
+	}
+
+	// Symbols
+	for _, node := range c.resolver.GetSymbols() {
+		if node == decl {
+			continue
+		}
+
+		var name2 *ast.Token
+
+		switch node := node.(type) {
+		case *ast.Struct:
+			name2 = node.Name
+		case *ast.Enum:
+			name2 = node.Name
+		case *ast.Func:
+			name2 = node.Name
+		}
+
+		if name2 != nil && name.String() == name2.String() {
+			c.error(name, "Declaration with this name already exists")
+			return
 		}
 	}
 }

@@ -15,10 +15,24 @@ func Convert(reporter utils.Reporter, path string, node cst.Node) *ast.File {
 		reporter: reporter,
 	}
 
+	var namespace *ast.Namespace
 	var decls []ast.Decl
 
+	reportedMissingNamespace := false
+
 	for _, child := range node.Children {
-		if child.Kind.IsDecl() {
+		if child.Kind == cst.NamespaceNode {
+			if namespace == nil {
+				namespace = c.convertNamespace(child)
+			} else {
+				c.error(child, "There can only be one top-level file namespace")
+			}
+		} else if child.Kind.IsDecl() {
+			if namespace == nil && !reportedMissingNamespace {
+				c.error(child, "First declaration of a file needs to be a namespace")
+				reportedMissingNamespace = true
+			}
+
 			decl := c.convertDecl(child)
 
 			if decl != nil {
@@ -27,7 +41,7 @@ func Convert(reporter utils.Reporter, path string, node cst.Node) *ast.File {
 		}
 	}
 
-	return ast.NewFile(node, path, decls)
+	return ast.NewFile(node, path, namespace, decls)
 }
 
 func (c *converter) convertToken(node cst.Node) *ast.Token {

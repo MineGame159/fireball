@@ -516,6 +516,12 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		return
 	}
 
+	// Resolver
+	if r := c.resolver.GetChild(expr.String()); r != nil {
+		expr.Result().SetResolver(r)
+		return
+	}
+
 	// Type
 	if t := c.resolver.GetType(expr.String()); t != nil {
 		expr.Result().SetType(t)
@@ -816,6 +822,33 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			c.error(expr.Value, "Invalid type")
 			return
 		}
+
+	case ast.ResolverResultKind:
+		resolver := expr.Value.Result().Resolver()
+
+		// Function
+		if parentWantsFunction(expr) {
+			if f := resolver.GetFunction(expr.Name.String()); f != nil {
+				expr.Result().SetCallable(f, f)
+				return
+			}
+		}
+
+		// Resolver
+		if r := resolver.GetChild(expr.String()); r != nil {
+			expr.Result().SetResolver(r)
+			return
+		}
+
+		// Type
+		if t := resolver.GetType(expr.String()); t != nil {
+			expr.Result().SetType(t)
+			return
+		}
+
+		// Error
+		c.error(expr.Name, "Unknown identifier")
+		expr.Result().SetInvalid()
 
 	case ast.ValueResultKind:
 		// Get struct

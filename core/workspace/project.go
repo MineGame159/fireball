@@ -8,6 +8,7 @@ import (
 	"fireball/core/cst"
 	"fireball/core/typeresolver"
 	"fireball/core/utils"
+	"fmt"
 	"github.com/pelletier/go-toml/v2"
 	"os"
 	"path/filepath"
@@ -18,14 +19,8 @@ type Project struct {
 	Path   string
 	Config Config
 
-	Files map[string]*File
-}
-
-type Config struct {
-	Name string
-	Src  string
-
-	LinkLibraries []string
+	Files     map[string]*File
+	namespace namespace
 }
 
 func NewProject(path string) (*Project, error) {
@@ -60,16 +55,20 @@ func NewProject(path string) (*Project, error) {
 	}
 
 	// Return
-	return &Project{
+	p := &Project{
 		Path:   path,
 		Config: config,
 
 		Files: make(map[string]*File),
-	}, nil
+	}
+
+	p.namespace.project = p
+
+	return p, nil
 }
 
 func NewEmptyProject(path, name string) *Project {
-	return &Project{
+	p := &Project{
 		Path: path,
 		Config: Config{
 			Name: name,
@@ -78,7 +77,89 @@ func NewEmptyProject(path, name string) *Project {
 
 		Files: make(map[string]*File),
 	}
+
+	p.namespace.project = p
+
+	return p
 }
+
+// Namespaces
+
+func (p *Project) addFileToNamespace(file *File) {
+	// Check namespace against config
+	if file.Ast == nil || file.Ast.Namespace == nil || file.Ast.Namespace.Name == nil {
+		return
+	}
+
+	parts := file.Ast.Namespace.Name.Parts
+	ok := true
+
+	for i, part := range p.Config.Namespace {
+		if i >= len(parts) || part != parts[i].String() {
+			ok = false
+			break
+		}
+	}
+
+	if !ok {
+		file.Report(utils.Diagnostic{
+			Kind:    utils.ErrorKind,
+			Range:   file.Ast.Namespace.Name.Cst().Range,
+			Message: fmt.Sprintf("All files in this project need to have a base namespace '%s'", p.Config.Name),
+		})
+
+		return
+	}
+
+	// Add
+	if n := p.getNamespace(file.Ast); n != nil {
+		n.addFile(file)
+	}
+}
+
+func (p *Project) removeFileFromNamespace(file *File) {
+	if n := p.getNamespace(file.Ast); n != nil {
+		n.removeFile(file)
+	}
+}
+
+func (p *Project) getNamespace(file *ast.File) *namespace {
+	if file == nil || file.Namespace == nil || file.Namespace.Name == nil {
+		return nil
+	}
+
+	n := &p.namespace
+
+	for _, part := range file.Namespace.Name.Parts {
+		n = n.getOrCreateChild(part.String())
+	}
+
+	return n
+}
+
+func (p *Project) GetResolverFile(file *ast.File) ast.RootResolver {
+	if n := p.getNamespace(file); n != nil {
+		return n
+	}
+
+	return nil
+}
+
+func (p *Project) GetResolverName(parts []string) ast.RootResolver {
+	n := &p.namespace
+
+	for _, part := range parts {
+		n = n.getOrCreateChild(part)
+	}
+
+	return n
+}
+
+func (p *Project) GetResolverRoot() ast.RootResolver {
+	return &p.namespace
+}
+
+// Files
 
 func (p *Project) LoadFiles() error {
 	// Get source files
@@ -117,95 +198,30 @@ func (p *Project) LoadFiles() error {
 		file.Cst = cst.Parse(file, file.Text)
 		file.Ast = cst2ast.Convert(file, file.AbsolutePath(), file.Cst)
 
-		file.parseDiagnosticCount = len(file.diagnostics)
-	}
+		p.addFileToNamespace(file)
 
-	for _, file := range p.Files {
-		file.CollectTypesAndFunctions()
+		file.parseDiagnosticCount = len(file.diagnostics)
 		file.parseWaitGroup.Done()
 	}
 
+	// Resolve types
 	for _, file := range p.Files {
-		file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
-		typeresolver.Resolve(file, p, file.Ast)
+		if resolver := p.getNamespace(file.Ast); resolver != nil {
+			file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
+			typeresolver.Resolve(file, resolver, file.Ast)
+		}
 	}
 
 	// Check
 	for _, file := range p.Files {
-		checker.Check(file, p, file.Ast)
+		if resolver := p.getNamespace(file.Ast); resolver != nil {
+			checker.Check(file, resolver, file.Ast)
+		}
+
 		file.checkWaitGroup.Done()
 	}
 
 	return nil
-}
-
-func (p *Project) GetType(name string) ast.Type {
-	for _, file := range p.Files {
-		if v, ok := file.Types[name]; ok {
-			return v
-		}
-	}
-
-	return nil
-}
-
-func (p *Project) GetFunction(name string) *ast.Func {
-	for _, file := range p.Files {
-		if v, ok := file.Functions[name]; ok {
-			return v
-		}
-	}
-
-	return nil
-}
-
-func (p *Project) GetMethod(type_ ast.Type, name string, static bool) *ast.Func {
-	for _, file := range p.Files {
-		for _, decl := range file.Ast.Decls {
-			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(type_) {
-				function := impl.GetMethod(name, static)
-
-				if function != nil {
-					return function
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (p *Project) GetMethods(type_ ast.Type, static bool) []*ast.Func {
-	var methods []*ast.Func
-
-	staticValue := ast.FuncFlags(0)
-	if static {
-		staticValue = 1
-	}
-
-	for _, file := range p.Files {
-		for _, decl := range file.Ast.Decls {
-			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(type_) {
-				for _, method := range impl.Methods {
-					if method.Flags&ast.Static == staticValue {
-						methods = append(methods, method)
-					}
-				}
-			}
-		}
-	}
-
-	return methods
-}
-
-func (p *Project) GetFileNodes() []*ast.File {
-	nodes := make([]*ast.File, 0, len(p.Files))
-
-	for _, file := range p.Files {
-		nodes = append(nodes, file.Ast)
-	}
-
-	return nodes
 }
 
 func (p *Project) GetOrCreateFile(path string) *File {
@@ -236,21 +252,26 @@ func (p *Project) RemoveFileAbs(path string) bool {
 
 func (p *Project) RemoveFile(path string) bool {
 	// Find file
-	if _, ok := p.Files[path]; ok {
+	if file, ok := p.Files[path]; ok {
 		// Delete file
+		p.removeFileFromNamespace(file)
 		delete(p.Files, path)
 
 		// Check the rest of the files
 		for _, file := range p.Files {
-			file.checkWaitGroup.Add(1)
+			if resolver := p.getNamespace(file.Ast); resolver != nil {
+				file.checkWaitGroup.Add(1)
 
-			file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
-			typeresolver.Resolve(file, file.Project, file.Ast)
+				file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
+				typeresolver.Resolve(file, resolver, file.Ast)
+			}
 		}
 
 		for _, file := range p.Files {
-			checker.Check(file, p, file.Ast)
-			file.checkWaitGroup.Done()
+			if resolver := p.getNamespace(file.Ast); resolver != nil {
+				checker.Check(file, resolver, file.Ast)
+				file.checkWaitGroup.Done()
+			}
 		}
 
 		// Return true
