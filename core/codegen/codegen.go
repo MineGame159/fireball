@@ -174,7 +174,7 @@ func (c *codegen) createStaticVariable(field *ast.Field, external bool) exprValu
 	ptr := ast.Pointer{Pointee: field.Type}
 
 	llvmValue := c.module.Variable(external, c.getType(field.Type), c.getType(&ptr))
-	llvmValue.SetName(field.GetMangledName())
+	llvmValue.SetName(field.MangledName())
 
 	value := exprValue{
 		v:           llvmValue,

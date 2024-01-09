@@ -96,7 +96,7 @@ func WriteText(module *Module, writer io.Writer) {
 	// Defines
 	for _, define := range module.defines {
 		w.beginFunction()
-		w.fmt("define %s @%s(", w.type_(define.type_.returns), define.type_.name)
+		w.fmt("define %s @%s(", w.type_(define.type_.returns), surroundName(define.type_.name))
 
 		for i, parameter := range define.parameters {
 			if i > 0 {
@@ -127,7 +127,7 @@ func WriteText(module *Module, writer io.Writer) {
 	// Declares
 	for _, declare := range module.declares {
 		w.beginFunction()
-		w.fmt("declare %s @%s(", w.type_(declare.returns), declare.name)
+		w.fmt("declare %s @%s(", w.type_(declare.returns), surroundName(declare.name))
 
 		for i, parameter := range declare.parameters {
 			if i > 0 {

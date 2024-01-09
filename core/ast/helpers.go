@@ -2,9 +2,20 @@ package ast
 
 import (
 	"fireball/core/scanner"
-	"fmt"
 	"strings"
 )
+
+// NamespaceName
+
+func (n *NamespaceName) WriteTo(sb *strings.Builder) {
+	for i, part := range n.Parts {
+		if i > 0 {
+			sb.WriteRune('.')
+		}
+
+		sb.WriteString(part.String())
+	}
+}
 
 // Struct
 
@@ -93,14 +104,27 @@ func (f *Field) Index() int {
 	panic("ast.Field.Index() - Field not found")
 }
 
-func (f *Field) GetMangledName() string {
-	parent := ""
+func (f *Field) MangledName() string {
+	sb := strings.Builder{}
+	sb.WriteString("fb$")
 
-	if s, ok := f.Parent().(*Struct); ok && s.Name != nil {
-		parent = s.Name.String()
+	file := GetParent[*File](f)
+	file.Namespace.Name.WriteTo(&sb)
+
+	if f.IsStatic() {
+		sb.WriteString(":s:")
+	} else {
+		sb.WriteString(":i:")
 	}
 
-	return fmt.Sprintf("fb$%s::%s", parent, f.Name)
+	sb.WriteString(f.Parent().(*Struct).Name.String())
+	sb.WriteRune('.')
+
+	if f.Name != nil {
+		sb.WriteString(f.Name.String())
+	}
+
+	return sb.String()
 }
 
 // Func
@@ -203,15 +227,26 @@ func (f *Func) MangledName() string {
 	}
 
 	// Normal
-	name := ""
+	sb := strings.Builder{}
+	sb.WriteString("fb$")
 
-	if f.Name != nil {
-		name = f.Name.String()
+	file := GetParent[*File](f)
+	file.Namespace.Name.WriteTo(&sb)
+
+	if _, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
+		sb.WriteString(":m:")
+	} else {
+		sb.WriteString(":f:")
 	}
 
 	if struct_, ok := f.Parent().(*Impl); ok {
-		name = fmt.Sprintf("%s.%s", struct_.Struct, name)
+		sb.WriteString(struct_.Struct.String())
+		sb.WriteRune('.')
 	}
 
-	return "fb$" + name
+	if f.Name != nil {
+		sb.WriteString(f.Name.String())
+	}
+
+	return sb.String()
 }
