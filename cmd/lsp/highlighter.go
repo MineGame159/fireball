@@ -99,6 +99,12 @@ func (h *highlighter) VisitFunc(decl *ast.Func) {
 	h.params = nil
 }
 
+func (h *highlighter) VisitGlobalVar(decl *ast.GlobalVar) {
+	h.add(decl.Name, variableKind)
+
+	decl.AcceptChildren(h)
+}
+
 // Statements
 
 func (h *highlighter) VisitBlock(stmt *ast.Block) {

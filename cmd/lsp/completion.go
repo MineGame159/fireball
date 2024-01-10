@@ -94,6 +94,11 @@ func getTypeCompletions(root ast.RootResolver, resolver ast.Resolver, c *complet
 			}
 		}
 
+	case *ast.Field:
+		if isAfterNode(pos, node.Name) {
+			getGlobalCompletions(resolver, c, false)
+		}
+
 	case *ast.Impl:
 		if isAfterCst(pos, node, scanner.Impl, true) {
 			getGlobalCompletions(resolver, c, false)
@@ -115,12 +120,12 @@ func getTypeCompletions(root ast.RootResolver, resolver ast.Resolver, c *complet
 			getGlobalCompletions(resolver, c, false)
 		}
 
-	case *ast.Field:
+	case *ast.Param:
 		if isAfterNode(pos, node.Name) {
 			getGlobalCompletions(resolver, c, false)
 		}
 
-	case *ast.Param:
+	case *ast.GlobalVar:
 		if isAfterNode(pos, node.Name) {
 			getGlobalCompletions(resolver, c, false)
 		}
@@ -299,6 +304,11 @@ func getResolverCompletions(c *completions, resolver ast.Resolver, functions boo
 		case *ast.Func:
 			if functions {
 				c.addNode(protocol.CompletionItemKindFunction, node.Name, printType(node))
+			}
+
+		case *ast.GlobalVar:
+			if functions {
+				c.addNode(protocol.CompletionItemKindVariable, node.Name, printType(node.Type))
 			}
 		}
 	}

@@ -5,6 +5,7 @@ type Resolver interface {
 	GetType(name string) Type
 
 	GetFunction(name string) *Func
+	GetVariable(name string) *GlobalVar
 
 	GetMethod(type_ Type, name string, static bool) *Func
 	GetMethods(type_ Type, static bool) []*Func
@@ -57,6 +58,16 @@ func (c *CombinedResolver) GetFunction(name string) *Func {
 	for _, resolver := range c.resolvers {
 		if function := resolver.GetFunction(name); function != nil {
 			return function
+		}
+	}
+
+	return nil
+}
+
+func (c *CombinedResolver) GetVariable(name string) *GlobalVar {
+	for _, resolver := range c.resolvers {
+		if variable := resolver.GetVariable(name); variable != nil {
+			return variable
 		}
 	}
 

@@ -126,6 +126,18 @@ func (n *namespace) GetFunction(name string) *ast.Func {
 	return nil
 }
 
+func (n *namespace) GetVariable(name string) *ast.GlobalVar {
+	for _, file := range n.files {
+		for _, decl := range file.Ast.Decls {
+			if variable, ok := decl.(*ast.GlobalVar); ok && variable.Name != nil && variable.Name.String() == name {
+				return variable
+			}
+		}
+	}
+
+	return nil
+}
+
 func (n *namespace) GetMethod(type_ ast.Type, name string, static bool) *ast.Func {
 	for _, file := range n.files {
 		for _, decl := range file.Ast.Decls {
@@ -174,7 +186,7 @@ func (n *namespace) GetSymbols() []ast.Node {
 	for _, file := range n.files {
 		for _, decl := range file.Ast.Decls {
 			switch decl.(type) {
-			case *ast.Struct, *ast.Enum, *ast.Func:
+			case *ast.Struct, *ast.Enum, *ast.Func, *ast.GlobalVar:
 				symbols = append(symbols, decl)
 			}
 		}

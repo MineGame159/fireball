@@ -86,6 +86,11 @@ var declarations = Group{
 			field("returns", type_("Type")),
 			field("body", array("Stmt")),
 		),
+		node(
+			"GlobalVar",
+			field("name", type_("Token")),
+			field("type", type_("Type")),
+		),
 	},
 }
 

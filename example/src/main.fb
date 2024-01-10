@@ -28,6 +28,8 @@ func add(x i32, y i32) i32 {
     return x + y;
 }
 
+var buh i32;
+
 func main() {
     LibC.printf("Size: %d\n", sizeof(Foo));
     LibC.printf("Align: %d\n", alignof(Foo));
@@ -61,6 +63,12 @@ func main() {
 
     LibC.printf("%f\n", mySqrt(a[2]));
     free(a);
+
+    LibC.printf("\n");
+    LibC.printf("Buh: %d\n", buh);
+
+    buh = 159;
+    LibC.printf("Buh: %d\n", buh);
 }
 
 #[Inline]

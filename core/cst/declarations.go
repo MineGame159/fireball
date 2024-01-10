@@ -10,6 +10,7 @@ var canStartDecl = []scanner.TokenKind{
 	scanner.Impl,
 	scanner.Enum,
 	scanner.Func,
+	scanner.Var,
 
 	scanner.Hashtag,
 }
@@ -26,18 +27,20 @@ func parseDecl(p *parser) Node {
 
 	switch p.peek() {
 	case scanner.Namespace:
-		return parseNamespace(p, attributes)
+		return parseNamespaceDecl(p, attributes)
 	case scanner.Using:
-		return parseUsing(p, attributes)
+		return parseUsingDecl(p, attributes)
 
 	case scanner.Struct:
-		return parseStruct(p, attributes)
+		return parseStructDecl(p, attributes)
 	case scanner.Impl:
-		return parseImpl(p, attributes)
+		return parseImplDecl(p, attributes)
 	case scanner.Enum:
-		return parseEnum(p, attributes)
+		return parseEnumDecl(p, attributes)
 	case scanner.Func:
-		return parseFunc(p, attributes)
+		return parseFuncDecl(p, attributes)
+	case scanner.Var:
+		return parseVarDecl(p, attributes)
 
 	default:
 		return p.error("Cannot start a declaration")
@@ -46,8 +49,8 @@ func parseDecl(p *parser) Node {
 
 // Namespace
 
-func parseNamespace(p *parser, attributes Node) Node {
-	p.begin(NamespaceNode)
+func parseNamespaceDecl(p *parser, attributes Node) Node {
+	p.begin(NamespaceDeclNode)
 
 	p.childAdd(attributes)
 	if p.consume(scanner.Namespace) {
@@ -63,8 +66,8 @@ func parseNamespace(p *parser, attributes Node) Node {
 	return p.end()
 }
 
-func parseUsing(p *parser, attributes Node) Node {
-	p.begin(UsingNode)
+func parseUsingDecl(p *parser, attributes Node) Node {
+	p.begin(UsingDeclNode)
 
 	p.childAdd(attributes)
 	if p.consume(scanner.Using) {
@@ -106,8 +109,8 @@ func parseNamespacePart(p *parser) Node {
 
 // Struct
 
-func parseStruct(p *parser, attributes Node) Node {
-	p.begin(StructNode)
+func parseStructDecl(p *parser, attributes Node) Node {
+	p.begin(StructDeclNode)
 
 	p.childAdd(attributes)
 	if p.consume(scanner.Struct) {
@@ -148,8 +151,8 @@ func parseStructField(p *parser) Node {
 
 // Impl
 
-func parseImpl(p *parser, attributes Node) Node {
-	p.begin(ImplNode)
+func parseImplDecl(p *parser, attributes Node) Node {
+	p.begin(ImplDeclNode)
 
 	p.childAdd(attributes)
 	if p.consume(scanner.Impl) {
@@ -181,13 +184,13 @@ func parseImplFunc(p *parser) Node {
 		}
 	}
 
-	return parseFunc(p, attributes)
+	return parseFuncDecl(p, attributes)
 }
 
 // Enum
 
-func parseEnum(p *parser, attributes Node) Node {
-	p.begin(EnumNode)
+func parseEnumDecl(p *parser, attributes Node) Node {
+	p.begin(EnumDeclNode)
 
 	p.childAdd(attributes)
 	if p.consume(scanner.Enum) {
@@ -236,8 +239,8 @@ func parseEnumCase(p *parser) Node {
 
 var canStartParam = []scanner.TokenKind{scanner.Identifier, scanner.Dot}
 
-func parseFunc(p *parser, attributes Node) Node {
-	p.begin(FuncNode)
+func parseFuncDecl(p *parser, attributes Node) Node {
+	p.begin(FuncDeclNode)
 
 	p.childAdd(attributes)
 	p.optional(scanner.Static)
@@ -284,6 +287,28 @@ func parseFuncParam(p *parser) Node {
 		return p.end()
 	}
 	if p.child(parseType) {
+		return p.end()
+	}
+
+	return p.end()
+}
+
+// Var
+
+func parseVarDecl(p *parser, attributes Node) Node {
+	p.begin(VarDeclNode)
+
+	p.childAdd(attributes)
+	if p.consume(scanner.Var) {
+		return p.end()
+	}
+	if p.consume(scanner.Identifier) {
+		return p.end()
+	}
+	if p.child(parseType) {
+		return p.end()
+	}
+	if p.consume(scanner.Semicolon) {
 		return p.end()
 	}
 

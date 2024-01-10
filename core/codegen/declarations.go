@@ -87,3 +87,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	c.block = nil
 	c.function = nil
 }
+
+func (c *codegen) VisitGlobalVar(decl *ast.GlobalVar) {
+
+}

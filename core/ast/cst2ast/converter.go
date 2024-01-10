@@ -21,9 +21,9 @@ func Convert(reporter utils.Reporter, path string, node cst.Node) *ast.File {
 	reportedMissingNamespace := false
 
 	for _, child := range node.Children {
-		if child.Kind == cst.NamespaceNode {
+		if child.Kind == cst.NamespaceDeclNode {
 			if namespace == nil {
-				namespace = c.convertNamespace(child)
+				namespace = c.convertNamespaceDecl(child)
 			} else {
 				c.error(child, "There can only be one top-level file namespace")
 			}

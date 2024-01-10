@@ -368,14 +368,23 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 		// Nothing
 
 	case ast.ValueResultKind:
-		if v := c.getVariable(expr.Name); v != nil {
-			c.exprResult = v.value
+		switch node := expr.Result().Value().(type) {
+		case *ast.GlobalVar:
+			c.exprResult = c.getGlobalVariable(node)
+
+		default:
+			if v := c.getVariable(expr.Name); v != nil {
+				c.exprResult = v.value
+			}
 		}
 
 	case ast.CallableResultKind:
 		switch node := expr.Result().Callable().(type) {
 		case *ast.Func:
 			c.exprResult = c.getFunction(node)
+
+		case *ast.GlobalVar:
+			c.exprResult = c.getGlobalVariable(node)
 
 		case *ast.Var, *ast.Param:
 			if v := c.getVariable(expr.Name); v != nil {
@@ -693,10 +702,23 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 					}
 				}
 			}
+
+		case *ast.GlobalVar:
+			c.exprResult = c.getGlobalVariable(node)
 		}
 
 	case ast.CallableResultKind:
 		switch node := expr.Result().Callable().(type) {
+		case *ast.Field:
+			if node.IsStatic() {
+				c.exprResult = c.getStaticVariable(node)
+			} else {
+				value, _ := c.memberLoad(expr.Value.Result().Type, value)
+
+				c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
+				c.this = value
+			}
+
 		case *ast.Func:
 			if expr.Value.Result().Type != nil {
 				value, _ = c.memberLoad(expr.Value.Result().Type, value)
@@ -714,15 +736,8 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			c.exprResult = c.getFunction(node)
 			c.this = value
 
-		case *ast.Field:
-			if node.IsStatic() {
-				c.exprResult = c.getStaticVariable(node)
-			} else {
-				value, _ := c.memberLoad(expr.Value.Result().Type, value)
-
-				c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
-				c.this = value
-			}
+		case *ast.GlobalVar:
+			c.exprResult = c.getGlobalVariable(node)
 
 		default:
 			panic("codegen.VisitMember() - Callable not implemented")

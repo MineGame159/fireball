@@ -250,3 +250,21 @@ func (f *Func) MangledName() string {
 
 	return sb.String()
 }
+
+// GlobalVar
+
+func (g *GlobalVar) MangledName() string {
+	sb := strings.Builder{}
+	sb.WriteString("fb$")
+
+	file := GetParent[*File](g)
+	file.Namespace.Name.WriteTo(&sb)
+
+	sb.WriteString(":g:")
+
+	if g.Name != nil {
+		sb.WriteString(g.Name.String())
+	}
+
+	return sb.String()
+}

@@ -245,6 +245,17 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	}
 }
 
+func (c *checker) VisitGlobalVar(decl *ast.GlobalVar) {
+	decl.AcceptChildren(c)
+
+	c.checkNameCollision(decl, decl.Name)
+
+	// Check void type
+	if ast.IsPrimitive(decl.Type, ast.Void) {
+		c.error(decl.Name, "Variable cannot be of type 'void'")
+	}
+}
+
 // Utils
 
 func (c *checker) checkNameCollision(decl ast.Decl, name *ast.Token) {
@@ -274,6 +285,8 @@ func (c *checker) checkNameCollision(decl ast.Decl, name *ast.Token) {
 		case *ast.Enum:
 			name2 = node.Name
 		case *ast.Func:
+			name2 = node.Name
+		case *ast.GlobalVar:
 			name2 = node.Name
 		}
 

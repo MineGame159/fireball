@@ -680,6 +680,8 @@ func IsNil(node Node) bool {
 		return node == nil
 	case *Func:
 		return node == nil
+	case *GlobalVar:
+		return node == nil
 	case *Expression:
 		return node == nil
 	case *Block:

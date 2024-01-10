@@ -74,16 +74,17 @@ const (
 	FuncTypeNode
 	FuncTypeParamNode
 
-	NamespaceNode
-	UsingNode
+	NamespaceDeclNode
+	UsingDeclNode
 	NamespaceNameNode
-	StructNode
+	StructDeclNode
 	StructFieldNode
-	ImplNode
-	EnumNode
+	ImplDeclNode
+	EnumDeclNode
 	EnumCaseNode
-	FuncNode
+	FuncDeclNode
 	FuncParamNode
+	VarDeclNode
 
 	ExprStmtNode
 	BlockStmtNode
@@ -154,7 +155,7 @@ func (n NodeKind) IsType() bool {
 
 func (n NodeKind) IsDecl() bool {
 	switch n {
-	case NamespaceNode, UsingNode, StructNode, ImplNode, EnumNode, FuncNode:
+	case NamespaceDeclNode, UsingDeclNode, StructDeclNode, ImplDeclNode, EnumDeclNode, FuncDeclNode, VarDeclNode:
 		return true
 
 	default:
@@ -188,26 +189,28 @@ func (n NodeKind) String() string {
 	case FuncTypeParamNode:
 		return "Function type param"
 
-	case NamespaceNode:
+	case NamespaceDeclNode:
 		return "Namespace"
-	case UsingNode:
+	case UsingDeclNode:
 		return "Using"
 	case NamespaceNameNode:
 		return "Namespace name"
-	case StructNode:
+	case StructDeclNode:
 		return "Struct"
 	case StructFieldNode:
 		return "Struct field"
-	case ImplNode:
+	case ImplDeclNode:
 		return "Impl"
-	case EnumNode:
+	case EnumDeclNode:
 		return "Enum"
 	case EnumCaseNode:
 		return "Enum case"
-	case FuncNode:
+	case FuncDeclNode:
 		return "Func"
 	case FuncParamNode:
 		return "Func param"
+	case VarDeclNode:
+		return "Var"
 
 	case ExprStmtNode:
 		return "Expression;"

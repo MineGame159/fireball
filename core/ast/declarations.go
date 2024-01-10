@@ -14,6 +14,7 @@ type DeclVisitor interface {
 	VisitEnum(decl *Enum)
 	VisitImpl(decl *Impl)
 	VisitFunc(decl *Func)
+	VisitGlobalVar(decl *GlobalVar)
 }
 
 type Decl interface {
@@ -612,4 +613,93 @@ func (f *Func) String() string {
 
 func (f *Func) AcceptDecl(visitor DeclVisitor) {
 	visitor.VisitFunc(f)
+}
+
+// GlobalVar
+
+type GlobalVar struct {
+	cst    cst.Node
+	parent Node
+
+	Name *Token
+	Type Type
+}
+
+func NewGlobalVar(node cst.Node, name *Token, type_ Type) *GlobalVar {
+	if name == nil && type_ == nil {
+		return nil
+	}
+
+	g := &GlobalVar{
+		cst:  node,
+		Name: name,
+		Type: type_,
+	}
+
+	if name != nil {
+		name.SetParent(g)
+	}
+	if type_ != nil {
+		type_.SetParent(g)
+	}
+
+	return g
+}
+
+func (g *GlobalVar) Cst() *cst.Node {
+	if g.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &g.cst
+}
+
+func (g *GlobalVar) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (g *GlobalVar) Parent() Node {
+	return g.parent
+}
+
+func (g *GlobalVar) SetParent(parent Node) {
+	if parent != nil && g.parent != nil {
+		panic("ast.GlobalVar.SetParent() - Parent is already set")
+	}
+
+	g.parent = parent
+}
+
+func (g *GlobalVar) AcceptChildren(visitor Visitor) {
+	if g.Name != nil {
+		visitor.VisitNode(g.Name)
+	}
+	if g.Type != nil {
+		visitor.VisitNode(g.Type)
+	}
+}
+
+func (g *GlobalVar) Clone() Node {
+	g2 := &GlobalVar{
+		cst: g.cst,
+	}
+
+	if g.Name != nil {
+		g2.Name = g.Name.Clone().(*Token)
+		g2.Name.SetParent(g2)
+	}
+	if g.Type != nil {
+		g2.Type = g.Type.Clone().(Type)
+		g2.Type.SetParent(g2)
+	}
+
+	return g2
+}
+
+func (g *GlobalVar) String() string {
+	return ""
+}
+
+func (g *GlobalVar) AcceptDecl(visitor DeclVisitor) {
+	visitor.VisitGlobalVar(g)
 }

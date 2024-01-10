@@ -8,27 +8,29 @@ import (
 
 func (c *converter) convertDecl(node cst.Node) ast.Decl {
 	switch node.Kind {
-	case cst.NamespaceNode:
-		if namespace := c.convertNamespace(node); namespace != nil {
+	case cst.NamespaceDeclNode:
+		if namespace := c.convertNamespaceDecl(node); namespace != nil {
 			return namespace
 		}
 
 		return nil
-	case cst.UsingNode:
-		return c.convertUsing(node)
+	case cst.UsingDeclNode:
+		return c.convertUsingDecl(node)
 
-	case cst.StructNode:
+	case cst.StructDeclNode:
 		return c.convertStructDecl(node)
-	case cst.ImplNode:
+	case cst.ImplDeclNode:
 		return c.convertImplDecl(node)
-	case cst.EnumNode:
+	case cst.EnumDeclNode:
 		return c.convertEnumDecl(node)
-	case cst.FuncNode:
+	case cst.FuncDeclNode:
 		if f := c.convertFuncDecl(node); f != nil {
 			return f
 		}
 
 		return nil
+	case cst.VarDeclNode:
+		return c.convertVarDecl(node)
 
 	default:
 		panic("cst2ast.convertDecl() - Not implemented")
@@ -37,7 +39,7 @@ func (c *converter) convertDecl(node cst.Node) ast.Decl {
 
 // Namespace
 
-func (c *converter) convertNamespace(node cst.Node) *ast.Namespace {
+func (c *converter) convertNamespaceDecl(node cst.Node) *ast.Namespace {
 	var name *ast.NamespaceName
 
 	for _, child := range node.Children {
@@ -51,7 +53,7 @@ func (c *converter) convertNamespace(node cst.Node) *ast.Namespace {
 	return ast.NewNamespace(node, name)
 }
 
-func (c *converter) convertUsing(node cst.Node) ast.Decl {
+func (c *converter) convertUsingDecl(node cst.Node) ast.Decl {
 	var name *ast.NamespaceName
 
 	for _, child := range node.Children {
@@ -145,7 +147,7 @@ func (c *converter) convertImplDecl(node cst.Node) ast.Decl {
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
 			struct_ = c.convertToken(child)
-		} else if child.Kind == cst.FuncNode {
+		} else if child.Kind == cst.FuncDeclNode {
 			method := c.convertFuncDecl(child)
 
 			if method != nil {
@@ -298,6 +300,29 @@ func (c *converter) convertFuncParam(node cst.Node) (*ast.Param, bool) {
 	}
 
 	return nil, varArgs
+}
+
+// Var
+
+func (c *converter) convertVarDecl(node cst.Node) ast.Decl {
+	var name *ast.Token
+	var type_ ast.Type
+
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			name = c.convertToken(child)
+		} else if child.Kind.IsType() {
+			type_ = c.convertType(child)
+		} else if child.Kind == cst.AttributesNode {
+			c.error(child.Children[0], "Global variables cannot have attributes")
+		}
+	}
+
+	if v := ast.NewGlobalVar(node, name, type_); v != nil {
+		return v
+	}
+
+	return nil
 }
 
 // Attributes

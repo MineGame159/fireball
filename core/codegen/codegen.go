@@ -14,7 +14,7 @@ type codegen struct {
 
 	types []typePair
 
-	staticVariables map[*ast.Field]exprValue
+	staticVariables map[ast.Node]exprValue
 	functions       map[*ast.Func]llvm.Value
 
 	scopes    []scope
@@ -60,7 +60,7 @@ func Emit(path string, root ast.RootResolver, file *ast.File, writer io.Writer) 
 		path:     path,
 		resolver: ast.NewCombinedResolver(root),
 
-		staticVariables: make(map[*ast.Field]exprValue),
+		staticVariables: make(map[ast.Node]exprValue),
 		functions:       make(map[*ast.Func]llvm.Value),
 
 		module: llvm.NewModule(),
@@ -89,6 +89,9 @@ func Emit(path string, root ast.RootResolver, file *ast.File, writer io.Writer) 
 
 		case *ast.Func:
 			c.defineOrDeclare(decl)
+
+		case *ast.GlobalVar:
+			c.createGlobalVariable(decl, false)
 		}
 	}
 
@@ -158,7 +161,7 @@ func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 	return c.load(c.acceptExpr(expr), expr.Result().Type)
 }
 
-// Static variables
+// Static / Global variables
 
 func (c *codegen) getStaticVariable(field *ast.Field) exprValue {
 	// Get static variable already in this module
@@ -168,6 +171,16 @@ func (c *codegen) getStaticVariable(field *ast.Field) exprValue {
 
 	// Create static variable
 	return c.createStaticVariable(field, true)
+}
+
+func (c *codegen) getGlobalVariable(variable *ast.GlobalVar) exprValue {
+	// Get static variable already in this module
+	if value, ok := c.staticVariables[variable]; ok {
+		return value
+	}
+
+	// Create static variable
+	return c.createGlobalVariable(variable, true)
 }
 
 func (c *codegen) createStaticVariable(field *ast.Field, external bool) exprValue {
@@ -182,6 +195,21 @@ func (c *codegen) createStaticVariable(field *ast.Field, external bool) exprValu
 	}
 
 	c.staticVariables[field] = value
+	return value
+}
+
+func (c *codegen) createGlobalVariable(variable *ast.GlobalVar, external bool) exprValue {
+	ptr := ast.Pointer{Pointee: variable.Type}
+
+	llvmValue := c.module.Variable(external, c.getType(variable.Type), c.getType(&ptr))
+	llvmValue.SetName(variable.MangledName())
+
+	value := exprValue{
+		v:           llvmValue,
+		addressable: true,
+	}
+
+	c.staticVariables[variable] = value
 	return value
 }
 

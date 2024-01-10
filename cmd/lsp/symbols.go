@@ -165,6 +165,15 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 					range_:         nodeCst(function).Range,
 					selectionRange: nodeCst(function.Name).Range,
 				}, 0)
+			} else if variable, ok := decl.(*ast.GlobalVar); ok && nodeCst(variable) != nil && nodeCst(variable.Name) != nil {
+				symbols.add(symbol{
+					file:           file,
+					kind:           protocol.SymbolKindVariable,
+					name:           variable.Name.String(),
+					detail:         printType(variable.Type),
+					range_:         nodeCst(variable).Range,
+					selectionRange: nodeCst(variable.Name).Range,
+				}, 0)
 			}
 		}
 	}
