@@ -254,6 +254,11 @@ func (c *checker) VisitGlobalVar(decl *ast.GlobalVar) {
 	if ast.IsPrimitive(decl.Type, ast.Void) {
 		c.error(decl.Name, "Variable cannot be of type 'void'")
 	}
+
+	// Set type to void if its nil, for example because it failed to parse
+	if decl.Type == nil {
+		decl.Type = &ast.Primitive{Kind: ast.Void}
+	}
 }
 
 // Utils
