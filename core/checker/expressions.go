@@ -500,7 +500,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		}
 
 		// Global variable
-		if variable := c.resolver.GetVariable(expr.String()); variable != nil {
+		if variable := c.resolver.GetVariable(expr.String()); variable != nil && variable.Type != nil {
 			if f, ok := ast.As[*ast.Func](variable.Type); ok {
 				expr.Result().SetCallable(f, variable)
 				return
@@ -537,7 +537,7 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	}
 
 	// Global variable
-	if variable := c.resolver.GetVariable(expr.String()); variable != nil {
+	if variable := c.resolver.GetVariable(expr.String()); variable != nil && variable.Type != nil {
 		expr.Result().SetValue(variable.Type, ast.AssignableFlag|ast.AddressableFlag, variable)
 		return
 	}
@@ -849,7 +849,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			}
 
 			// Global variable
-			if variable := resolver.GetVariable(expr.Name.String()); variable != nil {
+			if variable := resolver.GetVariable(expr.Name.String()); variable != nil && variable.Type != nil {
 				if f, ok := ast.As[*ast.Func](variable.Type); ok {
 					expr.Result().SetCallable(f, variable)
 					return
@@ -874,7 +874,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		}
 
 		// Global variable
-		if variable := resolver.GetVariable(expr.Name.String()); variable != nil {
+		if variable := resolver.GetVariable(expr.Name.String()); variable != nil && variable.Type != nil {
 			expr.Result().SetValue(variable.Type, ast.AssignableFlag|ast.AddressableFlag, variable)
 			return
 		}

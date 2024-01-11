@@ -162,7 +162,7 @@ func getMemberCompletions(resolver ast.Resolver, c *completions, member *ast.Mem
 		resolver := member.Value.Result().Resolver()
 		getResolverCompletions(c, resolver, true)
 
-	case ast.TypeResultKind:
+	case ast.TypeResultKind, ast.ValueResultKind:
 		if s, ok := asThroughPointer[*ast.Struct](member.Value.Result().Type); ok {
 			fields := s.Fields
 			static := false
@@ -179,7 +179,7 @@ func getMemberCompletions(resolver ast.Resolver, c *completions, member *ast.Mem
 			for _, method := range resolver.GetMethods(s, static) {
 				c.addNode(protocol.CompletionItemKindMethod, method.Name, printType(method))
 			}
-		} else if e, ok := asThroughPointer[*ast.Enum](member.Value.Result().Type); ok {
+		} else if e, ok := asThroughPointer[*ast.Enum](member.Value.Result().Type); ok && member.Value.Result().Kind == ast.TypeResultKind {
 			for _, case_ := range e.Cases {
 				c.addNode(protocol.CompletionItemKindEnumMember, case_.Name, strconv.FormatInt(case_.ActualValue, 10))
 			}
@@ -365,7 +365,6 @@ type completions struct {
 }
 
 var commitCharacters = []string{".", ";"}
-var commitCharactersFunction = []string{".", ";", "("}
 
 func (c *completions) addNode(kind protocol.CompletionItemKind, name ast.Node, detail string) {
 	if !ast.IsNil(name) {
@@ -383,8 +382,6 @@ func (c *completions) add(kind protocol.CompletionItemKind, name, detail string)
 
 	switch kind {
 	case protocol.CompletionItemKindFunction, protocol.CompletionItemKindMethod:
-		item.CommitCharacters = commitCharactersFunction
-
 		item.InsertText = name + "($1)"
 		item.InsertTextFormat = protocol.InsertTextFormatSnippet
 

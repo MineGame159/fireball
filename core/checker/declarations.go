@@ -160,8 +160,15 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 }
 
 func (c *checker) VisitFunc(decl *ast.Func) {
-	if decl.Method() == nil {
-		c.checkNameCollision(decl, decl.Name)
+	// Check name collision
+	if decl.Name != nil {
+		if s := decl.Receiver(); s != nil {
+			if method := c.resolver.GetMethod(s, decl.Name.String(), decl.IsStatic()); method != nil && method != decl {
+				c.error(decl.Name, "Method with this name already exists")
+			}
+		} else {
+			c.checkNameCollision(decl, decl.Name)
+		}
 	}
 
 	// Check attributes
@@ -222,13 +229,6 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	c.popScope()
 	c.function = nil
 
-	// Check parameter void type
-	for _, param := range decl.Params {
-		if ast.IsPrimitive(param.Type, ast.Void) {
-			c.error(param.Name, "Parameter cannot be of type 'void'")
-		}
-	}
-
 	// Check last return
 	if decl.HasBody() && !ast.IsPrimitive(decl.Returns, ast.Void) {
 		valid := len(decl.Body) > 0
@@ -253,11 +253,6 @@ func (c *checker) VisitGlobalVar(decl *ast.GlobalVar) {
 	// Check void type
 	if ast.IsPrimitive(decl.Type, ast.Void) {
 		c.error(decl.Name, "Variable cannot be of type 'void'")
-	}
-
-	// Set type to void if its nil, for example because it failed to parse
-	if decl.Type == nil {
-		decl.Type = &ast.Primitive{Kind: ast.Void}
 	}
 }
 

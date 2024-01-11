@@ -45,6 +45,10 @@ func (c *checker) visitIntrinsic(decl *ast.Func, attribute *ast.Attribute) {
 		token = arg
 		name = arg.String()[1 : len(arg.String())-1]
 	} else {
+		if decl.Name == nil {
+			return
+		}
+
 		token = decl.Name
 		name = decl.Name.String()
 	}

@@ -514,8 +514,8 @@ func (w *textWriter) value(value Value) string {
 			name = "@" + surroundName(name)
 
 			if count, ok := w.globalValueNamesCount[name]; ok {
-				name += fmt.Sprintf(".%d", count+1)
 				w.globalValueNamesCount[name]++
+				name += fmt.Sprintf(".%d", count+1)
 			} else {
 				w.globalValueNamesCount[name] = 0
 			}
@@ -538,8 +538,8 @@ func (w *textWriter) value(value Value) string {
 			name = "%" + surroundName(name)
 
 			if count, ok := w.localValueNamesCount[name]; ok {
-				name += fmt.Sprintf(".%d", count+1)
 				w.localValueNamesCount[name]++
+				name += fmt.Sprintf(".%d", count+1)
 			} else {
 				w.localValueNamesCount[name] = 0
 			}

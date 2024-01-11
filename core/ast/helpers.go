@@ -210,9 +210,21 @@ func (f *Func) Signature(paramNames bool) string {
 	return signature.String()
 }
 
+func (f *Func) Receiver() *Struct {
+	if impl, ok := f.Parent().(*Impl); ok {
+		if s, ok := As[*Struct](impl.Type); ok {
+			return s
+		}
+	}
+
+	return nil
+}
+
 func (f *Func) Method() *Struct {
 	if impl, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
-		return impl.Type.(*Struct)
+		if s, ok := As[*Struct](impl.Type); ok {
+			return s
+		}
 	}
 
 	return nil
