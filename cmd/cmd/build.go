@@ -4,6 +4,7 @@ import (
 	"fireball/cmd/build"
 	"fireball/core/ast"
 	"fireball/core/codegen"
+	"fireball/core/ir"
 	"fireball/core/llvm"
 	"fireball/core/utils"
 	"fireball/core/workspace"
@@ -87,7 +88,10 @@ func buildProject() string {
 		path = filepath.Join(project.Path, "build", path[:len(path)-3]+".ll")
 
 		irFile, _ := os.Create(path)
-		codegen.Emit(file.AbsolutePath(), project.GetResolverFile(file.Ast), file.Ast, irFile)
+
+		module := codegen.Emit(file.AbsolutePath(), project.GetResolverFile(file.Ast), file.Ast)
+		llvm.WriteText(module, irFile)
+
 		_ = irFile.Close()
 
 		irPaths = append(irPaths, path)
@@ -145,41 +149,43 @@ func buildProject() string {
 
 func generateEntrypoint(project *workspace.Project, path string) error {
 	// Create module
-	m := llvm.NewModule()
-	m.Source("__entrypoint")
+	m := &ir.Module{Path: "__entrypoint"}
 
 	resolver := project.GetResolverName(project.Config.Namespace)
 	function := resolver.GetFunction("main")
 
-	void := m.Void()
-	i32 := m.Primitive("i32", 32, llvm.SignedEncoding)
-
-	main := m.Define(m.Function("main", []llvm.Type{}, false, i32), "_fireball_entrypoint")
-	main.PushScope()
+	main := m.Define("main", &ir.FuncType{Returns: ir.I32}, 0)
 	mainBlock := main.Block("")
 
+	// Flags
+
 	if function != nil {
-		var fbMain llvm.Value
+		var fbMain ir.Value
 
 		if ast.IsPrimitive(function.Returns, ast.I32) {
-			fbMain = m.Declare(m.Function(function.MangledName(), []llvm.Type{}, false, i32))
+			fbMain = m.Declare(function.MangledName(), &ir.FuncType{Returns: ir.I32})
 		} else {
-			fbMain = m.Declare(m.Function(function.MangledName(), []llvm.Type{}, false, void))
+			fbMain = m.Declare(function.MangledName(), &ir.FuncType{})
 		}
 
+		call := mainBlock.Add(&ir.CallInst{
+			Callee: fbMain,
+			Args:   nil,
+		})
+
 		if ast.IsPrimitive(function.Returns, ast.I32) {
-			call := mainBlock.Call(fbMain, []llvm.Value{}, i32)
-			call.SetLocation(nil)
-
-			mainBlock.Ret(call)
+			mainBlock.Add(&ir.RetInst{Value: call})
 		} else {
-			call := mainBlock.Call(fbMain, []llvm.Value{}, void)
-			call.SetLocation(nil)
-
-			mainBlock.Ret(main.Literal(i32, llvm.Literal{Signed: 0}))
+			mainBlock.Add(&ir.RetInst{Value: &ir.IntConst{
+				Typ:   ir.I32,
+				Value: ir.Unsigned(0),
+			}})
 		}
 	} else {
-		mainBlock.Ret(main.Literal(i32, llvm.Literal{Signed: 0}))
+		mainBlock.Add(&ir.RetInst{Value: &ir.IntConst{
+			Typ:   ir.I32,
+			Value: ir.Unsigned(0),
+		}})
 	}
 
 	// Write module

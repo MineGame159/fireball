@@ -2,8 +2,7 @@ package codegen
 
 import (
 	"fireball/core/ast"
-	"fireball/core/cst"
-	"fireball/core/llvm"
+	"fireball/core/ir"
 	"fireball/core/scanner"
 	"log"
 	"strconv"
@@ -16,15 +15,18 @@ func (c *codegen) VisitParen(expr *ast.Paren) {
 
 func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	// Convert fireball constant into a LLVM IR constant
-	var value llvm.Value
-	type_ := c.getType(expr.Result().Type)
+	var value ir.Value
+	type_ := c.types.get(expr.Result().Type)
 
 	switch expr.Token().Kind {
 	case scanner.Nil:
-		value = c.function.LiteralRaw(type_, "null")
+		value = ir.Null
 
-	case scanner.True, scanner.False:
-		value = c.function.LiteralRaw(type_, expr.String())
+	case scanner.True:
+		value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(1)}
+
+	case scanner.False:
+		value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(0)}
 
 	case scanner.Number:
 		raw := expr.String()
@@ -32,29 +34,29 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 
 		if last == 'f' || last == 'F' {
 			v, _ := strconv.ParseFloat(raw[:len(raw)-1], 32)
-			value = c.function.Literal(type_, llvm.Literal{Floating: v})
+			value = &ir.FloatConst{Typ: type_, Value: v}
 		} else if strings.ContainsRune(raw, '.') {
 			v, _ := strconv.ParseFloat(raw, 64)
-			value = c.function.Literal(type_, llvm.Literal{Floating: v})
+			value = &ir.FloatConst{Typ: type_, Value: v}
 		} else {
 			t, _ := ast.As[*ast.Primitive](expr.Result().Type)
 
 			if ast.IsSigned(t.Kind) {
 				v, _ := strconv.ParseInt(raw, 10, 64)
-				value = c.function.Literal(type_, llvm.Literal{Signed: v})
+				value = &ir.IntConst{Typ: type_, Value: ir.Signed(v)}
 			} else {
 				v, _ := strconv.ParseUint(raw, 10, 64)
-				value = c.function.Literal(type_, llvm.Literal{Unsigned: v})
+				value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(v)}
 			}
 		}
 
 	case scanner.Hex:
 		v, _ := strconv.ParseUint(expr.String()[2:], 16, 64)
-		value = c.function.Literal(type_, llvm.Literal{Unsigned: v})
+		value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(v)}
 
 	case scanner.Binary:
 		v, _ := strconv.ParseUint(expr.String()[2:], 2, 64)
-		value = c.function.Literal(type_, llvm.Literal{Unsigned: v})
+		value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(v)}
 
 	case scanner.Character:
 		char := expr.String()[1 : len(expr.String())-1]
@@ -77,10 +79,10 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 			number = char[0]
 		}
 
-		value = c.function.Literal(type_, llvm.Literal{Unsigned: uint64(number)})
+		value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(uint64(number))}
 
 	case scanner.String:
-		value = c.module.Constant(expr.String()[1 : len(expr.String())-1])
+		value = c.module.Constant("", convertString(expr.String()[1:len(expr.String())-1]))
 
 	default:
 		panic("codegen.VisitLiteral() - Invalid literal kind")
@@ -92,20 +94,79 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 	}
 }
 
+func convertString(s string) *ir.StringConst {
+	b := &ir.StringConst{
+		Length: 0,
+		Value:  make([]byte, 0, len(s)),
+	}
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+
+		switch ch {
+		case '\\':
+			if i+1 >= len(s) {
+				break
+			}
+
+			switch s[i+1] {
+			case '0':
+				b.Value = append(b.Value, '\\')
+				b.Value = append(b.Value, '0')
+				b.Value = append(b.Value, '0')
+
+			case 'n':
+				b.Value = append(b.Value, '\\')
+				b.Value = append(b.Value, '0')
+				b.Value = append(b.Value, 'A')
+
+			case 'r':
+				b.Value = append(b.Value, '\\')
+				b.Value = append(b.Value, '0')
+				b.Value = append(b.Value, 'D')
+
+			case 't':
+				b.Value = append(b.Value, '\\')
+				b.Value = append(b.Value, '0')
+				b.Value = append(b.Value, '9')
+			}
+
+			i++
+
+		default:
+			b.Value = append(b.Value, ch)
+		}
+
+		b.Length++
+	}
+
+	b.Length++
+
+	b.Value = append(b.Value, '\\')
+	b.Value = append(b.Value, '0')
+	b.Value = append(b.Value, '0')
+
+	return b
+}
+
 func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Value
 	struct_, _ := ast.As[*ast.Struct](expr.Type)
-	type_ := c.getType(struct_)
+	type_ := c.types.get(struct_)
 
-	result := c.function.LiteralRaw(type_, "zeroinitializer")
+	var result ir.Value = &ir.ZeroInitConst{Typ: type_}
 
 	for _, field := range expr.Fields {
 		element := c.loadExpr(field.Value)
 		i, _ := struct_.GetField(field.Name.String())
 
-		r := c.block.InsertValue(result, element.v, i)
-		r.SetLocation(field.Name.Cst())
+		r := c.block.Add(&ir.InsertValueInst{
+			Value:   result,
+			Element: element.v,
+			Indices: []uint32{uint32(i)},
+		})
 
+		c.setLocationMeta(r, field)
 		result = r
 	}
 
@@ -116,32 +177,39 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 		mallocFunc := c.resolver.GetFunction("malloc")
 		malloc := c.getFunction(mallocFunc)
 
-		pointer := c.block.Call(
-			malloc.v,
-			[]llvm.Value{c.function.Literal(
-				c.getType(mallocFunc.Params[0].Type),
-				llvm.Literal{Unsigned: uint64(struct_.Size())},
-			)},
-			c.getType(mallocFunc.Returns),
-		)
+		pointer := c.block.Add(&ir.CallInst{
+			Callee: malloc.v,
+			Args: []ir.Value{&ir.IntConst{
+				Typ:   c.types.get(mallocFunc.Params[0].Type),
+				Value: ir.Unsigned(uint64(struct_.Size())),
+			}},
+		})
 
-		store := c.block.Store(pointer, result)
-		store.SetAlign(struct_.Align())
+		c.block.Add(&ir.StoreInst{
+			Pointer: pointer,
+			Value:   result,
+			Align:   struct_.Align() * 8,
+		})
 
 		c.exprResult = exprValue{v: pointer}
 	}
 }
 
 func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
-	type_ := c.getType(expr.Result().Type)
+	type_ := c.types.get(expr.Result().Type)
 
-	result := c.function.LiteralRaw(type_, "zeroinitializer")
+	var result ir.Value = &ir.ZeroInitConst{Typ: type_}
 
-	for i, valueExpr := range expr.Values {
-		element := c.loadExpr(valueExpr)
+	for i, value := range expr.Values {
+		element := c.loadExpr(value)
 
-		r := c.block.InsertValue(result, element.v, i)
-		r.SetLocation(valueExpr.Cst())
+		r := c.block.Add(&ir.InsertValueInst{
+			Value:   result,
+			Element: element.v,
+			Indices: []uint32{uint32(i)},
+		})
+
+		c.setLocationMeta(r, value)
 
 		result = r
 	}
@@ -164,47 +232,33 @@ func (c *codegen) VisitAllocateArray(expr *ast.AllocateArray) {
 		mallocFunc.Params[0].Type,
 		a.Kind,
 		b.Kind,
-		expr.Cst(),
+		expr,
 	)
 	count = c.exprResult
 
-	pointer := c.block.Call(
-		malloc.v,
-		[]llvm.Value{c.block.Binary(
-			llvm.Mul,
-			c.function.Literal(
-				c.getType(mallocFunc.Params[0].Type),
-				llvm.Literal{Unsigned: uint64(expr.Type.Size())},
-			),
-			count.v,
-		)},
-		c.getType(mallocFunc.Returns),
-	)
+	pointer := c.block.Add(&ir.CallInst{
+		Callee: malloc.v,
+		Args: []ir.Value{&ir.IntConst{
+			Typ:   c.types.get(mallocFunc.Params[0].Type),
+			Value: ir.Unsigned(uint64(expr.Type.Size())),
+		}},
+	})
 
 	c.exprResult = exprValue{v: pointer}
 }
 
 func (c *codegen) VisitUnary(expr *ast.Unary) {
 	value := c.acceptExpr(expr.Value)
-	var result llvm.Value
+	var result ir.Value
 
 	if expr.Prefix {
 		// Prefix
 		switch expr.Operator.Token().Kind {
 		case scanner.Bang:
-			t := ast.Primitive{Kind: ast.Bool}
-
-			r := c.block.Binary(
-				llvm.Xor,
-				c.function.Literal(
-					c.getType(&t),
-					llvm.Literal{Signed: 1},
-				),
-				c.load(value, expr.Value.Result().Type).v,
-			)
-
-			r.SetLocation(expr.Cst())
-			result = r
+			result = c.block.Add(&ir.XorInst{
+				Left:  ir.True,
+				Right: c.load(value, expr.Value.Result().Type).v,
+			})
 
 		case scanner.Minus:
 			if v, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
@@ -212,20 +266,16 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 
 				if ast.IsFloating(v.Kind) {
 					// floating
-					result = c.block.FNeg(value.v)
+					result = c.block.Add(&ir.FNegInst{Value: value.v})
 				} else {
 					// signed
-					r := c.block.Binary(
-						llvm.Sub,
-						c.function.Literal(
-							c.getType(expr.Value.Result().Type),
-							llvm.Literal{},
-						),
-						value.v,
-					)
-
-					r.SetLocation(expr.Cst())
-					result = r
+					result = c.block.Add(&ir.SubInst{
+						Left: &ir.IntConst{
+							Typ:   c.types.get(expr.Value.Result().Type),
+							Value: ir.Unsigned(0),
+						},
+						Right: value.v,
+					})
 				}
 			}
 
@@ -241,35 +291,49 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			result = c.load(value, expr.Value.Result().Type).v
 
 			if _, ok := expr.Parent().(*ast.Assignment); !ok {
-				load := c.block.Load(result)
-				load.SetAlign(expr.Result().Type.Align())
-
-				result = load
+				result = c.block.Add(&ir.LoadInst{
+					Typ:     result.Type().(*ir.PointerType).Pointee,
+					Pointer: result,
+					Align:   expr.Result().Type.Align() * 8,
+				})
 			}
 
 		case scanner.PlusPlus, scanner.MinusMinus:
+			var one ir.Value
+
+			if isFloating(expr.Value.Result().Type) {
+				one = &ir.FloatConst{
+					Typ:   c.types.get(expr.Value.Result().Type),
+					Value: 1,
+				}
+			} else {
+				one = &ir.IntConst{
+					Typ:   c.types.get(expr.Value.Result().Type),
+					Value: ir.Unsigned(1),
+				}
+			}
+
 			newValue := c.binary(
 				expr.Operator,
 				value,
-				exprValue{v: c.function.Literal(
-					c.getType(expr.Value.Result().Type),
-					llvm.Literal{
-						Signed:   1,
-						Unsigned: 1,
-						Floating: 1,
-					},
-				)},
+				exprValue{v: one},
 				expr.Value.Result().Type,
 			)
 
-			store := c.block.Store(value.v, newValue.v)
-			store.SetAlign(expr.Value.Result().Type.Align())
-			store.SetLocation(expr.Cst())
+			c.block.Add(&ir.StoreInst{
+				Pointer: value.v,
+				Value:   newValue.v,
+				Align:   expr.Value.Result().Type.Align() * 8,
+			})
 
 			result = newValue.v
 
 		default:
 			panic("codegen.VisitUnary() - Invalid unary prefix operator")
+		}
+
+		if metaValue, ok := result.(ir.MetaValue); ok {
+			c.setLocationMeta(metaValue, expr)
 		}
 	} else {
 		// Postfix
@@ -277,23 +341,32 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 		case scanner.PlusPlus, scanner.MinusMinus:
 			prevValue := c.load(value, expr.Value.Result().Type)
 
+			var one ir.Value
+
+			if isFloating(expr.Value.Result().Type) {
+				one = &ir.FloatConst{
+					Typ:   c.types.get(expr.Value.Result().Type),
+					Value: 1,
+				}
+			} else {
+				one = &ir.IntConst{
+					Typ:   c.types.get(expr.Value.Result().Type),
+					Value: ir.Unsigned(1),
+				}
+			}
+
 			newValue := c.binary(
 				expr.Operator,
 				prevValue,
-				exprValue{v: c.function.Literal(
-					c.getType(expr.Value.Result().Type),
-					llvm.Literal{
-						Signed:   1,
-						Unsigned: 1,
-						Floating: 1,
-					},
-				)},
+				exprValue{v: one},
 				expr.Value.Result().Type,
 			)
 
-			store := c.block.Store(value.v, newValue.v)
-			store.SetAlign(expr.Value.Result().Type.Align())
-			store.SetLocation(expr.Cst())
+			c.block.Add(&ir.StoreInst{
+				Pointer: value.v,
+				Value:   newValue.v,
+				Align:   expr.Value.Result().Type.Align() * 8,
+			})
 
 			result = prevValue.v
 
@@ -323,18 +396,35 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 
 		// Start
 		startBlock := c.block
-		c.block.Br(left.v, end, false_).SetLocation(expr.Cst())
+
+		c.setLocationMeta(
+			c.block.Add(&ir.BrInst{Condition: left.v, True: end, False: false_}),
+			expr,
+		)
 
 		// False
 		c.beginBlock(false_)
-		c.block.Br(nil, end, nil).SetLocation(expr.Cst())
+
+		c.setLocationMeta(
+			c.block.Add(&ir.BrInst{True: end}),
+			expr,
+		)
 
 		// End
 		c.beginBlock(end)
 
-		result := c.block.Phi(c.function.LiteralRaw(c.getType(expr.Result().Type), "true"), startBlock, right.v, false_)
-		result.SetLocation(expr.Cst())
+		result := c.block.Add(&ir.PhiInst{Incs: []ir.Incoming{
+			{
+				Value: ir.True,
+				Label: startBlock,
+			},
+			{
+				Value: right.v,
+				Label: false_,
+			},
+		}})
 
+		c.setLocationMeta(result, expr)
 		c.exprResult = exprValue{v: result}
 
 	case scanner.And:
@@ -343,18 +433,35 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 
 		// Start
 		startBlock := c.block
-		c.block.Br(left.v, true_, end).SetLocation(expr.Cst())
+
+		c.setLocationMeta(
+			c.block.Add(&ir.BrInst{Condition: left.v, True: end, False: end}),
+			expr,
+		)
 
 		// True
 		c.beginBlock(true_)
-		c.block.Br(nil, end, nil).SetLocation(expr.Cst())
+
+		c.setLocationMeta(
+			c.block.Add(&ir.BrInst{True: end}),
+			expr,
+		)
 
 		// End
 		c.beginBlock(end)
 
-		result := c.block.Phi(c.function.LiteralRaw(c.getType(expr.Result().Type), "false"), startBlock, right.v, true_)
-		result.SetLocation(expr.Cst())
+		result := c.block.Add(&ir.PhiInst{Incs: []ir.Incoming{
+			{
+				Value: ir.False,
+				Label: startBlock,
+			},
+			{
+				Value: right.v,
+				Label: true_,
+			},
+		}})
 
+		c.setLocationMeta(result, expr)
 		c.exprResult = exprValue{v: result}
 
 	default:
@@ -373,7 +480,7 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 			c.exprResult = c.getGlobalVariable(node)
 
 		default:
-			if v := c.getVariable(expr.Name); v != nil {
+			if v := c.scopes.getVariable(expr.Name); v != nil {
 				c.exprResult = v.value
 			}
 		}
@@ -387,7 +494,7 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 			c.exprResult = c.getGlobalVariable(node)
 
 		case *ast.Var, *ast.Param:
-			if v := c.getVariable(expr.Name); v != nil {
+			if v := c.scopes.getVariable(expr.Name); v != nil {
 				c.exprResult = v.value
 			}
 		}
@@ -414,10 +521,13 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	}
 
 	// Store
-	store := c.block.Store(assignee.v, value.v)
-	store.SetAlign(expr.Result().Type.Align())
-	store.SetLocation(expr.Cst())
+	store := c.block.Add(&ir.StoreInst{
+		Pointer: assignee.v,
+		Value:   value.v,
+		Align:   expr.Result().Type.Align() * 8,
+	})
 
+	c.setLocationMeta(store, expr)
 	c.exprResult = assignee
 }
 
@@ -427,7 +537,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
 		if to, ok := ast.As[*ast.Primitive](expr.Result().Type); ok {
 			// primitive to primitive
-			c.castPrimitiveToPrimitive(value, from, to, from.Kind, to.Kind, expr.Cst())
+			c.castPrimitiveToPrimitive(value, from, to, from.Kind, to.Kind, expr)
 			return
 		}
 	}
@@ -437,7 +547,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 			// enum to integer
 			fromT, _ := ast.As[*ast.Primitive](from.Type)
 
-			c.castPrimitiveToPrimitive(value, from, to, fromT.Kind, to.Kind, expr.Cst())
+			c.castPrimitiveToPrimitive(value, from, to, fromT.Kind, to.Kind, expr)
 			return
 		}
 	}
@@ -447,7 +557,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 			// integer to enum
 			toT, _ := ast.As[*ast.Primitive](to.Type)
 
-			c.castPrimitiveToPrimitive(value, from, to, from.Kind, toT.Kind, expr.Cst())
+			c.castPrimitiveToPrimitive(value, from, to, from.Kind, toT.Kind, expr)
 			return
 		}
 	}
@@ -470,7 +580,7 @@ func (c *codegen) VisitCast(expr *ast.Cast) {
 	panic("codegen.VisitCast() - Invalid cast")
 }
 
-func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to ast.Type, fromKind, toKind ast.PrimitiveKind, location *cst.Node) {
+func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to ast.Type, fromKind, toKind ast.PrimitiveKind, location ast.Node) {
 	if fromKind == toKind || (ast.EqualsPrimitiveCategory(fromKind, toKind) && ast.GetBitSize(fromKind) == ast.GetBitSize(toKind)) {
 		c.exprResult = value
 		return
@@ -480,58 +590,75 @@ func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to ast.Type, f
 
 	if (ast.IsInteger(fromKind) || ast.IsFloating(fromKind)) && toKind == ast.Bool {
 		// integer / floating to bool
-		result := c.block.Binary(
-			llvm.Ne,
-			value.v,
-			c.function.Literal(
-				value.v.Type(),
-				llvm.Literal{},
-			),
-		)
+		var result ir.MetaValue
 
-		result.SetLocation(location)
-		c.exprResult = exprValue{
-			v: result,
+		if ast.IsFloating(fromKind) {
+			result = c.block.Add(&ir.FCmpInst{
+				Kind:    ir.Ne,
+				Ordered: false,
+				Left:    value.v,
+				Right:   ir.False,
+			})
+		} else {
+			result = c.block.Add(&ir.ICmpInst{
+				Kind:   ir.Ne,
+				Signed: ast.IsSigned(fromKind),
+				Left:   value.v,
+				Right:  ir.False,
+			})
 		}
+
+		c.setLocationMeta(result, location)
+		c.exprResult = exprValue{v: result}
 	} else {
-		var kind llvm.CastKind
+		type_ := c.types.get(to)
+		var result ir.MetaValue
 
 		if (ast.IsInteger(fromKind) || fromKind == ast.Bool) && ast.IsInteger(toKind) {
 			// integer / bool to integer
 			if from.Size() > to.Size() {
-				kind = llvm.Trunc
+				result = c.block.Add(&ir.TruncInst{
+					Value: value.v,
+					Typ:   type_,
+				})
 			} else {
-				kind = llvm.ZExt
+				result = c.block.Add(&ir.ExtInst{
+					SignExtend: false,
+					Value:      value.v,
+					Typ:        type_,
+				})
 			}
 		} else if ast.IsFloating(fromKind) && ast.IsFloating(toKind) {
 			// floating to floating
 			if from.Size() > to.Size() {
-				kind = llvm.FpTrunc
+				result = c.block.Add(&ir.TruncInst{
+					Value: value.v,
+					Typ:   type_,
+				})
 			} else {
-				kind = llvm.FpExt
+				result = c.block.Add(&ir.FExtInst{
+					Value: value.v,
+					Typ:   type_,
+				})
 			}
 		} else if (ast.IsInteger(fromKind) || fromKind == ast.Bool) && ast.IsFloating(toKind) {
 			// integer / bool to floating
-			if ast.IsSigned(fromKind) {
-				kind = llvm.SiToFp
-			} else {
-				kind = llvm.UiToFp
-			}
+			result = c.block.Add(&ir.I2FInst{
+				Signed: ast.IsSigned(fromKind),
+				Value:  value.v,
+				Typ:    type_,
+			})
 		} else if ast.IsFloating(fromKind) && ast.IsInteger(toKind) {
 			// floating to integer
-			if ast.IsSigned(toKind) {
-				kind = llvm.FpToSi
-			} else {
-				kind = llvm.FpToUi
-			}
+			result = c.block.Add(&ir.F2IInst{
+				Signed: ast.IsSigned(toKind),
+				Value:  value.v,
+				Typ:    type_,
+			})
 		}
 
-		result := c.block.Cast(kind, value.v, c.getType(to))
-		result.SetLocation(location)
-
-		c.exprResult = exprValue{
-			v: result,
-		}
+		c.setLocationMeta(result, location)
+		c.exprResult = exprValue{v: result}
 	}
 }
 
@@ -541,20 +668,17 @@ func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
 	switch expr.Callee.String() {
 	case "sizeof":
 		value = expr.Arg.Size()
-
 	case "alignof":
 		value = expr.Arg.Align()
 
 	default:
-		panic("codegen.VisitTypeCall() - Invalid name")
+		panic("codegen.VisitTypeCall() - Not implemented")
 	}
 
-	c.exprResult = exprValue{
-		v: c.function.Literal(
-			c.getType(expr.Result().Type),
-			llvm.Literal{Signed: int64(value)},
-		),
-	}
+	c.exprResult = exprValue{v: &ir.IntConst{
+		Typ:   c.types.get(expr.Result().Type),
+		Value: ir.Unsigned(uint64(value)),
+	}}
 }
 
 func (c *codegen) VisitCall(expr *ast.Call) {
@@ -578,7 +702,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 		argCount++
 	}
 
-	args := make([]llvm.Value, argCount)
+	args := make([]ir.Value, argCount)
 
 	if function.Method() != nil {
 		args[0] = c.this.v
@@ -601,19 +725,23 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Call
-	result := c.block.Call(callee.v, args, c.getType(function.Returns))
-	result.SetLocation(expr.Cst())
+	result := c.block.Add(&ir.CallInst{
+		Callee: callee.v,
+		Args:   args,
+	})
 
-	c.exprResult = exprValue{
-		v: result,
-	}
+	c.setLocationMeta(result, expr)
+	c.exprResult = exprValue{v: result}
 
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
 	if callNeedsTempVariable(expr) {
 		pointer := c.allocas[expr]
 
-		store := c.block.Store(pointer.v, c.exprResult.v)
-		store.SetAlign(function.Returns.Align())
+		c.block.Add(&ir.StoreInst{
+			Pointer: pointer.v,
+			Value:   c.exprResult.v,
+			Align:   function.Returns.Align() * 8,
+		})
 
 		c.exprResult = pointer
 	}
@@ -624,23 +752,24 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 	index := c.loadExpr(expr.Index)
 
 	if pointer, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
-		load := c.block.Load(value.v)
-		load.SetAlign(pointer.Pointee.Align())
-
-		value = exprValue{v: load}
+		value = exprValue{v: c.block.Add(&ir.LoadInst{
+			Typ:     value.v.Type().(*ir.PointerType).Pointee,
+			Pointer: value.v,
+			Align:   pointer.Pointee.Align() * 8,
+		})}
 	}
 
-	t := ast.Pointer{Pointee: expr.Result().Type}
-	type_ := c.getType(&t)
+	ptrType := ast.Pointer{Pointee: expr.Result().Type}
 
-	result := c.block.GetElementPtr(
-		value.v,
-		[]llvm.Value{index.v},
-		type_,
-		c.getType(expr.Result().Type),
-	)
+	result := c.block.Add(&ir.GetElementPtrInst{
+		PointerTyp: c.types.get(&ptrType),
+		Typ:        c.types.get(expr.Result().Type),
+		Pointer:    value.v,
+		Indices:    []ir.Value{index.v},
+		Inbounds:   true,
+	})
 
-	result.SetLocation(expr.Cst())
+	c.setLocationMeta(result, expr)
 
 	c.exprResult = exprValue{
 		v:           result,
@@ -658,12 +787,10 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	case ast.ValueResultKind:
 		switch node := expr.Result().Value().(type) {
 		case *ast.EnumCase:
-			c.exprResult = exprValue{
-				v: c.function.Literal(
-					c.getType(node.Parent().(*ast.Enum).ActualType),
-					llvm.Literal{Signed: node.ActualValue, Unsigned: uint64(node.ActualValue)},
-				),
-			}
+			c.exprResult = exprValue{v: &ir.IntConst{
+				Typ:   c.types.get(node.Parent().(*ast.Enum).ActualType),
+				Value: ir.Signed(node.ActualValue),
+			}}
 
 		case *ast.Field:
 			if node.IsStatic() {
@@ -672,34 +799,33 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 				value, s := c.memberLoad(expr.Value.Result().Type, value)
 
 				if value.addressable {
-					i32Type_ := ast.Primitive{Kind: ast.I32}
-					i32Type := c.getType(&i32Type_)
+					ptrType := ast.Pointer{Pointee: node.Type}
 
-					t := ast.Pointer{Pointee: node.Type}
-
-					result := c.block.GetElementPtr(
-						value.v,
-						[]llvm.Value{
-							c.function.Literal(i32Type, llvm.Literal{Signed: 0}),
-							c.function.Literal(i32Type, llvm.Literal{Signed: int64(node.Index())}),
+					result := c.block.Add(&ir.GetElementPtrInst{
+						PointerTyp: c.types.get(&ptrType),
+						Typ:        c.types.get(s),
+						Pointer:    value.v,
+						Indices: []ir.Value{
+							&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(0)},
+							&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(uint64(node.Index()))},
 						},
-						c.getType(&t),
-						c.getType(s),
-					)
+						Inbounds: true,
+					})
 
-					result.SetLocation(expr.Cst())
+					c.setLocationMeta(result, expr)
 
 					c.exprResult = exprValue{
 						v:           result,
 						addressable: true,
 					}
 				} else {
-					result := c.block.ExtractValue(value.v, node.Index())
-					result.SetLocation(expr.Cst())
+					result := c.block.Add(&ir.ExtractValueInst{
+						Value:   value.v,
+						Indices: []uint32{uint32(node.Index())},
+					})
 
-					c.exprResult = exprValue{
-						v: result,
-					}
+					c.setLocationMeta(result, expr)
+					c.exprResult = exprValue{v: result}
 				}
 			}
 
@@ -727,8 +853,11 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			if node.Method() != nil && !value.addressable {
 				pointer := c.allocas[expr]
 
-				store := c.block.Store(pointer.v, value.v)
-				store.SetAlign(node.Align())
+				c.block.Add(&ir.StoreInst{
+					Pointer: pointer.v,
+					Value:   value.v,
+					Align:   node.Align() * 8,
+				})
 
 				value = pointer
 			}
@@ -755,8 +884,11 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 
 	if v, ok := ast.As[*ast.Pointer](type_); ok {
 		if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
-			load := c.block.Load(value.v)
-			load.SetAlign(v.Align())
+			load := c.block.Add(&ir.LoadInst{
+				Typ:     value.v.Type().(*ir.PointerType).Pointee,
+				Pointer: value.v,
+				Align:   v.Align() * 8,
+			})
 
 			return exprValue{
 				v:           load,
@@ -774,51 +906,125 @@ func (c *codegen) binary(op ast.Node, left exprValue, right exprValue, type_ ast
 	left = c.load(left, type_)
 	right = c.load(right, type_)
 
-	var kind llvm.BinaryKind
+	var result ir.MetaValue
 
 	switch op.Token().Kind {
 	case scanner.Plus, scanner.PlusEqual, scanner.PlusPlus:
-		kind = llvm.Add
+		result = c.block.Add(&ir.AddInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.Minus, scanner.MinusEqual, scanner.MinusMinus:
-		kind = llvm.Sub
+		result = c.block.Add(&ir.SubInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.Star, scanner.StarEqual:
-		kind = llvm.Mul
+		result = c.block.Add(&ir.MulInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.Slash, scanner.SlashEqual:
-		kind = llvm.Div
+		if isFloating(type_) {
+			result = c.block.Add(&ir.FDivInst{
+				Left:  left.v,
+				Right: right.v,
+			})
+		} else {
+			result = c.block.Add(&ir.IDivInst{
+				Signed: isSigned(type_),
+				Left:   left.v,
+				Right:  right.v,
+			})
+		}
+
 	case scanner.Percentage, scanner.PercentageEqual:
-		kind = llvm.Rem
-
-	case scanner.EqualEqual:
-		kind = llvm.Eq
-	case scanner.BangEqual:
-		kind = llvm.Ne
-
-	case scanner.Less:
-		kind = llvm.Lt
-	case scanner.LessEqual:
-		kind = llvm.Le
-	case scanner.Greater:
-		kind = llvm.Gt
-	case scanner.GreaterEqual:
-		kind = llvm.Ge
+		if isFloating(type_) {
+			result = c.block.Add(&ir.FRemInst{
+				Left:  left.v,
+				Right: right.v,
+			})
+		} else {
+			result = c.block.Add(&ir.IRemInst{
+				Signed: isSigned(type_),
+				Left:   left.v,
+				Right:  right.v,
+			})
+		}
 
 	case scanner.Pipe, scanner.PipeEqual:
-		kind = llvm.Or
+		result = c.block.Add(&ir.OrInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.Xor, scanner.XorEqual:
-		kind = llvm.Xor
+		result = c.block.Add(&ir.XorInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.Ampersand, scanner.AmpersandEqual:
-		kind = llvm.And
+		result = c.block.Add(&ir.AndInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.LessLess, scanner.LessLessEqual:
-		kind = llvm.Shl
+		result = c.block.Add(&ir.ShlInst{
+			Left:  left.v,
+			Right: right.v,
+		})
+
 	case scanner.GreaterGreater, scanner.GreaterGreaterEqual:
-		kind = llvm.Shr
+		result = c.block.Add(&ir.ShrInst{
+			SignExtend: false,
+			Left:       left.v,
+			Right:      right.v,
+		})
 
 	default:
-		panic("codegen.binary() - Invalid operator kind")
+		var kind ir.CmpKind
+
+		switch op.Token().Kind {
+		case scanner.EqualEqual:
+			kind = ir.Eq
+		case scanner.BangEqual:
+			kind = ir.Ne
+
+		case scanner.Less:
+			kind = ir.Lt
+		case scanner.LessEqual:
+			kind = ir.Le
+		case scanner.Greater:
+			kind = ir.Gt
+		case scanner.GreaterEqual:
+			kind = ir.Ge
+
+		default:
+			panic("codegen.binary() - Not implemented")
+		}
+
+		if isFloating(type_) {
+			result = c.block.Add(&ir.FCmpInst{
+				Kind:    kind,
+				Ordered: false,
+				Left:    left.v,
+				Right:   right.v,
+			})
+		} else {
+			result = c.block.Add(&ir.ICmpInst{
+				Kind:   kind,
+				Signed: isSigned(type_),
+				Left:   left.v,
+				Right:  right.v,
+			})
+		}
 	}
 
-	result := c.block.Binary(kind, left.v, right.v)
-	result.SetLocation(op.Cst())
-
+	c.setLocationMeta(result, op)
 	return exprValue{v: result}
 }

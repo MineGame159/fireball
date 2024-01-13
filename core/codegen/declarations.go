@@ -2,18 +2,15 @@ package codegen
 
 import (
 	"fireball/core/ast"
-	"fireball/core/llvm"
+	"fireball/core/ir"
 	"fireball/core/scanner"
 )
 
-func (c *codegen) VisitNamespace(_ *ast.Namespace) {
-}
+func (c *codegen) VisitNamespace(_ *ast.Namespace) {}
 
-func (c *codegen) VisitUsing(_ *ast.Using) {
-}
+func (c *codegen) VisitUsing(_ *ast.Using) {}
 
-func (c *codegen) VisitStruct(_ *ast.Struct) {
-}
+func (c *codegen) VisitStruct(_ *ast.Struct) {}
 
 func (c *codegen) VisitImpl(impl *ast.Impl) {
 	for _, function := range impl.Methods {
@@ -21,34 +18,28 @@ func (c *codegen) VisitImpl(impl *ast.Impl) {
 	}
 }
 
-func (c *codegen) VisitEnum(_ *ast.Enum) {
-}
+func (c *codegen) VisitEnum(_ *ast.Enum) {}
 
 func (c *codegen) VisitFunc(decl *ast.Func) {
-	// Get function
-	var function *llvm.Function
-
-	if f, ok := c.functions[decl]; ok {
-		if fu, ok := f.(*llvm.Function); ok {
-			function = fu
-		}
-	}
-
-	if function == nil {
+	if !decl.HasBody() {
 		return
 	}
+
+	// Get function
+	function := c.functions[decl]
 
 	// Setup state
 	c.function = function
 	c.beginBlock(function.Block("entry"))
 
-	c.pushScope()
-	function.PushScope()
+	c.scopes.push(function.Meta())
 
 	// Add this variable
 	if struct_ := decl.Method(); struct_ != nil {
 		name := scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}
-		c.addVariable(&ast.Token{Token_: name}, exprValue{v: function.GetParameter(0)})
+		type_ := ast.Pointer{Pointee: struct_}
+
+		c.scopes.addVariable(&ast.Token{Token_: name}, &type_, exprValue{v: function.Typ.Params[0]}, 1)
 	}
 
 	// Copy parameters
@@ -58,14 +49,15 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 			index++
 		}
 
-		pointer := c.block.Alloca(c.getType(param.Type))
-		pointer.SetName(param.Name.String() + ".var")
-		pointer.SetAlign(param.Type.Align())
+		pointer := c.alloca(param.Type, param.Name.String()+".var", param)
 
-		store := c.block.Store(pointer, function.GetParameter(index))
-		store.SetAlign(param.Type.Align())
+		c.block.Add(&ir.StoreInst{
+			Pointer: pointer,
+			Value:   function.Typ.Params[index],
+			Align:   param.Type.Align() * 8,
+		})
 
-		c.addVariable(param.Name, exprValue{v: pointer})
+		c.scopes.addVariable(param.Name, param.Type, exprValue{v: pointer}, uint32(index+1))
 	}
 
 	// Body
@@ -77,17 +69,14 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 
 	// Add return if needed
 	if ast.IsPrimitive(decl.Returns, ast.Void) {
-		c.block.Ret(nil)
+		c.block.Add(&ir.RetInst{})
 	}
 
 	// Reset state
-	function.PopScope()
-	c.popScope()
+	c.scopes.pop()
 
 	c.block = nil
 	c.function = nil
 }
 
-func (c *codegen) VisitGlobalVar(decl *ast.GlobalVar) {
-
-}
+func (c *codegen) VisitGlobalVar(_ *ast.GlobalVar) {}
