@@ -90,49 +90,49 @@ func getTypeCompletions(root ast.RootResolver, resolver ast.Resolver, c *complet
 	case *ast.Struct:
 		for _, field := range node.Fields {
 			if field.Type == nil && isAfterNode(pos, field.Name) {
-				getGlobalCompletions(resolver, c, false)
+				getGlobalCompletions(resolver, c, true)
 			}
 		}
 
 	case *ast.Field:
 		if isAfterNode(pos, node.Name) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 
 	case *ast.Impl:
 		if isAfterCst(pos, node, scanner.Impl, true) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 
 	case *ast.Enum:
 		if isAfterCst(pos, node, scanner.Colon, true) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 
 	case *ast.Func:
 		for _, param := range node.Params {
 			if param.Type == nil && isAfterNode(pos, param.Name) {
-				getGlobalCompletions(resolver, c, false)
+				getGlobalCompletions(resolver, c, true)
 			}
 		}
 
 		if isAfterCst(pos, node, scanner.RightParen, true) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 
 	case *ast.Param:
 		if isAfterNode(pos, node.Name) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 
 	case *ast.GlobalVar:
 		if isAfterNode(pos, node.Name) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 
 	case ast.Type:
 		if !isComplexType(node) {
-			getGlobalCompletions(resolver, c, false)
+			getGlobalCompletions(resolver, c, true)
 		}
 	}
 }
@@ -160,7 +160,7 @@ func getMemberCompletions(resolver ast.Resolver, c *completions, member *ast.Mem
 	switch member.Value.Result().Kind {
 	case ast.ResolverResultKind:
 		resolver := member.Value.Result().Resolver()
-		getResolverCompletions(c, resolver, true)
+		getResolverCompletions(c, resolver, false)
 
 	case ast.TypeResultKind, ast.ValueResultKind:
 		if s, ok := asThroughPointer[*ast.Struct](member.Value.Result().Type); ok {
@@ -189,7 +189,7 @@ func getMemberCompletions(resolver ast.Resolver, c *completions, member *ast.Mem
 
 func getIdentifierCompletions(resolver ast.Resolver, c *completions, pos core.Pos, node ast.Node) {
 	// Types and global functions
-	getGlobalCompletions(resolver, c, true)
+	getGlobalCompletions(resolver, c, false)
 
 	// Variables
 	function := ast.GetParent[*ast.Func](node)
@@ -259,7 +259,7 @@ func getStmtCompletions(c *completions, node ast.Node) {
 	}
 }
 
-func getGlobalCompletions(resolver ast.Resolver, c *completions, functions bool) {
+func getGlobalCompletions(resolver ast.Resolver, c *completions, symbolsOnlyTypes bool) {
 	// Primitive types
 	c.add(protocol.CompletionItemKindStruct, "void", "")
 	c.add(protocol.CompletionItemKindStruct, "bool", "")
@@ -285,31 +285,34 @@ func getGlobalCompletions(resolver ast.Resolver, c *completions, functions bool)
 	c.add(protocol.CompletionItemKindFunction, "alignof", "(<type>) u32")
 
 	// Language defined types and functions
-	getResolverCompletions(c, resolver, functions)
+	getResolverCompletions(c, resolver, symbolsOnlyTypes)
 }
 
-func getResolverCompletions(c *completions, resolver ast.Resolver, functions bool) {
+func getResolverCompletions(c *completions, resolver ast.Resolver, symbolsOnlyTypes bool) {
 	for _, child := range resolver.GetChildren() {
 		c.add(protocol.CompletionItemKindModule, child, "")
 	}
 
-	for _, node := range resolver.GetSymbols() {
-		switch node := node.(type) {
-		case *ast.Struct:
-			c.addNode(protocol.CompletionItemKindStruct, node.Name, "")
+	c.symbolsOnlyTypes = symbolsOnlyTypes
+	resolver.GetSymbols(c)
+}
 
-		case *ast.Enum:
-			c.addNode(protocol.CompletionItemKindEnum, node.Name, "")
+func (c *completions) VisitSymbol(node ast.Node) {
+	switch node := node.(type) {
+	case *ast.Struct:
+		c.addNode(protocol.CompletionItemKindStruct, node.Name, "")
 
-		case *ast.Func:
-			if functions {
-				c.addNode(protocol.CompletionItemKindFunction, node.Name, printType(node))
-			}
+	case *ast.Enum:
+		c.addNode(protocol.CompletionItemKindEnum, node.Name, "")
 
-		case *ast.GlobalVar:
-			if functions {
-				c.addNode(protocol.CompletionItemKindVariable, node.Name, printType(node.Type))
-			}
+	case *ast.Func:
+		if !c.symbolsOnlyTypes {
+			c.addNode(protocol.CompletionItemKindFunction, node.Name, printType(node))
+		}
+
+	case *ast.GlobalVar:
+		if !c.symbolsOnlyTypes {
+			c.addNode(protocol.CompletionItemKindVariable, node.Name, printType(node.Type))
 		}
 	}
 }
@@ -361,6 +364,8 @@ func isInFunctionBody(pos core.Pos, node ast.Node) bool {
 // Completions
 
 type completions struct {
+	symbolsOnlyTypes bool
+
 	items []protocol.CompletionItem
 }
 

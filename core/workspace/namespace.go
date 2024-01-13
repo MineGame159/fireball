@@ -180,17 +180,13 @@ func (n *namespace) GetChildren() []string {
 	return children
 }
 
-func (n *namespace) GetSymbols() []ast.Node {
-	var symbols []ast.Node
-
+func (n *namespace) GetSymbols(visitor ast.SymbolVisitor) {
 	for _, file := range n.files {
 		for _, decl := range file.Ast.Decls {
 			switch decl.(type) {
 			case *ast.Struct, *ast.Enum, *ast.Func, *ast.GlobalVar:
-				symbols = append(symbols, decl)
+				visitor.VisitSymbol(decl)
 			}
 		}
 	}
-
-	return symbols
 }

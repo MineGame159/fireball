@@ -1,5 +1,9 @@
 package ast
 
+type SymbolVisitor interface {
+	VisitSymbol(node Node)
+}
+
 type Resolver interface {
 	GetChild(name string) Resolver
 	GetType(name string) Type
@@ -11,7 +15,7 @@ type Resolver interface {
 	GetMethods(type_ Type, static bool) []*Func
 
 	GetChildren() []string
-	GetSymbols() []Node
+	GetSymbols(visitor SymbolVisitor)
 }
 
 type RootResolver interface {
@@ -104,12 +108,8 @@ func (c *CombinedResolver) GetChildren() []string {
 	return children
 }
 
-func (c *CombinedResolver) GetSymbols() []Node {
-	var symbols []Node
-
+func (c *CombinedResolver) GetSymbols(visitor SymbolVisitor) {
 	for _, resolver := range c.resolvers {
-		symbols = append(symbols, resolver.GetSymbols()...)
+		resolver.GetSymbols(visitor)
 	}
-
-	return symbols
 }
