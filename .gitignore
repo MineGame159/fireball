@@ -1,6 +1,7 @@
 .vscode
 .idea
 
-build
+example/build
+tests/build
 
 fireball

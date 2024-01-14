@@ -3,19 +3,12 @@ package cmd
 import (
 	"fireball/cmd/build"
 	"fireball/core/ast"
-	"fireball/core/codegen"
 	"fireball/core/ir"
-	"fireball/core/llvm"
-	"fireball/core/utils"
 	"fireball/core/workspace"
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"log"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"time"
 )
 
@@ -54,90 +47,16 @@ func buildProject() string {
 	}
 
 	// Report errors
-	reporter := consoleReporter{
-		error:   color.New(color.FgRed),
-		warning: color.New(color.FgYellow),
-	}
+	build.Report(project)
 
-	for _, file := range project.Files {
-		for _, diagnostic := range file.Diagnostics() {
-			reporter.Report(file, diagnostic)
-		}
-	}
-
-	if reporter.errorCount > 0 {
-		fmt.Println()
-		_, _ = color.New(color.FgRed).Print("Build failed")
-
-		if reporter.errorCount == 1 {
-			fmt.Printf(", with %d error\n", reporter.errorCount)
-		} else {
-			fmt.Printf(", with %d errors\n", reporter.errorCount)
-		}
-
-		os.Exit(1)
-	}
-
-	// Emit LLVM IR
-	_ = os.Mkdir("build", 0750)
-
-	irPaths := make([]string, 0, len(project.Files))
-
-	for _, file := range project.Files {
-		path := strings.ReplaceAll(file.Path, "/", "-")
-		path = filepath.Join(project.Path, "build", path[:len(path)-3]+".ll")
-
-		irFile, _ := os.Create(path)
-
-		module := codegen.Emit(file.AbsolutePath(), project.GetResolverFile(file.Ast), file.Ast)
-		llvm.WriteText(module, irFile)
-
-		_ = irFile.Close()
-
-		irPaths = append(irPaths, path)
-	}
-
-	entrypointPath := filepath.Join(project.Path, "build", "__entrypoint.ll")
-	irPaths = append(irPaths, entrypointPath)
-
-	err = generateEntrypoint(project, entrypointPath)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
-
-	// Compile
-	c := build.Compiler{
-		OptimizationLevel: min(max(int(opt), 0), 3),
-	}
-
-	for _, irPath := range irPaths {
-		c.AddInput(irPath)
-	}
-
-	if runtime.GOOS == "darwin" {
-		c.AddLibrary("System")
-	} else {
-		c.AddLibrary("m")
-		c.AddLibrary("c")
-	}
-
-	for _, library := range project.Config.LinkLibraries {
-		c.AddLibrary(library)
-	}
-
-	output := filepath.Join(project.Path, "build", project.Config.Name)
-	err = c.Compile(output)
-
+	// Build
+	output, err := build.Build(project, generateEntrypoint(project), opt, project.Config.Name)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
 
 	// Print info
 	took := time.Now().Sub(start)
-
-	if reporter.hadDiagnostic {
-		fmt.Println()
-	}
 
 	_, _ = color.New(color.FgGreen).Print("Build successful")
 	fmt.Printf(", took %s\n", took)
@@ -147,8 +66,7 @@ func buildProject() string {
 	return output
 }
 
-func generateEntrypoint(project *workspace.Project, path string) error {
-	// Create module
+func generateEntrypoint(project *workspace.Project) *ir.Module {
 	m := &ir.Module{Path: "__entrypoint"}
 
 	resolver := project.GetResolverName(project.Config.Namespace)
@@ -156,8 +74,6 @@ func generateEntrypoint(project *workspace.Project, path string) error {
 
 	main := m.Define("main", &ir.FuncType{Returns: ir.I32}, 0)
 	mainBlock := main.Block("")
-
-	// Flags
 
 	if function != nil {
 		var fbMain ir.Value
@@ -188,43 +104,5 @@ func generateEntrypoint(project *workspace.Project, path string) error {
 		}})
 	}
 
-	// Write module
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-
-	llvm.WriteText(m, file)
-
-	_ = file.Close()
-	return nil
-}
-
-type consoleReporter struct {
-	error   *color.Color
-	warning *color.Color
-
-	hadDiagnostic bool
-	errorCount    int
-}
-
-func (c *consoleReporter) Report(file *workspace.File, diag utils.Diagnostic) {
-	path, err := filepath.Rel(file.Project.Config.Src, file.Path)
-	if err != nil {
-		path = file.Path
-	}
-
-	msg := fmt.Sprintf("[%s:%d:%d] %s", path, diag.Range.Start.Line, diag.Range.Start.Column+1, diag.Message)
-
-	if diag.Kind == utils.ErrorKind {
-		_, _ = c.error.Fprint(os.Stderr, "ERROR   ")
-		_, _ = fmt.Fprintln(os.Stderr, msg)
-
-		c.errorCount++
-	} else {
-		_, _ = c.warning.Print("WARNING ")
-		fmt.Println(msg)
-	}
-
-	c.hadDiagnostic = true
+	return m
 }
