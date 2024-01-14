@@ -19,7 +19,7 @@ func annotate(node ast.Node) []protocol.InlayHint {
 	}
 
 	for _, decl := range node.(*ast.File).Decls {
-		if f, ok := decl.(*ast.Func); ok {
+		if f, ok := decl.(*ast.Func); ok && f.Name != nil {
 			a.functions[f.Name.String()] = f
 		}
 	}

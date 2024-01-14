@@ -185,12 +185,16 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	isExtern := false
 	isIntrinsic := false
+	isTest := false
 
 	for _, attribute := range decl.Attributes {
-		if attribute.Name.String() == "Extern" {
+		switch attribute.Name.String() {
+		case "Extern":
 			isExtern = true
-		} else if attribute.Name.String() == "Intrinsic" {
+		case "Intrinsic":
 			isIntrinsic = true
+		case "Test":
+			isTest = true
 		}
 	}
 
@@ -200,9 +204,16 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	if isImpl && isIntrinsic && !decl.IsStatic() {
 		c.error(decl.Name, "Non static methods can't be intrinsics")
 	}
+	if isImpl && isTest && !decl.IsStatic() {
+		c.error(decl.Name, "Non static methods can't be a test")
+	}
 
 	if decl.IsVariadic() && !isExtern {
 		c.error(decl.Name, "Only extern functions can be variadic")
+	}
+
+	if (isExtern && isIntrinsic) || (isExtern && isTest) || (isIntrinsic && isTest) {
+		c.error(decl.Name, "Invalid combination of attributes")
 	}
 
 	// Push scope

@@ -329,6 +329,13 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 			expr.Result().SetValue(result.Type, 0, nil)
 
 		case scanner.FuncPtr:
+			if result.Kind != ast.CallableResultKind {
+				c.error(expr.Value, "Invalid value")
+				expr.Result().SetInvalid()
+
+				return
+			}
+
 			if f, ok := result.Callable().(*ast.Func); ok && f.Method() != nil {
 				c.error(expr.Value, "Cannot take address of a non-static method")
 			}

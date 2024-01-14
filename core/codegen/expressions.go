@@ -435,7 +435,7 @@ func (c *codegen) VisitLogical(expr *ast.Logical) {
 		startBlock := c.block
 
 		c.setLocationMeta(
-			c.block.Add(&ir.BrInst{Condition: left.v, True: end, False: end}),
+			c.block.Add(&ir.BrInst{Condition: left.v, True: true_, False: end}),
 			expr,
 		)
 

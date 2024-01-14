@@ -165,6 +165,20 @@ func (f *Func) IntrinsicName() string {
 	return ""
 }
 
+func (f *Func) TestName() string {
+	for _, attribute := range f.Attributes {
+		if attribute.Name.String() == "Test" {
+			if len(attribute.Args) > 0 {
+				return attribute.Args[0].String()[1 : len(attribute.Args[0].String())-1]
+			}
+
+			return f.Name.String()
+		}
+	}
+
+	return ""
+}
+
 func (f *Func) HasBody() bool {
 	for _, attribute := range f.Attributes {
 		if attribute.Name.String() == "Extern" || attribute.Name.String() == "Intrinsic" {

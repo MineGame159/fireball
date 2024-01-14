@@ -56,12 +56,12 @@ const (
 	FuncPtr
 	Hashtag
 	DotDotDot
+	And
+	Or
 
 	Nil
 	True
 	False
-	And
-	Or
 	Var
 	If
 	Else

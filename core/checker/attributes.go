@@ -25,6 +25,19 @@ func (c *checker) visitAttribute(decl *ast.Func, attribute *ast.Attribute) {
 			c.error(attribute.Name, "Inline doesn't have any arguments")
 		}
 
+	case "Test":
+		if len(attribute.Args) > 1 {
+			c.error(attribute.Name, "Test attribute can only have one argument")
+		}
+
+		if !ast.IsPrimitive(decl.Returns, ast.Bool) {
+			c.error(attribute.Name, "Tests need to return a boolean")
+		}
+
+		if len(decl.Params) != 0 {
+			c.error(attribute.Name, "Tests can't have any parameters")
+		}
+
 	default:
 		c.error(attribute.Name, "Attribute with this name doesn't exist")
 	}

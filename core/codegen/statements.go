@@ -133,10 +133,11 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 		c.beginBlock(body)
 	}
 
-	c.acceptStmt(stmt.Body)
-	c.acceptExpr(stmt.Increment)
+	if c.acceptStmt(stmt.Body) {
+		c.acceptExpr(stmt.Increment)
 
-	c.block.Add(&ir.BrInst{True: c.loopStart})
+		c.block.Add(&ir.BrInst{True: c.loopStart})
+	}
 
 	// End
 	c.scopes.pop()
