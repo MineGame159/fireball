@@ -283,13 +283,29 @@ func (c *checker) checkNameCollision(decl ast.Decl, name *ast.Token) {
 	}
 
 	// Symbols
-	symbols := symbolGetter{except: decl}
-	c.resolver.GetSymbols(&symbols)
+	checker := nameChecker{
+		c:      c,
+		except: decl,
+		name:   name,
+	}
 
-	if symbols.node != nil {
+	c.resolver.GetSymbols(&checker)
+}
+
+type nameChecker struct {
+	c *checker
+
+	except ast.Node
+	name   *ast.Token
+
+	found bool
+}
+
+func (s *nameChecker) VisitSymbol(node ast.Node) {
+	if node != s.except && !s.found {
 		var name2 *ast.Token
 
-		switch node := symbols.node.(type) {
+		switch node := node.(type) {
 		case *ast.Struct:
 			name2 = node.Name
 		case *ast.Enum:
@@ -300,20 +316,9 @@ func (c *checker) checkNameCollision(decl ast.Decl, name *ast.Token) {
 			name2 = node.Name
 		}
 
-		if name2 != nil && name.String() == name2.String() {
-			c.error(name, "Declaration with this name already exists")
-			return
+		if name2 != nil && s.name.String() == name2.String() {
+			s.c.error(s.name, "Declaration with this name already exists")
+			s.found = true
 		}
-	}
-}
-
-type symbolGetter struct {
-	except ast.Node
-	node   ast.Node
-}
-
-func (s *symbolGetter) VisitSymbol(node ast.Node) {
-	if node != s.except && s.node == nil {
-		s.node = node
 	}
 }
