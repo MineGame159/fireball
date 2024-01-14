@@ -4,22 +4,31 @@ import (
 	"fireball/core/ast"
 	"fireball/core/utils"
 	"fmt"
+	"strings"
 )
 
 type typeResolver struct {
 	expr ast.Expr
 
 	reporter utils.Reporter
-	resolver ast.Resolver
+	resolver *ast.CombinedResolver
 }
 
-func Resolve(reporter utils.Reporter, resolver ast.Resolver, node ast.Node) {
+func Resolve(reporter utils.Reporter, root ast.RootResolver, file *ast.File) {
 	r := typeResolver{
 		reporter: reporter,
-		resolver: resolver,
+		resolver: ast.NewCombinedResolver(root),
 	}
 
-	r.VisitNode(node)
+	for _, decl := range file.Decls {
+		if using, ok := decl.(*ast.Using); ok {
+			if resolver := root.GetResolver(using.Name); resolver != nil {
+				r.resolver.Add(resolver)
+			}
+		}
+	}
+
+	r.VisitNode(file)
 }
 
 // Declarations
@@ -48,13 +57,39 @@ func (t *typeResolver) visitImpl(decl *ast.Impl) {
 
 func (t *typeResolver) visitType(type_ ast.Type) {
 	if resolvable, ok := type_.(*ast.Resolvable); ok {
-		if resolved := t.resolver.GetType(resolvable.Token().Lexeme); resolved != nil {
+		// Resolve type
+		var resolver ast.Resolver = t.resolver
+		var resolved ast.Type
+
+		for i, part := range resolvable.Parts {
+			if i == len(resolvable.Parts)-1 {
+				resolved = resolver.GetType(part.String())
+			} else {
+				if child := resolver.GetChild(part.String()); child != nil {
+					resolver = child
+				}
+			}
+		}
+
+		if resolved != nil {
+			// Store resolved type
 			resolvable.Type = resolved
 		} else {
+			// Report an error
+			str := strings.Builder{}
+
+			for i, part := range resolvable.Parts {
+				if i > 0 {
+					str.WriteRune('.')
+				}
+
+				str.WriteString(part.String())
+			}
+
 			t.reporter.Report(utils.Diagnostic{
 				Kind:    utils.ErrorKind,
 				Range:   resolvable.Cst().Range,
-				Message: fmt.Sprintf("Unknown type '%s'", resolvable.Token()),
+				Message: fmt.Sprintf("Unknown type '%s'", str.String()),
 			})
 
 			resolvable.Type = &ast.Primitive{Kind: ast.Void}
@@ -65,6 +100,7 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 		}
 	}
 
+	// Visit children
 	type_.AcceptChildren(t)
 }
 

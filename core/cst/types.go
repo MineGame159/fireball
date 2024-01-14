@@ -28,7 +28,14 @@ func parseType(p *parser) Node {
 func parseIdentifierType(p *parser) Node {
 	p.begin(IdentifierTypeNode)
 
-	p.consume(scanner.Identifier)
+	if p.consume(scanner.Identifier) {
+		return p.end()
+	}
+	for p.optional(scanner.Dot) {
+		if p.consume(scanner.Identifier) {
+			return p.end()
+		}
+	}
 
 	return p.end()
 }

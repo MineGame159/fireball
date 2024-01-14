@@ -31,7 +31,7 @@ var types = Group{
 		),
 		node(
 			"Resolvable",
-			field("name", type_("scanner.Token")),
+			field("parts", array("Token")),
 			field("Type", type_("Type")),
 		),
 	},

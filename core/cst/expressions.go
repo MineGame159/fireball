@@ -73,12 +73,13 @@ func parsePrefixExprPratt(p *parser) Node {
 	case scanner.Identifier:
 		if p.next.Lexeme == "new" && p.peek2Is(canStartType) {
 			new_ := p.advanceGetLeaf()
+			type_ := parseType(p)
 
-			if p.peek2() == scanner.LeftBrace {
+			if p.peek() == scanner.LeftBrace {
 				p.begin(StructExprNode)
 
 				p.childAdd(new_)
-				if p.child(parseType) {
+				if p.childAdd(type_) {
 					return p.end()
 				}
 				if p.consume(scanner.LeftBrace) {
@@ -97,7 +98,7 @@ func parsePrefixExprPratt(p *parser) Node {
 			p.begin(AllocateArrayExprNode)
 
 			p.childAdd(new_)
-			if p.child(parseType) {
+			if p.childAdd(type_) {
 				return p.end()
 			}
 			if p.consume(scanner.LeftBracket) {

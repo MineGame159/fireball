@@ -299,7 +299,13 @@ func (t *typePrinter) VisitArray(type_ *Array) {
 }
 
 func (t *typePrinter) VisitResolvable(type_ *Resolvable) {
-	t.str += type_.String()
+	for i, part := range type_.Parts {
+		if i > 0 {
+			t.str += "."
+		}
+
+		t.str += part.String()
+	}
 }
 
 func (t *typePrinter) VisitStruct(type_ *Struct) {

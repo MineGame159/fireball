@@ -23,48 +23,41 @@ func (c *converter) convertType(node cst.Node) ast.Type {
 }
 
 func (c *converter) convertIdentifierType(node cst.Node) ast.Type {
-	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
-			var kind ast.PrimitiveKind
+	if len(node.Children) == 1 {
+		kind := ast.Unknown
 
-			switch child.Token.Lexeme {
-			case "void":
-				kind = ast.Void
-			case "bool":
-				kind = ast.Bool
+		switch node.Children[0].Token.Lexeme {
+		case "void":
+			kind = ast.Void
+		case "bool":
+			kind = ast.Bool
 
-			case "u8":
-				kind = ast.U8
-			case "u16":
-				kind = ast.U16
-			case "u32":
-				kind = ast.U32
-			case "u64":
-				kind = ast.U64
+		case "u8":
+			kind = ast.U8
+		case "u16":
+			kind = ast.U16
+		case "u32":
+			kind = ast.U32
+		case "u64":
+			kind = ast.U64
 
-			case "i8":
-				kind = ast.I8
-			case "i16":
-				kind = ast.I16
-			case "i32":
-				kind = ast.I32
-			case "i64":
-				kind = ast.I64
+		case "i8":
+			kind = ast.I8
+		case "i16":
+			kind = ast.I16
+		case "i32":
+			kind = ast.I32
+		case "i64":
+			kind = ast.I64
 
-			case "f32":
-				kind = ast.F32
-			case "f64":
-				kind = ast.F64
+		case "f32":
+			kind = ast.F32
+		case "f64":
+			kind = ast.F64
+		}
 
-			default:
-				if r := ast.NewResolvable(node, child.Token); r != nil {
-					return r
-				}
-
-				return nil
-			}
-
-			if p := ast.NewPrimitive(node, kind, child.Token); p != nil {
+		if kind != ast.Unknown {
+			if p := ast.NewPrimitive(node, kind, node.Children[0].Token); p != nil {
 				return p
 			}
 
@@ -72,7 +65,19 @@ func (c *converter) convertIdentifierType(node cst.Node) ast.Type {
 		}
 	}
 
-	panic("cst2ast.convertIdentifierType() - Not implemented")
+	var parts []*ast.Token
+
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			parts = append(parts, c.convertToken(child))
+		}
+	}
+
+	if r := ast.NewResolvable(node, parts); r != nil {
+		return r
+	}
+
+	return nil
 }
 
 func (c *converter) convertPointerType(node cst.Node) ast.Type {

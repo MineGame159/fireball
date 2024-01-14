@@ -33,6 +33,9 @@ func getCompletions(project *workspace.Project, file *ast.File, pos core.Pos) *p
 	if leaf != nil {
 		if isInFunctionBody(pos, leaf) {
 			switch parent := leaf.Parent().(type) {
+			case *ast.Resolvable:
+				getResolvableCompletions(resolver, &c, pos, parent)
+
 			case *ast.Member:
 				if isAfterNode(pos, parent.Value) {
 					getMemberCompletions(resolver, &c, parent)
@@ -53,6 +56,16 @@ func getCompletions(project *workspace.Project, file *ast.File, pos core.Pos) *p
 
 		if isInFunctionBody(pos, node) {
 			switch node := node.(type) {
+			case *ast.Resolvable:
+				getResolvableCompletions(resolver, &c, pos, node)
+
+			case *ast.Var:
+				if isAfterNode(pos, node.Name) && isBeforeCst(pos, node, scanner.Equal) {
+					getGlobalCompletions(resolver, &c, true)
+				} else if isAfterCst(pos, node, scanner.Equal, false) {
+					getIdentifierCompletions(resolver, &c, pos, node)
+				}
+
 			case *ast.Member:
 				if isAfterNode(pos, node.Value) {
 					getMemberCompletions(resolver, &c, node)
@@ -80,6 +93,23 @@ func getCompletions(project *workspace.Project, file *ast.File, pos core.Pos) *p
 
 	// Return
 	return c.get()
+}
+
+func getResolvableCompletions(resolver ast.Resolver, c *completions, pos core.Pos, resolvable *ast.Resolvable) {
+	if resolvable.Cst() == nil || !resolvable.Cst().Contains(scanner.Dot) {
+		getGlobalCompletions(resolver, c, true)
+		return
+	}
+
+	for _, part := range resolvable.Parts {
+		if part.Cst() != nil && pos.IsAfter(part.Cst().Range.End) && resolver != nil {
+			resolver = resolver.GetChild(part.String())
+		}
+	}
+
+	if resolver != nil {
+		getResolverCompletions(c, resolver, true)
+	}
 }
 
 func getTypeCompletions(root ast.RootResolver, resolver ast.Resolver, c *completions, pos core.Pos, node ast.Node) {
@@ -129,6 +159,9 @@ func getTypeCompletions(root ast.RootResolver, resolver ast.Resolver, c *complet
 		if isAfterNode(pos, node.Name) {
 			getGlobalCompletions(resolver, c, true)
 		}
+
+	case *ast.Resolvable:
+		getResolvableCompletions(resolver, c, pos, node)
 
 	case ast.Type:
 		if !isComplexType(node) {
@@ -277,12 +310,14 @@ func getGlobalCompletions(resolver ast.Resolver, c *completions, symbolsOnlyType
 	c.add(protocol.CompletionItemKindStruct, "f32", "")
 	c.add(protocol.CompletionItemKindStruct, "f64", "")
 
-	// Builtin identifiers
-	c.add(protocol.CompletionItemKindKeyword, "true", "bool")
-	c.add(protocol.CompletionItemKindKeyword, "false", "bool")
+	if !symbolsOnlyTypes {
+		// Builtin identifiers
+		c.add(protocol.CompletionItemKindKeyword, "true", "bool")
+		c.add(protocol.CompletionItemKindKeyword, "false", "bool")
 
-	c.add(protocol.CompletionItemKindFunction, "sizeof", "(<type>) u32")
-	c.add(protocol.CompletionItemKindFunction, "alignof", "(<type>) u32")
+		c.add(protocol.CompletionItemKindFunction, "sizeof", "(<type>) u32")
+		c.add(protocol.CompletionItemKindFunction, "alignof", "(<type>) u32")
+	}
 
 	// Language defined types and functions
 	getResolverCompletions(c, resolver, symbolsOnlyTypes)
@@ -350,6 +385,19 @@ func isAfterCst(pos core.Pos, node ast.Node, kind scanner.TokenKind, sameLine bo
 	}
 
 	return pos.IsAfter(after)
+}
+
+func isBeforeCst(pos core.Pos, node ast.Node, kind scanner.TokenKind) bool {
+	if node.Cst() == nil {
+		return false
+	}
+
+	child := node.Cst().Get(kind)
+	if child == nil {
+		return true
+	}
+
+	return child.Range.Start.IsAfter(pos)
 }
 
 func isInFunctionBody(pos core.Pos, node ast.Node) bool {

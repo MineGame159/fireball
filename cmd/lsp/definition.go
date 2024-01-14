@@ -27,6 +27,11 @@ func getDefinition(node ast.Node, pos core.Pos) []protocol.Location {
 func getDefinitionToken(token *ast.Token) []protocol.Location {
 	// Get definition based on the token's parent
 	switch parent := token.Parent().(type) {
+	case *ast.Resolvable:
+		if token == parent.Parts[len(parent.Parts)-1] {
+			return newDefinition(parent.Resolved())
+		}
+
 	case *ast.Member:
 		return getDefinitionExprResult(parent.Result())
 

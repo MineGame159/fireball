@@ -253,11 +253,15 @@ func (h *highlighter) visitType(type_ ast.Type) {
 			h.add(type_, typeKind)
 
 		case *ast.Resolvable:
+			for i := 0; i < len(type_.Parts)-1; i++ {
+				h.add(type_.Parts[i], namespaceKind)
+			}
+
 			switch type_.Resolved().(type) {
 			case *ast.Struct:
-				h.add(type_, classKind)
+				h.add(type_.Parts[len(type_.Parts)-1], classKind)
 			case *ast.Enum:
-				h.add(type_, enumKind)
+				h.add(type_.Parts[len(type_.Parts)-1], enumKind)
 			}
 		}
 	}

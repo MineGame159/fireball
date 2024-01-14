@@ -275,18 +275,22 @@ type Resolvable struct {
 	cst    cst.Node
 	parent Node
 
-	Name scanner.Token
-	Type Type
+	Parts []*Token
+	Type  Type
 }
 
-func NewResolvable(node cst.Node, name scanner.Token) *Resolvable {
-	if name.IsEmpty() {
+func NewResolvable(node cst.Node, parts []*Token) *Resolvable {
+	if parts == nil {
 		return nil
 	}
 
 	r := &Resolvable{
-		cst:  node,
-		Name: name,
+		cst:   node,
+		Parts: parts,
+	}
+
+	for _, child := range parts {
+		child.SetParent(r)
 	}
 
 	return r
@@ -301,7 +305,7 @@ func (r *Resolvable) Cst() *cst.Node {
 }
 
 func (r *Resolvable) Token() scanner.Token {
-	return r.Name
+	return scanner.Token{}
 }
 
 func (r *Resolvable) Parent() Node {
@@ -317,15 +321,22 @@ func (r *Resolvable) SetParent(parent Node) {
 }
 
 func (r *Resolvable) AcceptChildren(visitor Visitor) {
+	for _, child := range r.Parts {
+		visitor.VisitNode(child)
+	}
 }
 
 func (r *Resolvable) Clone() Node {
 	r2 := &Resolvable{
 		cst:  r.cst,
-		Name: r.Name,
 		Type: r.Type,
 	}
 
+	r2.Parts = make([]*Token, len(r.Parts))
+	for i, child := range r2.Parts {
+		r2.Parts[i] = child.Clone().(*Token)
+		r2.Parts[i].SetParent(r2)
+	}
 	if r.Type != nil {
 		r2.Type = r.Type.Clone().(Type)
 		r2.Type.SetParent(r2)
@@ -335,7 +346,7 @@ func (r *Resolvable) Clone() Node {
 }
 
 func (r *Resolvable) String() string {
-	return r.Name.String()
+	return ""
 }
 
 func (r *Resolvable) AcceptType(visitor TypeVisitor) {

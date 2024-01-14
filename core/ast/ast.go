@@ -117,7 +117,18 @@ func (g *get) contains(node Node) bool {
 			next := GetNextSibling(node)
 
 			if next == nil || (next.Cst() != nil && next.Cst().Range.Start.Line > g.pos.Line) {
-				return true
+				parent := node.Parent().Cst()
+				var after cst.Node
+
+				for _, child := range parent.Children {
+					if child.Range.Start.IsAfter(range_.End) && after.Kind == cst.UnknownNode {
+						after = child
+					}
+				}
+
+				if after.Kind == cst.UnknownNode || after.Range.Start.IsAfter(g.pos) {
+					return true
+				}
 			}
 		}
 	}
