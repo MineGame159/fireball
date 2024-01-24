@@ -317,6 +317,7 @@ func getGlobalCompletions(resolver ast.Resolver, c *completions, symbolsOnlyType
 
 		c.add(protocol.CompletionItemKindFunction, "sizeof", "(<type>) u32")
 		c.add(protocol.CompletionItemKindFunction, "alignof", "(<type>) u32")
+		c.add(protocol.CompletionItemKindFunction, "typeof", "(<expression>) u32")
 	}
 
 	// Language defined types and functions

@@ -7,6 +7,7 @@ import (
 )
 
 type codegen struct {
+	ctx      *Context
 	path     string
 	resolver *ast.CombinedResolver
 
@@ -36,9 +37,10 @@ type exprValue struct {
 	addressable bool
 }
 
-func Emit(path string, root ast.RootResolver, file *ast.File) *ir.Module {
+func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.Module {
 	// Init codegen
 	c := &codegen{
+		ctx:      ctx,
 		path:     path,
 		resolver: ast.NewCombinedResolver(root),
 

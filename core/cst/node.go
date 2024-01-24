@@ -102,6 +102,7 @@ const (
 	IndexExprNode
 	CallExprNode
 	TypeCallExprNode
+	TypeofExprNode
 	StructExprNode
 	StructFieldExprNode
 	ArrayExprNode
@@ -243,6 +244,8 @@ func (n NodeKind) String() string {
 		return "Call"
 	case TypeCallExprNode:
 		return "Type call"
+	case TypeofExprNode:
+		return "Typeof"
 	case StructExprNode:
 		return "Struct"
 	case StructFieldExprNode:

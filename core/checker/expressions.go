@@ -466,6 +466,14 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		return
 	}
 
+	// Primitive type
+	for kind := ast.Void; kind <= ast.F64; kind++ {
+		if expr.String() == kind.String() {
+			expr.Result().SetType(&ast.Primitive{Kind: kind})
+			return
+		}
+	}
+
 	// Global variable
 	if variable := c.resolver.GetVariable(expr.String()); variable != nil && variable.Type != nil {
 		expr.Result().SetValue(variable.Type, ast.AssignableFlag|ast.AddressableFlag, variable)
@@ -554,6 +562,17 @@ func (c *checker) VisitTypeCall(expr *ast.TypeCall) {
 	expr.AcceptChildren(c)
 
 	expr.Result().SetValue(&ast.Primitive{Kind: ast.I32}, 0, nil)
+}
+
+func (c *checker) VisitTypeof(expr *ast.Typeof) {
+	expr.AcceptChildren(c)
+
+	expr.Result().SetValue(&ast.Primitive{Kind: ast.U32}, 0, nil)
+
+	// Check arg
+	if expr.Arg != nil && expr.Arg.Result().Kind == ast.InvalidResultKind {
+		c.error(expr.Arg, "Invalid expression")
+	}
 }
 
 func (c *checker) VisitCall(expr *ast.Call) {

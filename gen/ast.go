@@ -204,6 +204,11 @@ var expressions = Group{
 			field("arg", type_("Type")),
 		),
 		node(
+			"Typeof",
+			field("callee", type_("Token")),
+			field("arg", type_("Expr")),
+		),
+		node(
 			"StructInitializer",
 			field("new", type_("bool")),
 			field("type", type_("Type")),

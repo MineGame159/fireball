@@ -15,6 +15,7 @@ func Build(project *workspace.Project, entrypoint *ir.Module, optimizationLevel 
 	_ = os.Mkdir("build", 0750)
 
 	// Emit project IR
+	ctx := codegen.Context{}
 	irPaths := make([]string, 0, len(project.Files))
 
 	for _, file := range project.Files {
@@ -26,7 +27,7 @@ func Build(project *workspace.Project, entrypoint *ir.Module, optimizationLevel 
 			return "", err
 		}
 
-		module := codegen.Emit(file.AbsolutePath(), project.GetResolverFile(file.Ast), file.Ast)
+		module := codegen.Emit(&ctx, file.AbsolutePath(), project.GetResolverFile(file.Ast), file.Ast)
 		llvm.WriteText(module, irFile)
 
 		_ = irFile.Close()

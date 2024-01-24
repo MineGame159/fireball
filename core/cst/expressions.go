@@ -247,6 +247,22 @@ func parsePostfixExprPratt(p *parser, op scanner.TokenKind, lhs Node) Node {
 			return p.end()
 		}
 
+		// Typeof
+		if lhs.Token.Lexeme == "typeof" {
+			p.begin(TypeofExprNode)
+
+			p.childAdd(lhs)
+			p.advanceAddChild()
+			if p.child(parseExpr) {
+				return p.end()
+			}
+			if p.consume(scanner.RightParen) {
+				return p.end()
+			}
+
+			return p.end()
+		}
+
 		// Call
 		p.begin(CallExprNode)
 

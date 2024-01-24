@@ -720,6 +720,8 @@ func IsNil(node Node) bool {
 		return node == nil
 	case *TypeCall:
 		return node == nil
+	case *Typeof:
+		return node == nil
 	case *StructInitializer:
 		return node == nil
 	case *ArrayInitializer:

@@ -18,6 +18,7 @@ type ExprVisitor interface {
 	VisitCast(expr *Cast)
 	VisitCall(expr *Call)
 	VisitTypeCall(expr *TypeCall)
+	VisitTypeof(expr *Typeof)
 	VisitStructInitializer(expr *StructInitializer)
 	VisitArrayInitializer(expr *ArrayInitializer)
 	VisitAllocateArray(expr *AllocateArray)
@@ -1008,6 +1009,101 @@ func (t *TypeCall) AcceptExpr(visitor ExprVisitor) {
 }
 
 func (t *TypeCall) Result() *ExprResult {
+	return &t.result
+}
+
+// Typeof
+
+type Typeof struct {
+	cst    cst.Node
+	parent Node
+
+	Callee *Token
+	Arg    Expr
+
+	result ExprResult
+}
+
+func NewTypeof(node cst.Node, callee *Token, arg Expr) *Typeof {
+	if callee == nil && arg == nil {
+		return nil
+	}
+
+	t := &Typeof{
+		cst:    node,
+		Callee: callee,
+		Arg:    arg,
+	}
+
+	if callee != nil {
+		callee.SetParent(t)
+	}
+	if arg != nil {
+		arg.SetParent(t)
+	}
+
+	return t
+}
+
+func (t *Typeof) Cst() *cst.Node {
+	if t.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &t.cst
+}
+
+func (t *Typeof) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (t *Typeof) Parent() Node {
+	return t.parent
+}
+
+func (t *Typeof) SetParent(parent Node) {
+	if parent != nil && t.parent != nil {
+		panic("ast.Typeof.SetParent() - Parent is already set")
+	}
+
+	t.parent = parent
+}
+
+func (t *Typeof) AcceptChildren(visitor Visitor) {
+	if t.Callee != nil {
+		visitor.VisitNode(t.Callee)
+	}
+	if t.Arg != nil {
+		visitor.VisitNode(t.Arg)
+	}
+}
+
+func (t *Typeof) Clone() Node {
+	t2 := &Typeof{
+		cst: t.cst,
+	}
+
+	if t.Callee != nil {
+		t2.Callee = t.Callee.Clone().(*Token)
+		t2.Callee.SetParent(t2)
+	}
+	if t.Arg != nil {
+		t2.Arg = t.Arg.Clone().(Expr)
+		t2.Arg.SetParent(t2)
+	}
+
+	return t2
+}
+
+func (t *Typeof) String() string {
+	return ""
+}
+
+func (t *Typeof) AcceptExpr(visitor ExprVisitor) {
+	visitor.VisitTypeof(t)
+}
+
+func (t *Typeof) Result() *ExprResult {
 	return &t.result
 }
 

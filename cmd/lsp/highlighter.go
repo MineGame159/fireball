@@ -199,6 +199,12 @@ func (h *highlighter) VisitTypeCall(expr *ast.TypeCall) {
 	expr.AcceptChildren(h)
 }
 
+func (h *highlighter) VisitTypeof(expr *ast.Typeof) {
+	h.add(expr.Callee, functionKind)
+
+	expr.AcceptChildren(h)
+}
+
 func (h *highlighter) VisitCall(expr *ast.Call) {
 	expr.AcceptChildren(h)
 }
@@ -218,6 +224,8 @@ func (h *highlighter) visitExprResult(node ast.Node, result *ast.ExprResult) {
 	switch result.Kind {
 	case ast.TypeResultKind:
 		switch result.Type.(type) {
+		case *ast.Primitive:
+			h.add(node, typeKind)
 		case *ast.Struct:
 			h.add(node, classKind)
 		case *ast.Enum:

@@ -16,7 +16,7 @@ func intPromotion() bool {
     b = a;
 
     var c = a + b;
-    return c == 10;
+    return typeof(c) == typeof(i32);
 }
 
 #[Test]

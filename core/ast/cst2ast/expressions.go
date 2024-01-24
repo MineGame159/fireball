@@ -20,6 +20,8 @@ func (c *converter) convertExpr(node cst.Node) ast.Expr {
 		return c.convertCallExpr(node)
 	case cst.TypeCallExprNode:
 		return c.convertTypeCallExpr(node)
+	case cst.TypeofExprNode:
+		return c.convertTypeofExpr(node)
 	case cst.StructExprNode:
 		return c.convertStructExpr(node)
 	case cst.ArrayExprNode:
@@ -203,18 +205,41 @@ func (c *converter) convertCallExpr(node cst.Node) ast.Expr {
 }
 
 func (c *converter) convertTypeCallExpr(node cst.Node) ast.Expr {
-	var name *ast.Token
+	var callee *ast.Token
 	var arg ast.Type
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
-			name = c.convertToken(child)
+			callee = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			arg = c.convertType(child)
 		}
 	}
 
-	if t := ast.NewTypeCall(node, name, arg); t != nil {
+	if t := ast.NewTypeCall(node, callee, arg); t != nil {
+		return t
+	}
+
+	return nil
+}
+
+func (c *converter) convertTypeofExpr(node cst.Node) ast.Expr {
+	var callee *ast.Token
+	var arg ast.Expr
+
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			if callee == nil {
+				callee = c.convertToken(child)
+			} else {
+				arg = c.convertExpr(child)
+			}
+		} else if child.Kind.IsExpr() {
+			arg = c.convertExpr(child)
+		}
+	}
+
+	if t := ast.NewTypeof(node, callee, arg); t != nil {
 		return t
 	}
 

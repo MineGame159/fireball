@@ -546,6 +546,13 @@ func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
 	}}
 }
 
+func (c *codegen) VisitTypeof(expr *ast.Typeof) {
+	c.exprResult = exprValue{v: &ir.IntConst{
+		Typ:   c.types.get(expr.Result().Type),
+		Value: ir.Unsigned(uint64(c.ctx.GetTypeID(expr.Arg.Result().Type))),
+	}}
+}
+
 func (c *codegen) VisitCall(expr *ast.Call) {
 	// Get type
 	callee := c.acceptExpr(expr.Callee)
