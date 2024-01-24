@@ -146,6 +146,16 @@ func (c *checker) expectPrimitiveValue(expr ast.Expr, kind ast.PrimitiveKind) {
 	}
 }
 
+func (c *checker) checkRequired(required ast.Type, expr ast.Expr) {
+	if required == nil || expr == nil || expr.Result().Kind == ast.InvalidResultKind {
+		return
+	}
+
+	if _, ok := ast.GetImplicitCast(expr.Result().Type, required); !ok {
+		c.error(expr, "Expected a '%s' but got a '%s'", ast.PrintType(required), ast.PrintType(expr.Result().Type))
+	}
+}
+
 // ast.Visit
 
 func (c *checker) VisitNode(node ast.Node) {

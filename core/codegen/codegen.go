@@ -18,8 +18,9 @@ type codegen struct {
 
 	allocas map[ast.Node]exprValue
 
-	function *ir.Func
-	block    *ir.Block
+	astFunction *ast.Func
+	function    *ir.Func
+	block       *ir.Block
 
 	loopStart *ir.Block
 	loopEnd   *ir.Block
@@ -184,6 +185,95 @@ func (c *codegen) load(value exprValue, type_ ast.Type) exprValue {
 
 func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 	return c.load(c.acceptExpr(expr), expr.Result().Type)
+}
+
+func (c *codegen) implicitCast(required ast.Type, value exprValue, valueType ast.Type) exprValue {
+	if kind, ok := ast.GetImplicitCast(valueType, required); ok && kind != ast.None {
+		return c.cast(value, valueType, required, nil)
+	}
+
+	return value
+}
+
+func (c *codegen) implicitCastLoadExpr(required ast.Type, expr ast.Expr) exprValue {
+	return c.implicitCast(required, c.loadExpr(expr), expr.Result().Type)
+}
+
+func (c *codegen) cast(value exprValue, from, to ast.Type, location ast.Node) exprValue {
+	kind, ok := ast.GetCast(from, to)
+	if !ok {
+		panic("codegen.convertAstCastKind() - ast.GetCast() returned false")
+	}
+
+	return c.convertCast(value, kind, from, to, location)
+}
+
+func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.Type, location ast.Node) exprValue {
+	if kind == ast.None {
+		return value
+	}
+
+	value = c.load(value, from)
+	toIr := c.types.get(to)
+
+	switch kind {
+	case ast.Truncate:
+		result := c.block.Add(&ir.TruncInst{
+			Value: value.v,
+			Typ:   toIr,
+		})
+
+		c.setLocationMeta(result, location)
+		return exprValue{v: result}
+
+	case ast.Extend:
+		var result ir.MetaValue
+
+		if ast.IsFloating(to.Resolved().(*ast.Primitive).Kind) {
+			result = c.block.Add(&ir.FExtInst{
+				Value: value.v,
+				Typ:   toIr,
+			})
+		} else {
+			signed := ast.IsSigned(to.Resolved().(*ast.Primitive).Kind)
+
+			if from, ok := ast.As[*ast.Primitive](from); !ok || !ast.IsSigned(from.Kind) {
+				signed = false
+			}
+
+			result = c.block.Add(&ir.ExtInst{
+				SignExtend: signed,
+				Value:      value.v,
+				Typ:        toIr,
+			})
+		}
+
+		c.setLocationMeta(result, location)
+		return exprValue{v: result}
+
+	case ast.Int2Float:
+		result := c.block.Add(&ir.I2FInst{
+			Signed: ast.IsSigned(from.Resolved().(*ast.Primitive).Kind),
+			Value:  value.v,
+			Typ:    toIr,
+		})
+
+		c.setLocationMeta(result, location)
+		return exprValue{v: result}
+
+	case ast.Float2Int:
+		result := c.block.Add(&ir.F2IInst{
+			Signed: ast.IsSigned(to.Resolved().(*ast.Primitive).Kind),
+			Value:  value.v,
+			Typ:    toIr,
+		})
+
+		c.setLocationMeta(result, location)
+		return exprValue{v: result}
+
+	default:
+		panic("codegen.convertAstCastKind() - Not implemented")
+	}
 }
 
 // Static / Global variables

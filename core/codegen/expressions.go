@@ -156,9 +156,11 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 
 	var result ir.Value = &ir.ZeroInitConst{Typ: type_}
 
-	for _, field := range expr.Fields {
-		element := c.loadExpr(field.Value)
-		i, _ := struct_.GetField(field.Name.String())
+	for _, initField := range expr.Fields {
+		_, field := struct_.GetField(initField.Name.String())
+
+		element := c.implicitCastLoadExpr(field.Type, initField.Value)
+		i, _ := struct_.GetField(initField.Name.String())
 
 		r := c.block.Add(&ir.InsertValueInst{
 			Value:   result,
@@ -166,7 +168,7 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 			Indices: []uint32{uint32(i)},
 		})
 
-		c.setLocationMeta(r, field)
+		c.setLocationMeta(r, initField)
 		result = r
 	}
 
@@ -196,12 +198,13 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 }
 
 func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
+	baseType := expr.Result().Type.(*ast.Array).Base
 	type_ := c.types.get(expr.Result().Type)
 
 	var result ir.Value = &ir.ZeroInitConst{Typ: type_}
 
 	for i, value := range expr.Values {
-		element := c.loadExpr(value)
+		element := c.implicitCastLoadExpr(baseType, value)
 
 		r := c.block.Add(&ir.InsertValueInst{
 			Value:   result,
@@ -218,23 +221,11 @@ func (c *codegen) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 }
 
 func (c *codegen) VisitAllocateArray(expr *ast.AllocateArray) {
-	count := c.loadExpr(expr.Count)
-
 	mallocFunc := c.resolver.GetFunction("malloc")
 	malloc := c.getFunction(mallocFunc)
 
-	a, _ := ast.As[*ast.Primitive](expr.Count.Result().Type)
-	b, _ := ast.As[*ast.Primitive](mallocFunc.Params[0].Type)
-
-	c.castPrimitiveToPrimitive(
-		count,
-		expr.Count.Result().Type,
-		mallocFunc.Params[0].Type,
-		a.Kind,
-		b.Kind,
-		expr,
-	)
-	count = c.exprResult
+	count := c.loadExpr(expr.Count)
+	count = c.cast(count, expr.Count.Result().Type, mallocFunc.Params[0].Type, expr)
 
 	pointer := c.block.Add(&ir.CallInst{
 		Callee: malloc.v,
@@ -379,15 +370,14 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 }
 
 func (c *codegen) VisitBinary(expr *ast.Binary) {
-	left := c.acceptExpr(expr.Left)
-	right := c.acceptExpr(expr.Right)
-
-	c.exprResult = c.binary(expr.Operator, left, right, expr.Left.Result().Type)
+	c.exprResult = c.binaryLoad(expr.Left, expr.Right, expr.Operator)
 }
 
 func (c *codegen) VisitLogical(expr *ast.Logical) {
-	left := c.loadExpr(expr.Left)
-	right := c.loadExpr(expr.Right)
+	type_ := ast.Primitive{Kind: ast.Bool}
+
+	left := c.implicitCastLoadExpr(&type_, expr.Left)
+	right := c.implicitCastLoadExpr(&type_, expr.Right)
 
 	switch expr.Operator.Token().Kind {
 	case scanner.Or:
@@ -509,7 +499,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	assignee := c.acceptExpr(expr.Assignee)
 
 	// Value
-	value := c.loadExpr(expr.Value)
+	value := c.implicitCastLoadExpr(expr.Assignee.Result().Type, expr.Value)
 
 	if expr.Operator.Token().Kind != scanner.Equal {
 		value = c.binary(
@@ -534,132 +524,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 func (c *codegen) VisitCast(expr *ast.Cast) {
 	value := c.acceptExpr(expr.Value)
 
-	if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
-		if to, ok := ast.As[*ast.Primitive](expr.Result().Type); ok {
-			// primitive to primitive
-			c.castPrimitiveToPrimitive(value, from, to, from.Kind, to.Kind, expr)
-			return
-		}
-	}
-
-	if from, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
-		if to, ok := ast.As[*ast.Primitive](expr.Result().Type); ok {
-			// enum to integer
-			fromT, _ := ast.As[*ast.Primitive](from.Type)
-
-			c.castPrimitiveToPrimitive(value, from, to, fromT.Kind, to.Kind, expr)
-			return
-		}
-	}
-
-	if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
-		if to, ok := expr.Result().Type.(*ast.Enum); ok {
-			// integer to enum
-			toT, _ := ast.As[*ast.Primitive](to.Type)
-
-			c.castPrimitiveToPrimitive(value, from, to, from.Kind, toT.Kind, expr)
-			return
-		}
-	}
-
-	if _, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
-		if _, ok := ast.As[*ast.Pointer](expr.Result().Type); ok {
-			// pointer to pointer
-			c.exprResult = value
-			return
-		}
-
-		if _, ok := ast.As[*ast.Func](expr.Result().Type); ok {
-			// pointer to function pointer
-			c.exprResult = value
-			return
-		}
-	}
-
-	// Error
-	panic("codegen.VisitCast() - Invalid cast")
-}
-
-func (c *codegen) castPrimitiveToPrimitive(value exprValue, from, to ast.Type, fromKind, toKind ast.PrimitiveKind, location ast.Node) {
-	if fromKind == toKind || (ast.EqualsPrimitiveCategory(fromKind, toKind) && ast.GetBitSize(fromKind) == ast.GetBitSize(toKind)) {
-		c.exprResult = value
-		return
-	}
-
-	value = c.load(value, from)
-
-	if (ast.IsInteger(fromKind) || ast.IsFloating(fromKind)) && toKind == ast.Bool {
-		// integer / floating to bool
-		var result ir.MetaValue
-
-		if ast.IsFloating(fromKind) {
-			result = c.block.Add(&ir.FCmpInst{
-				Kind:    ir.Ne,
-				Ordered: false,
-				Left:    value.v,
-				Right:   ir.False,
-			})
-		} else {
-			result = c.block.Add(&ir.ICmpInst{
-				Kind:   ir.Ne,
-				Signed: ast.IsSigned(fromKind),
-				Left:   value.v,
-				Right:  ir.False,
-			})
-		}
-
-		c.setLocationMeta(result, location)
-		c.exprResult = exprValue{v: result}
-	} else {
-		type_ := c.types.get(to)
-		var result ir.MetaValue
-
-		if (ast.IsInteger(fromKind) || fromKind == ast.Bool) && ast.IsInteger(toKind) {
-			// integer / bool to integer
-			if from.Size() > to.Size() {
-				result = c.block.Add(&ir.TruncInst{
-					Value: value.v,
-					Typ:   type_,
-				})
-			} else {
-				result = c.block.Add(&ir.ExtInst{
-					SignExtend: false,
-					Value:      value.v,
-					Typ:        type_,
-				})
-			}
-		} else if ast.IsFloating(fromKind) && ast.IsFloating(toKind) {
-			// floating to floating
-			if from.Size() > to.Size() {
-				result = c.block.Add(&ir.TruncInst{
-					Value: value.v,
-					Typ:   type_,
-				})
-			} else {
-				result = c.block.Add(&ir.FExtInst{
-					Value: value.v,
-					Typ:   type_,
-				})
-			}
-		} else if (ast.IsInteger(fromKind) || fromKind == ast.Bool) && ast.IsFloating(toKind) {
-			// integer / bool to floating
-			result = c.block.Add(&ir.I2FInst{
-				Signed: ast.IsSigned(fromKind),
-				Value:  value.v,
-				Typ:    type_,
-			})
-		} else if ast.IsFloating(fromKind) && ast.IsInteger(toKind) {
-			// floating to integer
-			result = c.block.Add(&ir.F2IInst{
-				Signed: ast.IsSigned(toKind),
-				Value:  value.v,
-				Typ:    type_,
-			})
-		}
-
-		c.setLocationMeta(result, location)
-		c.exprResult = exprValue{v: result}
-	}
+	c.exprResult = c.cast(value, expr.Value.Result().Type, expr.Target, expr)
 }
 
 func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
@@ -709,12 +574,13 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	for i, arg := range expr.Args {
-		index := i
 		if function.Method() != nil {
-			index++
+			args[i+1] = c.loadExpr(arg).v
+		} else if i >= len(function.Params) {
+			args[i] = c.loadExpr(arg).v
+		} else {
+			args[i] = c.implicitCastLoadExpr(function.Params[i].Type, arg).v
 		}
-
-		args[index] = c.loadExpr(arg).v
 	}
 
 	// Intrinsic
@@ -901,6 +767,35 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 }
 
 // Utils
+
+func (c *codegen) binaryLoad(left, right ast.Expr, operator *ast.Token) exprValue {
+	// Left -> Right
+	cast, castOk := ast.GetImplicitCast(left.Result().Type, right.Result().Type)
+
+	if castOk {
+		to := right.Result().Type
+
+		left := c.convertCast(c.loadExpr(left), cast, left.Result().Type, to, operator)
+		right := c.loadExpr(right)
+
+		return c.binary(operator, left, right, to)
+	}
+
+	// Right -> Left
+	cast, castOk = ast.GetImplicitCast(right.Result().Type, left.Result().Type)
+
+	if castOk {
+		to := left.Result().Type
+
+		left := c.loadExpr(left)
+		right := c.convertCast(c.loadExpr(right), cast, right.Result().Type, to, operator)
+
+		return c.binary(operator, left, right, to)
+	}
+
+	// Invalid
+	panic("codegen.binaryLoad() - Not implemented")
+}
 
 func (c *codegen) binary(op ast.Node, left exprValue, right exprValue, type_ ast.Type) exprValue {
 	left = c.load(left, type_)

@@ -3,6 +3,7 @@ package cst2ast
 import (
 	"fireball/core/ast"
 	"fireball/core/cst"
+	"fireball/core/scanner"
 	"strconv"
 )
 
@@ -23,10 +24,12 @@ func (c *converter) convertType(node cst.Node) ast.Type {
 }
 
 func (c *converter) convertIdentifierType(node cst.Node) ast.Type {
-	if len(node.Children) == 1 {
+	identifier := node.Get(scanner.Identifier)
+
+	if identifier != nil {
 		kind := ast.Unknown
 
-		switch node.Children[0].Token.Lexeme {
+		switch identifier.Token.Lexeme {
 		case "void":
 			kind = ast.Void
 		case "bool":

@@ -54,10 +54,6 @@ func (p *Primitive) Equals(other Type) bool {
 	return IsPrimitive(other, p.Kind)
 }
 
-func (p *Primitive) CanAssignTo(other Type) bool {
-	return IsPrimitive(other, p.Kind)
-}
-
 // Pointer
 
 func (p *Pointer) Size() uint32 {
@@ -71,14 +67,6 @@ func (p *Pointer) Align() uint32 {
 func (p *Pointer) Equals(other Type) bool {
 	if p2, ok := As[*Pointer](other); ok {
 		return typesEquals(p.Pointee, p2.Pointee)
-	}
-
-	return false
-}
-
-func (p *Pointer) CanAssignTo(other Type) bool {
-	if p2, ok := As[*Pointer](other); ok {
-		return IsPrimitive(p2.Pointee, Void) || typesEquals(p.Pointee, p2.Pointee)
 	}
 
 	return false
@@ -100,10 +88,6 @@ func (a *Array) Equals(other Type) bool {
 	}
 
 	return false
-}
-
-func (a *Array) CanAssignTo(other Type) bool {
-	return a.Equals(other)
 }
 
 // Resolvable
@@ -132,14 +116,6 @@ func (r *Resolvable) Equals(other Type) bool {
 	return r.Resolved().Equals(other.Resolved())
 }
 
-func (r *Resolvable) CanAssignTo(other Type) bool {
-	if r.Resolved() == nil {
-		panic("ast.Resolvable.Equals() - Not resolved")
-	}
-
-	return r.Resolved().CanAssignTo(other.Resolved())
-}
-
 // Struct
 
 func (s *Struct) Size() uint32 {
@@ -163,23 +139,7 @@ func (s *Struct) Align() uint32 {
 }
 
 func (s *Struct) Equals(other Type) bool {
-	if s2, ok := As[*Struct](other); ok {
-		return tokensEquals(s.Name, s2.Name) && slices.EqualFunc(s.Fields, s2.Fields, fieldEquals)
-	}
-
-	return false
-}
-
-func fieldEquals(v1, v2 *Field) bool {
-	return tokensEquals(v1.Name, v2.Name) && typesEquals(v1.Type, v2.Type)
-}
-
-func (s *Struct) CanAssignTo(other Type) bool {
-	if s2, ok := As[*Struct](other); ok {
-		return slices.EqualFunc(s.Fields, s2.Fields, fieldEquals)
-	}
-
-	return false
+	return s == other.Resolved()
 }
 
 func (s *Struct) Resolved() Type {
@@ -201,19 +161,7 @@ func (e *Enum) Align() uint32 {
 }
 
 func (e *Enum) Equals(other Type) bool {
-	if e2, ok := As[*Enum](other); ok {
-		return typesEquals(e.ActualType, e2.ActualType) && slices.EqualFunc(e.Cases, e2.Cases, enumCaseEquals)
-	}
-
-	return false
-}
-
-func enumCaseEquals(v1, v2 *EnumCase) bool {
-	return tokensEquals(v1.Name, v2.Name) && v1.ActualValue == v2.ActualValue
-}
-
-func (e *Enum) CanAssignTo(other Type) bool {
-	return e.Equals(other)
+	return e == other.Resolved()
 }
 
 func (e *Enum) Resolved() Type {
@@ -236,7 +184,11 @@ func (f *Func) Align() uint32 {
 
 func (f *Func) Equals(other Type) bool {
 	if f2, ok := As[*Func](other); ok {
-		return tokensEquals(f.Name, f2.Name) && typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
+		if f.Name != nil && f2.Name != nil {
+			return f == f2
+		}
+
+		return typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
 	}
 
 	return false
@@ -244,14 +196,6 @@ func (f *Func) Equals(other Type) bool {
 
 func paramEquals(v1, v2 *Param) bool {
 	return typesEquals(v1.Type, v2.Type)
-}
-
-func (f *Func) CanAssignTo(other Type) bool {
-	if f2, ok := As[*Func](other); ok {
-		return typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
-	}
-
-	return false
 }
 
 func (f *Func) Resolved() Type {
@@ -331,10 +275,6 @@ func (t *typePrinter) VisitNode(node Node) {
 }
 
 // Utils
-
-func tokensEquals(t1, t2 *Token) bool {
-	return (t1 == nil && t2 == nil) || (t1 != nil && t2 != nil && t1.String() == t2.String())
-}
 
 func typesEquals(t1, t2 Type) bool {
 	return (t1 == nil && t2 == nil) || (t1 != nil && t2 != nil && t1.Equals(t2))

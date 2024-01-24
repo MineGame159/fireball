@@ -44,9 +44,7 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 					stmt.ActualType = stmt.Value.Result().Type
 				}
 			} else {
-				if stmt.Value != nil && !stmt.Value.Result().Type.CanAssignTo(stmt.ActualType) {
-					c.error(stmt.Value, "Initializer with type '%s' cannot be assigned to a variable with type '%s'", ast.PrintType(stmt.Value.Result().Type), ast.PrintType(stmt.ActualType))
-				}
+				c.checkRequired(stmt.ActualType, stmt.Value)
 			}
 		}
 	}
@@ -71,7 +69,8 @@ func (c *checker) VisitVar(stmt *ast.Var) {
 func (c *checker) VisitIf(stmt *ast.If) {
 	stmt.AcceptChildren(c)
 
-	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
+	required := ast.Primitive{Kind: ast.Bool}
+	c.checkRequired(&required, stmt.Condition)
 }
 
 func (c *checker) VisitWhile(stmt *ast.While) {
@@ -80,7 +79,8 @@ func (c *checker) VisitWhile(stmt *ast.While) {
 	c.loopDepth--
 
 	// Check condition value
-	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
+	required := ast.Primitive{Kind: ast.Bool}
+	c.checkRequired(&required, stmt.Condition)
 }
 
 func (c *checker) VisitFor(stmt *ast.For) {
@@ -94,31 +94,27 @@ func (c *checker) VisitFor(stmt *ast.For) {
 	c.popScope()
 
 	// Check condition value
-	c.expectPrimitiveValue(stmt.Condition, ast.Bool)
+	required := ast.Primitive{Kind: ast.Bool}
+	c.checkRequired(&required, stmt.Condition)
 }
 
 func (c *checker) VisitReturn(stmt *ast.Return) {
 	stmt.AcceptChildren(c)
 
 	// Check return value
-	var type_ ast.Type
-	var errorNode ast.Node
-
 	if stmt.Value != nil {
 		if stmt.Value.Result().Kind != ast.ValueResultKind {
 			c.error(stmt.Value, "Invalid value")
 			return
 		}
 
-		type_ = stmt.Value.Result().Type
-		errorNode = stmt.Value
+		c.checkRequired(c.function.Returns, stmt.Value)
 	} else {
-		type_ = &ast.Primitive{Kind: ast.Void}
-		errorNode = stmt
-	}
+		type_ := ast.Primitive{Kind: ast.Void}
 
-	if !type_.CanAssignTo(c.function.Returns) {
-		c.error(errorNode, "Cannot return type '%s' from a function with return type '%s'", ast.PrintType(type_), ast.PrintType(c.function.Returns))
+		if !c.function.Returns.Equals(&type_) {
+			c.error(stmt, "Expected a '%s' but got a 'void'", ast.PrintType(c.function.Returns))
+		}
 	}
 }
 

@@ -23,6 +23,10 @@ func (c *codegen) alloca(type_ ast.Type, name string, node ast.Node) ir.Value {
 }
 
 func (c *codegen) setLocationMeta(value ir.MetaValue, node ast.Node) {
+	if node == nil {
+		return
+	}
+
 	meta := &ir.LocationMeta{
 		Scope: c.scopes.getMeta(),
 	}

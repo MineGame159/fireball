@@ -155,9 +155,7 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 				continue
 			}
 
-			if !initField.Value.Result().Type.CanAssignTo(field.Type) {
-				c.error(initField.Value, "Expected a '%s' but got '%s'", ast.PrintType(field.Type), ast.PrintType(initField.Value.Result().Type))
-			}
+			c.checkRequired(field.Type, initField.Value)
 		}
 	}
 
@@ -198,10 +196,7 @@ func (c *checker) VisitArrayInitializer(expr *ast.ArrayInitializer) {
 		if type_ == nil {
 			type_ = value.Result().Type
 		} else {
-			if !value.Result().Type.CanAssignTo(type_) {
-				c.error(value, "Expected a '%s' but got '%s'", ast.PrintType(type_), ast.PrintType(value.Result().Type))
-				ok = false
-			}
+			c.checkRequired(type_, value)
 		}
 	}
 
@@ -383,6 +378,8 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 		return
 	}
 
+	expr.Result().SetInvalid()
+
 	if expr.Left.Result().Kind == ast.InvalidResultKind || expr.Right.Result().Kind == ast.InvalidResultKind {
 		return // // Do not cascade errors
 	}
@@ -401,95 +398,21 @@ func (c *checker) VisitBinary(expr *ast.Binary) {
 	}
 
 	if !ok {
-		expr.Result().SetInvalid()
 		return
 	}
 
-	leftType := expr.Left.Result().Type
-	rightType := expr.Right.Result().Type
-
-	// Check based on the operator
-	if scanner.IsArithmetic(expr.Operator.Token().Kind) {
-		// Arithmetic
-		if left, ok := ast.As[*ast.Primitive](leftType); ok {
-			if right, ok := ast.As[*ast.Primitive](rightType); ok {
-				if ast.IsNumber(left.Kind) && ast.IsNumber(right.Kind) && left.Equals(right) {
-					expr.Result().SetValue(leftType, 0, nil)
-					return
-				}
-			}
-		}
-
-		c.error(expr, "Expected two equal number types")
-		expr.Result().SetInvalid()
-	} else if scanner.IsEquality(expr.Operator.Token().Kind) {
-		// Equality
-		valid := false
-
-		if leftType.Equals(rightType) {
-			// left type == right type
-			valid = true
-		} else if left, ok := ast.As[*ast.Primitive](leftType); ok {
-			// integer == integer || floating == floating
-			if right, ok := ast.As[*ast.Primitive](rightType); ok {
-				if (ast.IsInteger(left.Kind) && ast.IsInteger(right.Kind)) || (ast.IsFloating(left.Kind) && ast.IsFloating(right.Kind)) {
-					valid = true
-				}
-			}
-		} else if left, ok := ast.As[*ast.Pointer](leftType); ok {
-			if right, ok := ast.As[*ast.Pointer](rightType); ok {
-				// *void == *? || *? == *void
-				if ast.IsPrimitive(left.Pointee, ast.Void) || ast.IsPrimitive(right.Pointee, ast.Void) {
-					valid = true
-				}
-			}
-		}
-
-		if !valid {
-			c.error(expr, "Cannot check equality for '%s' and '%s'", ast.PrintType(leftType), ast.PrintType(rightType))
-			expr.Result().SetInvalid()
-		} else {
-			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
-		}
-	} else if scanner.IsComparison(expr.Operator.Token().Kind) {
-		// Comparison
-		if left, ok := ast.As[*ast.Primitive](leftType); ok {
-			if right, ok := ast.As[*ast.Primitive](rightType); ok {
-				if !ast.IsNumber(left.Kind) || !ast.IsNumber(right.Kind) || !left.Equals(right) {
-					c.error(expr, "Expected two equal number types")
-					expr.Result().SetInvalid()
-
-					return
-				}
-			}
-		}
-
-		expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
-	} else if scanner.IsBitwise(expr.Operator.Token().Kind) {
-		// Bitwise
-		if left, ok := ast.As[*ast.Primitive](leftType); ok {
-			if right, ok := ast.As[*ast.Primitive](rightType); ok {
-				if left.Equals(right) && ast.IsInteger(left.Kind) {
-					expr.Result().SetValue(leftType, 0, nil)
-					return
-				}
-			}
-		}
-
-		c.error(expr, "Expected two equal integer types")
-		expr.Result().SetInvalid()
-	} else {
-		// Error
-		panic("checker.VisitBinary() - Invalid operator kind")
-	}
+	// Check
+	c.checkBinary(expr, expr.Left, expr.Right, expr.Operator, false)
 }
 
 func (c *checker) VisitLogical(expr *ast.Logical) {
 	expr.AcceptChildren(c)
 
 	// Check expressions
-	c.expectPrimitiveValue(expr.Left, ast.Bool)
-	c.expectPrimitiveValue(expr.Right, ast.Bool)
+	type_ := ast.Primitive{Kind: ast.Bool}
+
+	c.checkRequired(&type_, expr.Left)
+	c.checkRequired(&type_, expr.Right)
 
 	// Set type
 	expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
@@ -589,42 +512,13 @@ func (c *checker) VisitAssignment(expr *ast.Assignment) {
 	// Check type
 	if expr.Operator.Token().Kind == scanner.Equal {
 		// Equal
-		if !expr.Value.Result().Type.CanAssignTo(expr.Assignee.Result().Type) {
-			c.error(expr.Value, "Expected a '%s' but got '%s'", ast.PrintType(expr.Assignee.Result().Type), ast.PrintType(expr.Value.Result().Type))
-		}
+		c.checkRequired(expr.Assignee.Result().Type, expr.Value)
 	} else {
-		if scanner.IsArithmetic(expr.Operator.Token().Kind) {
-			// Arithmetic
-			valid := false
+		// Binary
+		c.checkBinary(expr, expr.Assignee, expr.Value, expr.Operator, true)
 
-			if assignee, ok := ast.As[*ast.Primitive](expr.Assignee.Result().Type); ok {
-				if value, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
-					if ast.IsNumber(assignee.Kind) && ast.IsNumber(value.Kind) && assignee.Equals(value) {
-						valid = true
-					}
-				}
-			}
-
-			if !valid {
-				c.error(expr.Value, "Expected two equal number types")
-			}
-		} else if scanner.IsBitwise(expr.Operator.Token().Kind) {
-			// Bitwise
-			valid := false
-
-			if left, ok := ast.As[*ast.Primitive](expr.Assignee.Result().Type); ok {
-				if right, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); ok {
-					if left.Equals(right) && ast.IsInteger(left.Kind) {
-						valid = true
-					}
-				}
-			}
-
-			if !valid {
-				c.error(expr.Value, "Expected two equal integer types")
-			}
-		} else {
-			panic("checker.VisitAssignment() - Invalid operator")
+		if expr.Result().Kind == ast.InvalidResultKind {
+			panic("checker.VisitAssignment() - Not implemented")
 		}
 	}
 }
@@ -651,19 +545,8 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	expr.Result().SetValue(expr.Target, 0, nil)
 
 	// Check type
-	if ast.IsPrimitive(expr.Value.Result().Type, ast.Void) || ast.IsPrimitive(expr.Target, ast.Void) {
-		// void
-		c.error(expr, "Cannot cast to or from type 'void'")
-	} else if _, ok := ast.As[*ast.Enum](expr.Value.Result().Type); ok {
-		// enum to non integer
-		if to, ok := ast.As[*ast.Primitive](expr.Target); !ok || !ast.IsInteger(to.Kind) {
-			c.error(expr, "Can only cast enums to integers, not '%s'", ast.PrintType(to))
-		}
-	} else if _, ok := ast.As[*ast.Enum](expr.Target); ok {
-		// non integer to enum
-		if from, ok := ast.As[*ast.Primitive](expr.Value.Result().Type); !ok || !ast.IsInteger(from.Kind) {
-			c.error(expr, "Can only cast to enums from integers, not '%s'", ast.PrintType(from))
-		}
+	if _, ok := ast.GetCast(expr.Value.Result().Type, expr.Target); !ok {
+		c.error(expr, "Cannot cast type '%s' to type '%s'", ast.PrintType(expr.Value.Result().Type), ast.PrintType(expr.Target))
 	}
 }
 
@@ -721,9 +604,7 @@ func (c *checker) VisitCall(expr *ast.Call) {
 			continue
 		}
 
-		if !arg.Result().Type.CanAssignTo(param.Type) {
-			c.error(arg, "Argument with type '%s' cannot be assigned to a parameter with type '%s'", ast.PrintType(arg.Result().Type), ast.PrintType(param.Type))
-		}
+		c.checkRequired(param.Type, arg)
 	}
 }
 
@@ -958,6 +839,81 @@ func parentWantsFunction(expr ast.Expr) bool {
 
 	default:
 		return false
+	}
+}
+
+func (c *checker) checkBinary(expr, left, right ast.Expr, operator *ast.Token, assignment bool) {
+	// Implicitly cast between left and right types
+	leftType := left.Result().Type
+	rightType := right.Result().Type
+
+	castType := leftType
+	_, castOk := ast.GetImplicitCast(rightType, leftType)
+
+	if !castOk {
+		if assignment {
+			c.error(expr, "Expected a '%s' but got a '%s'", ast.PrintType(leftType), ast.PrintType(rightType))
+			return
+		}
+
+		castType = rightType
+		_, castOk = ast.GetImplicitCast(leftType, rightType)
+	}
+
+	// Arithmetic
+	if scanner.IsArithmetic(operator.Token().Kind) {
+		if left, ok := ast.As[*ast.Primitive](leftType); ok {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if ast.IsNumber(left.Kind) && ast.IsNumber(right.Kind) && castOk {
+					expr.Result().SetValue(castType, 0, nil)
+					return
+				}
+			}
+		}
+
+		c.error(expr, "Operator '%s' cannot be applied to '%s' and '%s'", operator.String(), ast.PrintType(leftType), ast.PrintType(rightType))
+		return
+	}
+
+	// Equality
+	if !assignment && scanner.IsEquality(operator.Token().Kind) {
+		if castOk {
+			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
+			return
+		}
+
+		c.error(expr, "Operator '%s' cannot be applied to '%s' and '%s'", operator.String(), ast.PrintType(leftType), ast.PrintType(rightType))
+		return
+	}
+
+	// Comparison
+	if scanner.IsComparison(operator.Token().Kind) {
+		if left, ok := ast.As[*ast.Primitive](leftType); ok {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if ast.IsNumber(left.Kind) && ast.IsNumber(right.Kind) && castOk {
+					expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
+					return
+				}
+			}
+		}
+
+		c.error(expr, "Operator '%s' cannot be applied to '%s' and '%s'", operator.String(), ast.PrintType(leftType), ast.PrintType(rightType))
+		return
+	}
+
+	// Bitwise
+	if !assignment && scanner.IsBitwise(operator.Token().Kind) {
+		if left, ok := ast.As[*ast.Primitive](leftType); ok {
+			if right, ok := ast.As[*ast.Primitive](rightType); ok {
+				if ast.IsInteger(left.Kind) && ast.IsInteger(right.Kind) && castOk {
+					expr.Result().SetValue(castType, 0, nil)
+					return
+				}
+			}
+		}
+
+		c.error(expr, "Operator '%s' cannot be applied to '%s' and '%s'", operator.String(), ast.PrintType(leftType), ast.PrintType(rightType))
+		return
 	}
 }
 

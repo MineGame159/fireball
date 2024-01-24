@@ -24,7 +24,6 @@ type Type interface {
 	Align() uint32
 
 	Equals(other Type) bool
-	CanAssignTo(other Type) bool
 
 	Resolved() Type
 

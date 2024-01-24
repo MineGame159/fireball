@@ -26,7 +26,7 @@ func (c *codegen) VisitVar(stmt *ast.Var) {
 
 	// Initializer
 	if stmt.Value != nil {
-		initializer := c.loadExpr(stmt.Value)
+		initializer := c.implicitCastLoadExpr(stmt.ActualType, stmt.Value)
 
 		store := c.block.Add(&ir.StoreInst{
 			Pointer: pointer.v,
@@ -49,7 +49,9 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 	}
 
 	// Condition
-	condition := c.loadExpr(stmt.Condition)
+	required := ast.Primitive{Kind: ast.Bool}
+	condition := c.implicitCastLoadExpr(&required, stmt.Condition)
+
 	c.block.Add(&ir.BrInst{Condition: condition.v, True: then, False: else_})
 
 	// Then
@@ -83,7 +85,10 @@ func (c *codegen) VisitWhile(stmt *ast.While) {
 
 	// Condition
 	c.beginBlock(c.loopStart)
-	condition := c.acceptExpr(stmt.Condition)
+
+	required := ast.Primitive{Kind: ast.Bool}
+	condition := c.implicitCastLoadExpr(&required, stmt.Condition)
+
 	c.block.Add(&ir.BrInst{Condition: condition.v, True: body, False: c.loopEnd})
 
 	// Body
@@ -124,7 +129,9 @@ func (c *codegen) VisitFor(stmt *ast.For) {
 	c.beginBlock(c.loopStart)
 
 	if stmt.Condition != nil {
-		condition := c.loadExpr(stmt.Condition)
+		required := ast.Primitive{Kind: ast.Bool}
+		condition := c.implicitCastLoadExpr(&required, stmt.Condition)
+
 		c.block.Add(&ir.BrInst{Condition: condition.v, True: body, False: c.loopEnd})
 	}
 
@@ -157,7 +164,7 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		)
 	} else {
 		// Other
-		value := c.loadExpr(stmt.Value)
+		value := c.implicitCastLoadExpr(c.astFunction.Returns, stmt.Value)
 
 		c.setLocationMeta(
 			c.block.Add(&ir.RetInst{Value: value.v}),

@@ -29,6 +29,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	function := c.functions[decl]
 
 	// Setup state
+	c.astFunction = decl
 	c.function = function
 	c.beginBlock(function.Block("entry"))
 
@@ -77,6 +78,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 
 	c.block = nil
 	c.function = nil
+	c.astFunction = nil
 }
 
 func (c *codegen) VisitGlobalVar(_ *ast.GlobalVar) {}

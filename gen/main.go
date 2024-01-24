@@ -74,7 +74,6 @@ func genVisitor(w *Writer, group Group) {
 		w.write("Align() uint32")
 		w.write("")
 		w.write("Equals(other Type) bool")
-		w.write("CanAssignTo(other Type) bool")
 		w.write("")
 		w.write("Resolved() Type")
 		w.write("")
