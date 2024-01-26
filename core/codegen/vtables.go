@@ -34,14 +34,22 @@ func (v *vtables) get(type_, inter ast.Type) ir.Value {
 		methods[i] = v.c.getFunction(method).v
 	}
 
+	typ := v.getType(inter.Resolved().(*ast.Interface))
+
 	value := v.c.module.Constant(
 		getVtableName(type_, inter),
-		&ir.ArrayConst{
-			Typ: &ir.ArrayType{
-				Count: uint32(len(methods)),
-				Base:  &ir.PointerType{},
+		&ir.StructConst{
+			Typ: typ,
+			Fields: []ir.Value{
+				&ir.IntConst{
+					Typ:   ir.I32,
+					Value: ir.Unsigned(uint64(v.c.ctx.GetTypeID(type_))),
+				},
+				&ir.ArrayConst{
+					Typ:    typ.Fields[1],
+					Values: methods,
+				},
 			},
-			Values: methods,
 		},
 	)
 
@@ -52,6 +60,21 @@ func (v *vtables) get(type_, inter ast.Type) ir.Value {
 	})
 
 	return value
+}
+
+func (v *vtables) getType(inter *ast.Interface) *ir.StructType {
+	funcPtrArrayType := &ir.ArrayType{
+		Count: uint32(len(inter.Methods)),
+		Base:  &ir.PointerType{},
+	}
+
+	return &ir.StructType{
+		Name: "",
+		Fields: []ir.Type{
+			ir.I32,
+			funcPtrArrayType,
+		},
+	}
 }
 
 func getVtableName(type_, inter ast.Type) string {

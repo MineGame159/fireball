@@ -194,7 +194,7 @@ func parseStructFieldExpr(p *parser) Node {
 
 func parseInfixExprPratt(p *parser, op scanner.TokenKind, lhs Node, rightPower int) Node {
 	switch op {
-	case scanner.As:
+	case scanner.As, scanner.Is:
 		p.begin(BinaryExprNode)
 
 		p.childAdd(lhs)
@@ -326,8 +326,8 @@ func init() {
 	infix(false, scanner.Ampersand)
 	// ==, !=
 	infix(false, scanner.EqualEqual, scanner.BangEqual)
-	// >, <=, >, >=, as
-	infix(false, scanner.Less, scanner.LessEqual, scanner.Greater, scanner.GreaterEqual, scanner.As)
+	// >, <=, >, >=, as, is
+	infix(false, scanner.Less, scanner.LessEqual, scanner.Greater, scanner.GreaterEqual, scanner.As, scanner.Is)
 	// <<, >>
 	infix(false, scanner.LessLess, scanner.GreaterGreater)
 	// +, -

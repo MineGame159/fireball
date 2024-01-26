@@ -73,6 +73,14 @@ func checkConcrete() bool {
     return s == &f && s != &s;
 }
 
+#[Test("is")]
+func _is() bool {
+    var f = Foo {};
+    var s Something = &f;
+
+    return (s is Foo) && !(s is i32);
+}
+
 func check(s Something, number i32) bool {
     return s.getNumber() == number;
 }

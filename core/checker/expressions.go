@@ -550,11 +550,24 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 		return
 	}
 
-	expr.Result().SetValue(expr.Target, 0, nil)
+	// Check based on the operator
+	switch expr.Operator.Token().Kind {
+	case scanner.As:
+		if _, ok := ast.GetCast(expr.Value.Result().Type, expr.Target); !ok {
+			c.error(expr, "Cannot cast type '%s' to type '%s'", ast.PrintType(expr.Value.Result().Type), ast.PrintType(expr.Target))
+		}
 
-	// Check type
-	if _, ok := ast.GetCast(expr.Value.Result().Type, expr.Target); !ok {
-		c.error(expr, "Cannot cast type '%s' to type '%s'", ast.PrintType(expr.Value.Result().Type), ast.PrintType(expr.Target))
+		expr.Result().SetValue(expr.Target, 0, nil)
+
+	case scanner.Is:
+		if _, ok := ast.As[*ast.Interface](expr.Value.Result().Type); !ok {
+			c.error(expr.Value, "Runtime type checking is only supported for interfaces")
+		}
+
+		expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
+
+	default:
+		panic("checker.VisitCast() - Not implemented")
 	}
 }
 

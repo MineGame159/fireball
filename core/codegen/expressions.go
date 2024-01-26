@@ -522,9 +522,57 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 }
 
 func (c *codegen) VisitCast(expr *ast.Cast) {
-	value := c.acceptExpr(expr.Value)
+	switch expr.Operator.Token().Kind {
+	case scanner.As:
+		value := c.acceptExpr(expr.Value)
+		c.exprResult = c.cast(value, expr.Value.Result().Type, expr.Target, expr)
 
-	c.exprResult = c.cast(value, expr.Value.Result().Type, expr.Target, expr)
+	case scanner.Is:
+		value := c.loadExpr(expr.Value)
+
+		// Get vtable pointer
+		vtablePtr := c.block.Add(&ir.ExtractValueInst{
+			Value:   value.v,
+			Indices: []uint32{uint32(0)},
+		})
+
+		// Get type id
+		typ := c.vtables.getType(expr.Value.Result().Type.Resolved().(*ast.Interface))
+		typPtr := &ir.PointerType{Pointee: typ}
+
+		typeIdPtr := c.block.Add(&ir.GetElementPtrInst{
+			PointerTyp: typPtr,
+			Typ:        typ,
+			Pointer:    vtablePtr,
+			Indices: []ir.Value{
+				&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(0)},
+				&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(0)},
+			},
+			Inbounds: true,
+		})
+
+		typeId := c.block.Add(&ir.LoadInst{
+			Typ:     ir.I32,
+			Pointer: typeIdPtr,
+		})
+
+		// Compare
+		result := c.block.Add(&ir.ICmpInst{
+			Kind:   ir.Eq,
+			Signed: false,
+			Left:   typeId,
+			Right: &ir.IntConst{
+				Typ:   ir.I32,
+				Value: ir.Unsigned(uint64(c.ctx.GetTypeID(expr.Target))),
+			},
+		})
+
+		c.setLocationMeta(result, expr.Operator)
+		c.exprResult = exprValue{v: result}
+
+	default:
+		panic("codegen.VisitCast() - Not implemented")
+	}
 }
 
 func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
@@ -731,41 +779,44 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 					value = c.load(value, expr.Value.Result().Type)
 				}
 
+				// Get vtable pointer
 				vtablePtr := c.block.Add(&ir.ExtractValueInst{
 					Value:   value.v,
 					Indices: []uint32{uint32(0)},
 				})
 
+				// Get function
 				_, index := inter.GetMethod(expr.Name.String())
 
-				void := ast.Primitive{Kind: ast.Void}
-				fnPtr := ast.Pointer{Pointee: &void}
-
-				typ := ast.Array{Base: &fnPtr, Count: uint32(len(inter.Methods))}
-				typPtr := ast.Pointer{Pointee: &typ}
+				typ := c.vtables.getType(inter)
+				typPtr := &ir.PointerType{Pointee: typ}
 
 				functionPtr := c.block.Add(&ir.GetElementPtrInst{
-					PointerTyp: c.types.get(&typPtr),
-					Typ:        c.types.get(&typ),
+					PointerTyp: typPtr,
+					Typ:        typ,
 					Pointer:    vtablePtr,
 					Indices: []ir.Value{
 						&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(0)},
+						&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(1)},
 						&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(uint64(index))},
 					},
 					Inbounds: true,
 				})
 
+				fnPtr := typ.Fields[1].(*ir.ArrayType).Base
+
 				function := c.block.Add(&ir.LoadInst{
-					Typ:     c.types.get(&fnPtr),
+					Typ:     fnPtr,
 					Pointer: functionPtr,
-					Align:   fnPtr.Align(),
 				})
 
+				// Get data pointer
 				dataPtr := c.block.Add(&ir.ExtractValueInst{
 					Value:   value.v,
 					Indices: []uint32{uint32(1)},
 				})
 
+				// Return
 				c.exprResult = exprValue{v: function}
 				c.this = exprValue{v: dataPtr, addressable: true}
 

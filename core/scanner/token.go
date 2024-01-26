@@ -1,6 +1,9 @@
 package scanner
 
-import "fireball/core"
+import (
+	"fireball/core"
+	"slices"
+)
 
 type TokenKind uint8
 
@@ -68,6 +71,7 @@ const (
 	While
 	For
 	As
+	Is
 	Static
 	Func
 	Fn
@@ -93,6 +97,10 @@ const (
 	Eof
 )
 
+func (t TokenKind) IsAny(kinds []TokenKind) bool {
+	return slices.Contains(kinds, t)
+}
+
 var LogicalOperators = []TokenKind{
 	And,
 	Or,
@@ -113,6 +121,11 @@ var AssignmentOperators = []TokenKind{
 
 	LessLessEqual,
 	GreaterGreaterEqual,
+}
+
+var CastOperators = []TokenKind{
+	As,
+	Is,
 }
 
 type Token struct {
@@ -304,6 +317,8 @@ func TokenKindStr(kind TokenKind) string {
 		return "'for'"
 	case As:
 		return "'as'"
+	case Is:
+		return "'is'"
 	case Static:
 		return "'static'"
 	case Func:

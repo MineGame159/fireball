@@ -194,6 +194,8 @@ func (s *Scanner) identifierKind() TokenKind {
 				return s.checkKeyword(2, "pl", Impl)
 			case 'n':
 				return s.checkKeyword(2, "terface", Interface)
+			case 's':
+				return Is
 			}
 		}
 	case 'n':

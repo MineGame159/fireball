@@ -82,7 +82,7 @@ func (c *converter) convertBinaryExpr(node cst.Node) ast.Expr {
 	if node.Contains(scanner.Dot) {
 		return c.convertMemberExpr(node)
 	}
-	if node.Contains(scanner.As) {
+	if node.ContainsAny(scanner.CastOperators) {
 		return c.convertCastExpr(node)
 	}
 
@@ -162,17 +162,20 @@ func (c *converter) convertIndexExpr(node cst.Node) ast.Expr {
 
 func (c *converter) convertCastExpr(node cst.Node) ast.Expr {
 	var value ast.Expr
+	var operator *ast.Token
 	var target ast.Type
 
 	for _, child := range node.Children {
 		if child.Kind.IsExpr() {
 			value = c.convertExpr(child)
+		} else if child.Token.Kind.IsAny(scanner.CastOperators) {
+			operator = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			target = c.convertType(child)
 		}
 	}
 
-	if c := ast.NewCast(node, value, target); c != nil {
+	if c := ast.NewCast(node, value, operator, target); c != nil {
 		return c
 	}
 

@@ -732,25 +732,30 @@ type Cast struct {
 	cst    cst.Node
 	parent Node
 
-	Value  Expr
-	Target Type
+	Value    Expr
+	Operator *Token
+	Target   Type
 
 	result ExprResult
 }
 
-func NewCast(node cst.Node, value Expr, target Type) *Cast {
-	if value == nil && target == nil {
+func NewCast(node cst.Node, value Expr, operator *Token, target Type) *Cast {
+	if value == nil && operator == nil && target == nil {
 		return nil
 	}
 
 	c := &Cast{
-		cst:    node,
-		Value:  value,
-		Target: target,
+		cst:      node,
+		Value:    value,
+		Operator: operator,
+		Target:   target,
 	}
 
 	if value != nil {
 		value.SetParent(c)
+	}
+	if operator != nil {
+		operator.SetParent(c)
 	}
 	if target != nil {
 		target.SetParent(c)
@@ -787,6 +792,9 @@ func (c *Cast) AcceptChildren(visitor Visitor) {
 	if c.Value != nil {
 		visitor.VisitNode(c.Value)
 	}
+	if c.Operator != nil {
+		visitor.VisitNode(c.Operator)
+	}
 	if c.Target != nil {
 		visitor.VisitNode(c.Target)
 	}
@@ -800,6 +808,10 @@ func (c *Cast) Clone() Node {
 	if c.Value != nil {
 		c2.Value = c.Value.Clone().(Expr)
 		c2.Value.SetParent(c2)
+	}
+	if c.Operator != nil {
+		c2.Operator = c.Operator.Clone().(*Token)
+		c2.Operator.SetParent(c2)
 	}
 	if c.Target != nil {
 		c2.Target = c.Target.Clone().(Type)

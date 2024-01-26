@@ -198,6 +198,7 @@ var expressions = Group{
 		node(
 			"Cast",
 			field("value", type_("Expr")),
+			field("operator", type_("Token")),
 			field("target", type_("Type")),
 		),
 		node(
