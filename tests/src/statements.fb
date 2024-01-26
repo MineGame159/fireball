@@ -1,6 +1,14 @@
 namespace Tests.Statements;
 
 #[Test]
+func variableZeroInit() bool {
+    var n i32;
+    var p *void;
+
+    return n == 0 && p == nil;
+}
+
+#[Test]
 func variableShadowing() bool {
     var a = 3;
 

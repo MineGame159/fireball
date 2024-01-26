@@ -25,17 +25,21 @@ func (c *codegen) VisitVar(stmt *ast.Var) {
 	c.scopes.addVariable(stmt.Name, stmt.ActualType, pointer, 0)
 
 	// Initializer
+	var initializer ir.Value
+
 	if stmt.Value != nil {
-		initializer := c.implicitCastLoadExpr(stmt.ActualType, stmt.Value)
-
-		store := c.block.Add(&ir.StoreInst{
-			Pointer: pointer.v,
-			Value:   initializer.v,
-			Align:   stmt.ActualType.Align() * 8,
-		})
-
-		c.setLocationMeta(store, stmt)
+		initializer = c.implicitCastLoadExpr(stmt.ActualType, stmt.Value).v
+	} else {
+		initializer = &ir.ZeroInitConst{Typ: c.types.get(stmt.ActualType)}
 	}
+
+	store := c.block.Add(&ir.StoreInst{
+		Pointer: pointer.v,
+		Value:   initializer,
+		Align:   stmt.ActualType.Align() * 8,
+	})
+
+	c.setLocationMeta(store, stmt)
 }
 
 func (c *codegen) VisitIf(stmt *ast.If) {
