@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/utils"
 	"fmt"
@@ -182,6 +183,20 @@ func (c *checker) error(node ast.Node, format string, args ...any) {
 	c.reporter.Report(utils.Diagnostic{
 		Kind:    utils.ErrorKind,
 		Range:   node.Cst().Range,
+		Message: fmt.Sprintf(format, args...),
+	})
+}
+
+func errorSlice[T ast.Node](c *checker, nodes []T, format string, args ...any) {
+	start := nodes[0].Cst().Range.Start
+	end := nodes[len(nodes)-1].Cst().Range.End
+
+	c.reporter.Report(utils.Diagnostic{
+		Kind: utils.ErrorKind,
+		Range: core.Range{
+			Start: start,
+			End:   end,
+		},
 		Message: fmt.Sprintf(format, args...),
 	})
 }

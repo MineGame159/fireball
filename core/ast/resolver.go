@@ -13,6 +13,7 @@ type Resolver interface {
 
 	GetMethod(type_ Type, name string, static bool) *Func
 	GetMethods(type_ Type, static bool) []*Func
+	GetImpl(type_ Type, inter *Interface) *Impl
 
 	GetChildren() []string
 	GetSymbols(visitor SymbolVisitor)
@@ -96,6 +97,16 @@ func (c *CombinedResolver) GetMethods(type_ Type, static bool) []*Func {
 	}
 
 	return methods
+}
+
+func (c *CombinedResolver) GetImpl(type_ Type, inter *Interface) *Impl {
+	for _, resolver := range c.resolvers {
+		if impl := resolver.GetImpl(type_, inter); impl != nil {
+			return impl
+		}
+	}
+
+	return nil
 }
 
 func (c *CombinedResolver) GetChildren() []string {

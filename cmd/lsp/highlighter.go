@@ -3,37 +3,16 @@ package lsp
 import (
 	"cmp"
 	"fireball/core/ast"
-	"fireball/core/scanner"
-	"fireball/core/utils"
 	"slices"
 )
 
 type highlighter struct {
-	enums utils.Set[string]
-
-	functions utils.Set[string]
-	params    []*ast.Param
-
 	tokens []semantic
 }
 
 func highlight(node ast.Node) []uint32 {
 	h := highlighter{
-		enums:     utils.NewSet[string](),
-		functions: utils.NewSet[string](),
-		tokens:    make([]semantic, 0, 256),
-	}
-
-	for _, decl := range node.(*ast.File).Decls {
-		if v, ok := decl.(*ast.Enum); ok {
-			if v.Name != nil {
-				h.enums.Add(v.Name.String())
-			}
-		} else if v, ok := decl.(*ast.Func); ok {
-			if v.Name != nil {
-				h.functions.Add(v.Name.String())
-			}
-		}
+		tokens: make([]semantic, 0, 256),
 	}
 
 	h.VisitNode(node)
@@ -69,18 +48,24 @@ func (h *highlighter) VisitStruct(decl *ast.Struct) {
 	decl.AcceptChildren(h)
 }
 
-func (h *highlighter) VisitImpl(decl *ast.Impl) {
-	h.add(decl.Struct, classKind)
-
-	decl.AcceptChildren(h)
-}
-
 func (h *highlighter) VisitEnum(decl *ast.Enum) {
 	h.add(decl.Name, enumKind)
 
 	for _, case_ := range decl.Cases {
 		h.add(case_.Name, enumMemberKind)
 	}
+
+	decl.AcceptChildren(h)
+}
+
+func (h *highlighter) VisitImpl(decl *ast.Impl) {
+	h.add(decl.Struct, classKind)
+
+	decl.AcceptChildren(h)
+}
+
+func (h *highlighter) VisitInterface(decl *ast.Interface) {
+	h.add(decl.Name, interfaceKind)
 
 	decl.AcceptChildren(h)
 }
@@ -94,9 +79,7 @@ func (h *highlighter) VisitFunc(decl *ast.Func) {
 		h.add(param.Name, parameterKind)
 	}
 
-	h.params = decl.Params
 	decl.AcceptChildren(h)
-	h.params = nil
 }
 
 func (h *highlighter) VisitGlobalVar(decl *ast.GlobalVar) {
@@ -230,6 +213,8 @@ func (h *highlighter) visitExprResult(node ast.Node, result *ast.ExprResult) {
 			h.add(node, classKind)
 		case *ast.Enum:
 			h.add(node, enumKind)
+		case *ast.Interface:
+			h.add(node, interfaceKind)
 		}
 
 	case ast.ResolverResultKind:
@@ -270,6 +255,8 @@ func (h *highlighter) visitType(type_ ast.Type) {
 				h.add(type_.Parts[len(type_.Parts)-1], classKind)
 			case *ast.Enum:
 				h.add(type_.Parts[len(type_.Parts)-1], enumKind)
+			case *ast.Interface:
+				h.add(type_.Parts[len(type_.Parts)-1], interfaceKind)
 			}
 		}
 	}
@@ -310,6 +297,7 @@ const (
 	propertyKind
 	enumMemberKind
 	namespaceKind
+	interfaceKind
 )
 
 type semantic struct {
@@ -374,16 +362,4 @@ func (h *highlighter) data() []uint32 {
 	}
 
 	return data
-}
-
-// Utils
-
-func (h *highlighter) isParameter(name scanner.Token) bool {
-	for _, param := range h.params {
-		if param.Name.String() == name.Lexeme {
-			return true
-		}
-	}
-
-	return false
 }

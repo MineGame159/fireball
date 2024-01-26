@@ -101,3 +101,37 @@ func (z *ZeroInitConst) Name() string {
 }
 
 func (z *ZeroInitConst) isConst() {}
+
+// Array
+
+type ArrayConst struct {
+	Typ    Type
+	Values []Value
+}
+
+func (a *ArrayConst) Type() Type {
+	return a.Typ
+}
+
+func (a *ArrayConst) Name() string {
+	return ""
+}
+
+func (a *ArrayConst) isConst() {}
+
+// Struct
+
+type StructConst struct {
+	Typ    Type
+	Fields []Value
+}
+
+func (s *StructConst) Type() Type {
+	return s.Typ
+}
+
+func (s *StructConst) Name() string {
+	return ""
+}
+
+func (s *StructConst) isConst() {}

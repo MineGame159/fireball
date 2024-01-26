@@ -107,6 +107,11 @@ func (n *namespace) GetType(name string) ast.Type {
 				if decl.Name != nil && decl.Name.String() == name {
 					return decl
 				}
+
+			case *ast.Interface:
+				if decl.Name != nil && decl.Name.String() == name {
+					return decl
+				}
 			}
 		}
 	}
@@ -170,6 +175,18 @@ func (n *namespace) GetMethods(type_ ast.Type, static bool) []*ast.Func {
 	return methods
 }
 
+func (n *namespace) GetImpl(type_ ast.Type, inter *ast.Interface) *ast.Impl {
+	for _, file := range n.files {
+		for _, decl := range file.Ast.Decls {
+			if impl, ok := decl.(*ast.Impl); ok && type_.Equals(impl.Type) && inter.Equals(impl.Implements) {
+				return impl
+			}
+		}
+	}
+
+	return nil
+}
+
 func (n *namespace) GetChildren() []string {
 	children := make([]string, len(n.children))
 
@@ -184,7 +201,7 @@ func (n *namespace) GetSymbols(visitor ast.SymbolVisitor) {
 	for _, file := range n.files {
 		for _, decl := range file.Ast.Decls {
 			switch decl.(type) {
-			case *ast.Struct, *ast.Enum, *ast.Func, *ast.GlobalVar:
+			case *ast.Struct, *ast.Impl, *ast.Enum, *ast.Interface, *ast.Func, *ast.GlobalVar:
 				visitor.VisitSymbol(decl)
 			}
 		}

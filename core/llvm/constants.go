@@ -67,6 +67,32 @@ func (w *textWriter) writeConst(c ir.Const) {
 	case *ir.ZeroInitConst:
 		w.writeString("zeroinitializer")
 
+	case *ir.ArrayConst:
+		w.writeString("[ ")
+
+		for i, value := range c.Values {
+			if i > 0 {
+				w.writeString(", ")
+			}
+
+			w.writeValue(value)
+		}
+
+		w.writeString(" ]")
+
+	case *ir.StructConst:
+		w.writeString("{ ")
+
+		for i, field := range c.Fields {
+			if i > 0 {
+				w.writeString(", ")
+			}
+
+			w.writeValue(field)
+		}
+
+		w.writeString(" }")
+
 	default:
 		panic("ir.writeConst() - Not implemented")
 	}

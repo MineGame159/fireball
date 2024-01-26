@@ -794,7 +794,7 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		// Get struct
 		var s *ast.Struct
 
-		if v, ok := expr.Value.Result().Type.(*ast.Struct); ok {
+		if v, ok := ast.As[*ast.Struct](expr.Value.Result().Type); ok {
 			s = v
 		} else if v, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
 			if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
@@ -803,7 +803,20 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		}
 
 		if s == nil {
-			c.error(expr.Value, "Only structs and pointers to structs can have members, not '%s'", ast.PrintType(expr.Value.Result().Type))
+			if inter, ok := ast.As[*ast.Interface](expr.Value.Result().Type); ok {
+				// Interface
+				method, _ := inter.GetMethod(expr.Name.String())
+
+				if method != nil {
+					expr.Result().SetCallable(method, method)
+					return
+				}
+
+				c.error(expr.Name, "Interface '%s' does not contain method with the name '%s'", ast.PrintType(inter), expr.Name)
+				return
+			}
+
+			c.error(expr.Value, "Only structs, pointers to structs and interfaces can have members, not '%s'", ast.PrintType(expr.Value.Result().Type))
 			return
 		}
 
@@ -899,6 +912,13 @@ func (c *checker) checkBinary(expr, left, right ast.Expr, operator *ast.Token, a
 		if castOk {
 			expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
 			return
+		}
+
+		if _, ok := ast.As[*ast.Interface](leftType); ok {
+			if _, ok := ast.As[*ast.Pointer](rightType); ok {
+				expr.Result().SetValue(&ast.Primitive{Kind: ast.Bool}, 0, nil)
+				return
+			}
 		}
 
 		c.error(expr, "Operator '%s' cannot be applied to '%s' and '%s'", operator.String(), ast.PrintType(leftType), ast.PrintType(rightType))

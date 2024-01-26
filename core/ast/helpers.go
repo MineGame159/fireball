@@ -127,6 +127,18 @@ func (f *Field) MangledName() string {
 	return sb.String()
 }
 
+// Interface
+
+func (i *Interface) GetMethod(name string) (*Func, int) {
+	for i, function := range i.Methods {
+		if function.Name != nil && function.Name.String() == name {
+			return function, i
+		}
+	}
+
+	return nil, 0
+}
+
 // Func
 
 func (f *Func) IsStatic() bool {
@@ -184,6 +196,10 @@ func (f *Func) HasBody() bool {
 		if attribute.Name.String() == "Extern" || attribute.Name.String() == "Intrinsic" {
 			return false
 		}
+	}
+
+	if _, ok := f.Parent().(*Interface); ok {
+		return false
 	}
 
 	return true

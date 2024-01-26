@@ -139,7 +139,7 @@ func (s *Struct) Align() uint32 {
 }
 
 func (s *Struct) Equals(other Type) bool {
-	return s == other.Resolved()
+	return other != nil && s == other.Resolved()
 }
 
 func (s *Struct) Resolved() Type {
@@ -172,6 +172,28 @@ func (e *Enum) AcceptType(visitor TypeVisitor) {
 	visitor.VisitEnum(e)
 }
 
+// Interface
+
+func (i *Interface) Size() uint32 {
+	return 8 * 2
+}
+
+func (i *Interface) Align() uint32 {
+	return 8
+}
+
+func (i *Interface) Equals(other Type) bool {
+	return other != nil && i == other.Resolved()
+}
+
+func (i *Interface) Resolved() Type {
+	return i
+}
+
+func (i *Interface) AcceptType(visitor TypeVisitor) {
+	visitor.VisitInterface(i)
+}
+
 // Func
 
 func (f *Func) Size() uint32 {
@@ -194,6 +216,10 @@ func (f *Func) Equals(other Type) bool {
 	return false
 }
 
+func (f *Func) NameAndSignatureEquals(other *Func) bool {
+	return tokensEquals(f.Name, other.Name) && typesEquals(f.Returns, other.Returns) && slices.EqualFunc(f.Params, other.Params, paramEquals)
+}
+
 func paramEquals(v1, v2 *Param) bool {
 	return typesEquals(v1.Type, v2.Type)
 }
@@ -209,6 +235,7 @@ func (f *Func) AcceptType(visitor TypeVisitor) {
 // Printer
 
 type TypePrintOptions struct {
+	FuncNames  bool
 	ParamNames bool
 }
 
@@ -264,7 +291,17 @@ func (t *typePrinter) VisitEnum(type_ *Enum) {
 	}
 }
 
+func (t *typePrinter) VisitInterface(type_ *Interface) {
+	if type_.Name != nil {
+		t.str += type_.Name.String()
+	}
+}
+
 func (t *typePrinter) VisitFunc(type_ *Func) {
+	if t.options.FuncNames && type_.Name != nil {
+		t.str += type_.Name.String()
+	}
+
 	t.str += type_.Signature(t.options.ParamNames)
 }
 
@@ -275,6 +312,14 @@ func (t *typePrinter) VisitNode(node Node) {
 }
 
 // Utils
+
+func tokensEquals(t1, t2 *Token) bool {
+	if t1 == nil || t2 == nil {
+		return t1 == nil && t2 == nil
+	}
+
+	return t1.String() == t2.String()
+}
 
 func typesEquals(t1, t2 Type) bool {
 	return (t1 == nil && t2 == nil) || (t1 != nil && t2 != nil && t1.Equals(t2))

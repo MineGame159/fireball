@@ -20,8 +20,11 @@ type cachedTypeMeta struct {
 type types struct {
 	module *ir.Module
 
-	types    []cachedType
-	metadata []cachedTypeMeta
+	interfaceType ir.Type
+	types         []cachedType
+
+	interfaceMetadata ir.MetaID
+	metadata          []cachedTypeMeta
 }
 
 // Types
@@ -88,6 +91,25 @@ func (t *types) get(type_ ast.Type) ir.Type {
 
 	case *ast.Enum:
 		return t.get(type_.ActualType)
+
+	case *ast.Interface:
+		if t.interfaceType == nil {
+			void := ast.Primitive{Kind: ast.Void}
+			ptr := ast.Pointer{Pointee: &void}
+
+			typ := &ir.StructType{
+				Name: "__interface",
+				Fields: []ir.Type{
+					t.get(&ptr),
+					t.get(&ptr),
+				},
+			}
+
+			t.module.Struct(typ)
+			t.interfaceType = typ
+		}
+
+		return t.interfaceType
 
 	case *ast.Func:
 		if typ := t.getCachedType(type_); typ != nil {
@@ -233,12 +255,43 @@ func (t *types) cacheType(type_ ast.Type, typ ir.Type) ir.Type {
 // Meta
 
 func (t *types) getMeta(type_ ast.Type) ir.MetaID {
+	// Interface
+	if _, ok := ast.As[*ast.Interface](type_); ok {
+		if !t.interfaceMetadata.Valid() {
+			void := ast.Primitive{Kind: ast.Void}
+			ptr := ast.Pointer{Pointee: &void}
+
+			t.interfaceMetadata = t.module.Meta(&ir.CompositeTypeMeta{
+				Tag:   ir.StructureTypeTag,
+				Name:  "__interface",
+				Size:  type_.Size() * 8,
+				Align: type_.Align() * 8,
+				Elements: []ir.MetaID{
+					t.module.Meta(&ir.DerivedTypeMeta{
+						Tag:      ir.MemberTag,
+						BaseType: t.getMeta(&ptr),
+						Offset:   0,
+					}),
+					t.module.Meta(&ir.DerivedTypeMeta{
+						Tag:      ir.MemberTag,
+						BaseType: t.getMeta(&ptr),
+						Offset:   ptr.Size() * 8,
+					}),
+				},
+			})
+		}
+
+		return t.interfaceMetadata
+	}
+
+	// Check cache
 	for _, cached := range t.metadata {
 		if cached.type_.Equals(type_) {
 			return cached.id
 		}
 	}
 
+	// Create
 	switch type_ := type_.Resolved().(type) {
 	case *ast.Primitive:
 		if type_.Kind == ast.Void {

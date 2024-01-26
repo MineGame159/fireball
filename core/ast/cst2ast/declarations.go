@@ -23,6 +23,8 @@ func (c *converter) convertDecl(node cst.Node) ast.Decl {
 		return c.convertImplDecl(node)
 	case cst.EnumDeclNode:
 		return c.convertEnumDecl(node)
+	case cst.InterfaceDeclNode:
+		return c.convertInterfaceDecl(node)
 	case cst.FuncDeclNode:
 		if f := c.convertFuncDecl(node); f != nil {
 			return f
@@ -142,11 +144,14 @@ func (c *converter) convertStructField(node cst.Node) (*ast.Field, bool) {
 
 func (c *converter) convertImplDecl(node cst.Node) ast.Decl {
 	var struct_ *ast.Token
+	var implements ast.Type
 	var methods []*ast.Func
 
 	for _, child := range node.Children {
 		if child.Kind == cst.IdentifierNode {
 			struct_ = c.convertToken(child)
+		} else if child.Kind.IsType() {
+			implements = c.convertType(child)
 		} else if child.Kind == cst.FuncDeclNode {
 			method := c.convertFuncDecl(child)
 
@@ -158,7 +163,7 @@ func (c *converter) convertImplDecl(node cst.Node) ast.Decl {
 		}
 	}
 
-	if i := ast.NewImpl(node, struct_, methods); i != nil {
+	if i := ast.NewImpl(node, struct_, implements, methods); i != nil {
 		return i
 	}
 
@@ -210,6 +215,31 @@ func (c *converter) convertEnumCase(node cst.Node) *ast.EnumCase {
 	return ast.NewEnumCase(node, name, value)
 }
 
+// Interface
+
+func (c *converter) convertInterfaceDecl(node cst.Node) ast.Decl {
+	var name *ast.Token
+	var methods []*ast.Func
+
+	for _, child := range node.Children {
+		if child.Kind == cst.IdentifierNode {
+			name = c.convertToken(child)
+		} else if child.Kind == cst.FuncDeclNode {
+			method := c.convertFuncDecl(child)
+
+			if method != nil {
+				methods = append(methods, method)
+			}
+		}
+	}
+
+	if i := ast.NewInterface(node, name, methods); i != nil {
+		return i
+	}
+
+	return nil
+}
+
 // Func
 
 func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
@@ -250,25 +280,6 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 			}
 		} else if child.Kind == cst.AttributesNode {
 			attributes = c.convertAttributes(child)
-		}
-	}
-
-	needsBody := true
-
-	for _, attribute := range attributes {
-		if attribute.Name.String() == "Extern" || attribute.Name.String() == "Intrinsic" {
-			needsBody = false
-			break
-		}
-	}
-
-	if needsBody {
-		if !node.Contains(scanner.LeftBrace) {
-			c.error(node, "Functions without the extern or intrinsic attribute need to have a body")
-		}
-	} else {
-		if node.Contains(scanner.LeftBrace) {
-			c.error(node, "Functions with the extern or intrinsic attribute can't have a body")
 		}
 	}
 

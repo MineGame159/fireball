@@ -465,10 +465,16 @@ func (s *SelectInst) Type() Type {
 type CallInst struct {
 	baseInst
 
+	Typ *FuncType
+
 	Callee Value
 	Args   []Value
 }
 
 func (c *CallInst) Type() Type {
-	return c.Callee.Type().(*FuncType).Returns
+	if c.Typ == nil {
+		return c.Callee.Type().(*FuncType).Returns
+	}
+
+	return c.Typ.Returns
 }

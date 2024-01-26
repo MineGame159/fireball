@@ -216,6 +216,10 @@ func getMemberCompletions(resolver ast.Resolver, c *completions, member *ast.Mem
 			for _, case_ := range e.Cases {
 				c.addNode(protocol.CompletionItemKindEnumMember, case_.Name, strconv.FormatInt(case_.ActualValue, 10))
 			}
+		} else if i, ok := asThroughPointer[*ast.Interface](member.Value.Result().Type); ok && member.Value.Result().Kind == ast.ValueResultKind {
+			for _, method := range i.Methods {
+				c.addNode(protocol.CompletionItemKindMethod, method.Name, printType(method))
+			}
 		}
 	}
 }
@@ -340,6 +344,9 @@ func (c *completions) VisitSymbol(node ast.Node) {
 
 	case *ast.Enum:
 		c.addNode(protocol.CompletionItemKindEnum, node.Name, "")
+
+	case *ast.Interface:
+		c.addNode(protocol.CompletionItemKindInterface, node.Name, "")
 
 	case *ast.Func:
 		if !c.symbolsOnlyTypes {

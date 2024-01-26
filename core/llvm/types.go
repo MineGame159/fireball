@@ -8,7 +8,7 @@ func (w *textWriter) writeStructs() {
 	for _, s := range w.m.Structs {
 		w.writeString("%struct.")
 		w.writeString(s.Name)
-		w.writeString(" = ")
+		w.writeString(" = type ")
 		w.writeStruct(s)
 		w.writeRune('\n')
 	}
@@ -77,7 +77,7 @@ func (w *textWriter) writeType(t ir.Type) {
 }
 
 func (w *textWriter) writeStruct(s *ir.StructType) {
-	w.writeString("type { ")
+	w.writeString("{ ")
 
 	for i, field := range s.Fields {
 		if i > 0 {

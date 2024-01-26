@@ -10,6 +10,8 @@ const (
 
 	Int2Float
 	Float2Int
+
+	Pointer2Interface
 )
 
 func GetCast(from, to Type) (CastKind, bool) {
@@ -50,9 +52,14 @@ func GetCast(from, to Type) (CastKind, bool) {
 			}
 		}
 
-	// Pointer -> Pointer, Func
+	// Pointer -> Interface, Pointer, Func
 	case *Pointer:
-		switch to.Resolved().(type) {
+		switch to := to.Resolved().(type) {
+		case *Interface:
+			if implements(from, to) {
+				return Pointer2Interface, true
+			}
+
 		case *Pointer, *Func:
 			return None, true
 		}
@@ -94,12 +101,43 @@ func GetImplicitCast(from, to Type) (CastKind, bool) {
 			}
 		}
 
-	// Pointer -> Pointer (*void)
+	// Pointer -> Interface, Pointer (*void)
 	case *Pointer:
-		if to, ok := As[*Pointer](to); ok && IsPrimitive(to.Pointee, Void) {
-			return None, true
+		switch to := to.Resolved().(type) {
+		case *Interface:
+			if implements(from, to) {
+				return Pointer2Interface, true
+			}
+
+		case *Pointer:
+			if IsPrimitive(to.Pointee, Void) {
+				return None, true
+			}
 		}
 	}
 
 	return None, false
+}
+
+func implements(type_ Type, inter *Interface) bool {
+	// Check struct pointee
+	if pointer, ok := type_.(*Pointer); ok {
+		if s, ok := As[*Struct](pointer.Pointee); ok {
+			type_ = s
+		} else {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	// Get resolver
+	resolver := GetParent[*File](type_).Resolver
+
+	// Check impl
+	if resolver.GetImpl(type_, inter) != nil {
+		return true
+	}
+
+	return false
 }

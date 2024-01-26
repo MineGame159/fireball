@@ -79,6 +79,7 @@ const (
 	Struct
 	Impl
 	Enum
+	Interface
 
 	Number
 	Hex
@@ -148,7 +149,7 @@ func (p PositionedToken) Range() core.Range {
 }
 
 func IsKeyword(kind TokenKind) bool {
-	return kind >= Nil && kind <= Enum
+	return kind >= Nil && kind <= Interface
 }
 
 func IsEquality(kind TokenKind) bool {
@@ -325,6 +326,8 @@ func TokenKindStr(kind TokenKind) string {
 		return "'impl'"
 	case Enum:
 		return "'enum'"
+	case Interface:
+		return "'interface'"
 
 	case Number:
 		return "number"

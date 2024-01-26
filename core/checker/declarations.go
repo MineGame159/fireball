@@ -49,6 +49,36 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 }
 
 func (c *checker) VisitImpl(decl *ast.Impl) {
+	// Implements
+	if decl.Implements != nil {
+		// Check interface
+		if inter, ok := ast.As[*ast.Interface](decl.Implements); ok {
+			// Check methods
+			count := 0
+
+			for _, method := range decl.Methods {
+				if method.Name == nil {
+					continue
+				}
+
+				interMethod, _ := inter.GetMethod(method.Name.String())
+
+				if interMethod != nil && interMethod.NameAndSignatureEquals(method) {
+					count++
+				} else {
+					c.error(method, "Interface '%s' does not contain method '%s'", ast.PrintType(inter), ast.PrintTypeOptions(method, ast.TypePrintOptions{FuncNames: true}))
+				}
+			}
+
+			if count != len(inter.Methods) {
+				c.error(decl.Struct, "Missing method from interface '%s'", ast.PrintType(decl.Implements))
+			}
+		} else {
+			c.error(decl.Implements, "'%s' is not an interface", ast.PrintType(decl.Implements))
+		}
+	}
+
+	// Children
 	if decl.Type != nil {
 		c.pushScope()
 		c.addVariable(&ast.Token{Token_: scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}}, decl.Type, nil)
@@ -159,6 +189,19 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 	}
 }
 
+func (c *checker) VisitInterface(decl *ast.Interface) {
+	decl.AcceptChildren(c)
+
+	c.checkNameCollision(decl, decl.Name)
+
+	// Check method bodies
+	for _, method := range decl.Methods {
+		if method.Cst().Contains(scanner.LeftBrace) {
+			errorSlice(c, method.Body, "Interface methods can't have bodies")
+		}
+	}
+}
+
 func (c *checker) VisitFunc(decl *ast.Func) {
 	// Check name collision
 	if decl.Name != nil {
@@ -214,6 +257,17 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	if (isExtern && isIntrinsic) || (isExtern && isTest) || (isIntrinsic && isTest) {
 		c.error(decl.Name, "Invalid combination of attributes")
+	}
+
+	// Check body
+	if decl.HasBody() {
+		if !decl.Cst().Contains(scanner.LeftBrace) {
+			c.error(decl, "Function need to have a body")
+		}
+	} else {
+		if decl.Cst().Contains(scanner.LeftBrace) {
+			c.error(decl, "Function can't have a body")
+		}
 	}
 
 	// Push scope

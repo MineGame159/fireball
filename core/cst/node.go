@@ -82,6 +82,7 @@ const (
 	ImplDeclNode
 	EnumDeclNode
 	EnumCaseNode
+	InterfaceDeclNode
 	FuncDeclNode
 	FuncParamNode
 	VarDeclNode
@@ -156,7 +157,7 @@ func (n NodeKind) IsType() bool {
 
 func (n NodeKind) IsDecl() bool {
 	switch n {
-	case NamespaceDeclNode, UsingDeclNode, StructDeclNode, ImplDeclNode, EnumDeclNode, FuncDeclNode, VarDeclNode:
+	case NamespaceDeclNode, UsingDeclNode, StructDeclNode, ImplDeclNode, EnumDeclNode, InterfaceDeclNode, FuncDeclNode, VarDeclNode:
 		return true
 
 	default:
@@ -206,6 +207,8 @@ func (n NodeKind) String() string {
 		return "Enum"
 	case EnumCaseNode:
 		return "Enum case"
+	case InterfaceDeclNode:
+		return "Interface"
 	case FuncDeclNode:
 		return "Func"
 	case FuncParamNode:

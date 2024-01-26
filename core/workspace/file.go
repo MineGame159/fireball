@@ -50,6 +50,7 @@ func (f *File) SetText(text string, parse bool) {
 
 		f.Cst = cst.Parse(f, text)
 		f.Ast = cst2ast.Convert(f, f.AbsolutePath(), f.Cst)
+		f.Ast.Resolver = f.Project.GetResolverFile(f.Ast)
 
 		f.Project.addFileToNamespace(f)
 

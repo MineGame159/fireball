@@ -197,6 +197,7 @@ func (p *Project) LoadFiles() error {
 
 		file.Cst = cst.Parse(file, file.Text)
 		file.Ast = cst2ast.Convert(file, file.AbsolutePath(), file.Cst)
+		file.Ast.Resolver = p.GetResolverFile(file.Ast)
 
 		p.addFileToNamespace(file)
 

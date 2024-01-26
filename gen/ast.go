@@ -39,6 +39,7 @@ var types = Group{
 	additionalVisitors: []string{
 		"Struct",
 		"Enum",
+		"Interface",
 		"Func",
 	},
 }
@@ -75,6 +76,12 @@ var declarations = Group{
 			"Impl",
 			field("struct", type_("Token")),
 			field("Type", type_("Type")),
+			field("implements", type_("Type")),
+			field("methods", array("Func")),
+		),
+		node(
+			"Interface",
+			field("name", type_("Token")),
 			field("methods", array("Func")),
 		),
 		node(
@@ -245,6 +252,7 @@ var other = Group{
 			"File",
 			field("path", type_("string")),
 			field("namespace", type_("Namespace")),
+			field("Resolver", type_("Resolver")),
 			field("decls", array("Decl")),
 		),
 		node(

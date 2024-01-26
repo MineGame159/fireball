@@ -130,11 +130,11 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 			} else if enum, ok := decl.(*ast.Enum); ok && nodeCst(enum) != nil && nodeCst(enum.Name) != nil {
 				// Enum
 				id := symbols.add(symbol{
+					file:           file,
 					kind:           protocol.SymbolKindEnum,
 					name:           enum.Name.String(),
 					range_:         nodeCst(enum).Range,
 					selectionRange: nodeCst(enum.Name).Range,
-					file:           file,
 				}, len(enum.Cases))
 
 				for _, case_ := range enum.Cases {
@@ -146,6 +146,34 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 							detail:         strconv.FormatInt(case_.ActualValue, 10),
 							range_:         nodeCst(case_.Name).Range,
 							selectionRange: nodeCst(case_.Name).Range,
+						})
+					}
+				}
+			} else if inter, ok := decl.(*ast.Interface); ok && nodeCst(inter) != nil && nodeCst(inter.Name) != nil {
+				// Interface
+				id := symbols.add(symbol{
+					file:           file,
+					kind:           protocol.SymbolKindInterface,
+					name:           inter.Name.String(),
+					range_:         nodeCst(inter).Range,
+					selectionRange: nodeCst(inter.Name).Range,
+				}, len(inter.Methods))
+
+				for _, method := range inter.Methods {
+					if nodeCst(method.Name) != nil {
+						detail := ""
+
+						if symbols.supportsDetail() {
+							detail = method.Signature(true)
+						}
+
+						symbols.addChild(id, symbol{
+							file:           file,
+							kind:           protocol.SymbolKindMethod,
+							name:           method.Name.String(),
+							detail:         detail,
+							range_:         nodeCst(method).Range,
+							selectionRange: nodeCst(method.Name).Range,
 						})
 					}
 				}

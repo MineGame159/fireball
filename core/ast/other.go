@@ -13,6 +13,7 @@ type File struct {
 
 	Path      string
 	Namespace *Namespace
+	Resolver  Resolver
 	Decls     []Decl
 }
 
@@ -69,8 +70,9 @@ func (f *File) AcceptChildren(visitor Visitor) {
 
 func (f *File) Clone() Node {
 	f2 := &File{
-		cst:  f.cst,
-		Path: f.Path,
+		cst:      f.cst,
+		Path:     f.Path,
+		Resolver: f.Resolver,
 	}
 
 	if f.Namespace != nil {
@@ -677,6 +679,8 @@ func IsNil(node Node) bool {
 	case *Enum:
 		return node == nil
 	case *Impl:
+		return node == nil
+	case *Interface:
 		return node == nil
 	case *Func:
 		return node == nil

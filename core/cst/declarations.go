@@ -9,6 +9,7 @@ var canStartDecl = []scanner.TokenKind{
 	scanner.Struct,
 	scanner.Impl,
 	scanner.Enum,
+	scanner.Interface,
 	scanner.Func,
 	scanner.Var,
 
@@ -37,6 +38,8 @@ func parseDecl(p *parser) Node {
 		return parseImplDecl(p, attributes)
 	case scanner.Enum:
 		return parseEnumDecl(p, attributes)
+	case scanner.Interface:
+		return parseInterfaceDecl(p, attributes)
 	case scanner.Func:
 		return parseFuncDecl(p, attributes)
 	case scanner.Var:
@@ -161,10 +164,15 @@ func parseImplDecl(p *parser, attributes Node) Node {
 	if p.consume(scanner.Identifier) {
 		return p.end()
 	}
+	if p.optional(scanner.Colon) {
+		if p.child(parseType) {
+			return p.end()
+		}
+	}
 	if p.consume(scanner.LeftBrace) {
 		return p.end()
 	}
-	if p.repeatSync(parseImplFunc, scanner.RightBrace, scanner.Hashtag, scanner.Static, scanner.Func) {
+	if p.repeatSync(parseFuncDeclWithAttributes, scanner.RightBrace, scanner.Hashtag, scanner.Static, scanner.Func) {
 		return p.end()
 	}
 	if p.consume(scanner.RightBrace) {
@@ -172,19 +180,6 @@ func parseImplDecl(p *parser, attributes Node) Node {
 	}
 
 	return p.end()
-}
-
-func parseImplFunc(p *parser) Node {
-	var attributes Node
-
-	if p.peek() == scanner.Hashtag {
-		attributes = parseAttributes(p)
-		if p.recovering() {
-			return Node{}
-		}
-	}
-
-	return parseFuncDecl(p, attributes)
 }
 
 // Enum
@@ -235,9 +230,47 @@ func parseEnumCase(p *parser) Node {
 	return p.end()
 }
 
+// Interface
+
+func parseInterfaceDecl(p *parser, attributes Node) Node {
+	p.begin(InterfaceDeclNode)
+
+	p.childAdd(attributes)
+	if p.consume(scanner.Interface) {
+		return p.end()
+	}
+	if p.consume(scanner.Identifier) {
+		return p.end()
+	}
+	if p.consume(scanner.LeftBrace) {
+		return p.end()
+	}
+	if p.repeatSync(parseFuncDeclWithAttributes, scanner.RightBrace, scanner.Hashtag, scanner.Func) {
+		return p.end()
+	}
+	if p.consume(scanner.RightBrace) {
+		return p.end()
+	}
+
+	return p.end()
+}
+
 // Func
 
 var canStartParam = []scanner.TokenKind{scanner.Identifier, scanner.Dot}
+
+func parseFuncDeclWithAttributes(p *parser) Node {
+	var attributes Node
+
+	if p.peek() == scanner.Hashtag {
+		attributes = parseAttributes(p)
+		if p.recovering() {
+			return Node{}
+		}
+	}
+
+	return parseFuncDecl(p, attributes)
+}
 
 func parseFuncDecl(p *parser, attributes Node) Node {
 	p.begin(FuncDeclNode)

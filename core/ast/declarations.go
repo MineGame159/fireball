@@ -13,6 +13,7 @@ type DeclVisitor interface {
 	VisitStruct(decl *Struct)
 	VisitEnum(decl *Enum)
 	VisitImpl(decl *Impl)
+	VisitInterface(decl *Interface)
 	VisitFunc(decl *Func)
 	VisitGlobalVar(decl *GlobalVar)
 }
@@ -394,24 +395,29 @@ type Impl struct {
 	cst    cst.Node
 	parent Node
 
-	Struct  *Token
-	Type    Type
-	Methods []*Func
+	Struct     *Token
+	Type       Type
+	Implements Type
+	Methods    []*Func
 }
 
-func NewImpl(node cst.Node, struct_ *Token, methods []*Func) *Impl {
-	if struct_ == nil && methods == nil {
+func NewImpl(node cst.Node, struct_ *Token, implements Type, methods []*Func) *Impl {
+	if struct_ == nil && implements == nil && methods == nil {
 		return nil
 	}
 
 	i := &Impl{
-		cst:     node,
-		Struct:  struct_,
-		Methods: methods,
+		cst:        node,
+		Struct:     struct_,
+		Implements: implements,
+		Methods:    methods,
 	}
 
 	if struct_ != nil {
 		struct_.SetParent(i)
+	}
+	if implements != nil {
+		implements.SetParent(i)
 	}
 	for _, child := range methods {
 		child.SetParent(i)
@@ -448,6 +454,9 @@ func (i *Impl) AcceptChildren(visitor Visitor) {
 	if i.Struct != nil {
 		visitor.VisitNode(i.Struct)
 	}
+	if i.Implements != nil {
+		visitor.VisitNode(i.Implements)
+	}
 	for _, child := range i.Methods {
 		visitor.VisitNode(child)
 	}
@@ -467,6 +476,10 @@ func (i *Impl) Clone() Node {
 		i2.Type = i.Type.Clone().(Type)
 		i2.Type.SetParent(i2)
 	}
+	if i.Implements != nil {
+		i2.Implements = i.Implements.Clone().(Type)
+		i2.Implements.SetParent(i2)
+	}
 	i2.Methods = make([]*Func, len(i.Methods))
 	for i, child := range i2.Methods {
 		i2.Methods[i] = child.Clone().(*Func)
@@ -482,6 +495,96 @@ func (i *Impl) String() string {
 
 func (i *Impl) AcceptDecl(visitor DeclVisitor) {
 	visitor.VisitImpl(i)
+}
+
+// Interface
+
+type Interface struct {
+	cst    cst.Node
+	parent Node
+
+	Name    *Token
+	Methods []*Func
+}
+
+func NewInterface(node cst.Node, name *Token, methods []*Func) *Interface {
+	if name == nil && methods == nil {
+		return nil
+	}
+
+	i := &Interface{
+		cst:     node,
+		Name:    name,
+		Methods: methods,
+	}
+
+	if name != nil {
+		name.SetParent(i)
+	}
+	for _, child := range methods {
+		child.SetParent(i)
+	}
+
+	return i
+}
+
+func (i *Interface) Cst() *cst.Node {
+	if i.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &i.cst
+}
+
+func (i *Interface) Token() scanner.Token {
+	return scanner.Token{}
+}
+
+func (i *Interface) Parent() Node {
+	return i.parent
+}
+
+func (i *Interface) SetParent(parent Node) {
+	if parent != nil && i.parent != nil {
+		panic("ast.Interface.SetParent() - Parent is already set")
+	}
+
+	i.parent = parent
+}
+
+func (i *Interface) AcceptChildren(visitor Visitor) {
+	if i.Name != nil {
+		visitor.VisitNode(i.Name)
+	}
+	for _, child := range i.Methods {
+		visitor.VisitNode(child)
+	}
+}
+
+func (i *Interface) Clone() Node {
+	i2 := &Interface{
+		cst: i.cst,
+	}
+
+	if i.Name != nil {
+		i2.Name = i.Name.Clone().(*Token)
+		i2.Name.SetParent(i2)
+	}
+	i2.Methods = make([]*Func, len(i.Methods))
+	for i, child := range i2.Methods {
+		i2.Methods[i] = child.Clone().(*Func)
+		i2.Methods[i].SetParent(i2)
+	}
+
+	return i2
+}
+
+func (i *Interface) String() string {
+	return ""
+}
+
+func (i *Interface) AcceptDecl(visitor DeclVisitor) {
+	visitor.VisitInterface(i)
 }
 
 // Func

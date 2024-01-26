@@ -11,8 +11,9 @@ type codegen struct {
 	path     string
 	resolver *ast.CombinedResolver
 
-	types  types
-	scopes scopes
+	types   types
+	vtables vtables
+	scopes  scopes
 
 	staticVariables map[ast.Node]exprValue
 	functions       map[*ast.Func]*ir.Func
@@ -54,6 +55,7 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 	c.module.Path = path
 
 	c.types.module = c.module
+	c.vtables.c = c
 	c.scopes.c = c
 
 	c.scopes.pushFile(path)
@@ -271,6 +273,25 @@ func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.T
 		})
 
 		c.setLocationMeta(result, location)
+		return exprValue{v: result}
+
+	case ast.Pointer2Interface:
+		type_ := from.Resolved().(*ast.Pointer).Pointee
+
+		result := c.block.Add(&ir.InsertValueInst{
+			Value:   &ir.ZeroInitConst{Typ: c.types.get(to)},
+			Element: c.vtables.get(type_, to),
+			Indices: []uint32{0},
+		})
+		c.setLocationMeta(result, location)
+
+		result = c.block.Add(&ir.InsertValueInst{
+			Value:   result,
+			Element: value.v,
+			Indices: []uint32{1},
+		})
+		c.setLocationMeta(result, location)
+
 		return exprValue{v: result}
 
 	default:

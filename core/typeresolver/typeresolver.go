@@ -34,6 +34,7 @@ func Resolve(reporter utils.Reporter, root ast.RootResolver, file *ast.File) {
 // Declarations
 
 func (t *typeResolver) visitImpl(decl *ast.Impl) {
+	// Struct
 	if decl.Struct != nil {
 		type_ := t.resolver.GetType(decl.Struct.Token().Lexeme)
 
@@ -43,13 +44,16 @@ func (t *typeResolver) visitImpl(decl *ast.Impl) {
 			t.reporter.Report(utils.Diagnostic{
 				Kind:    utils.ErrorKind,
 				Range:   decl.Struct.Cst().Range,
-				Message: fmt.Sprintf("Struct with the name '%s' does not exist", decl.Struct.Token()),
+				Message: fmt.Sprintf("Unknown struct '%s'", decl.Struct.Token()),
 			})
 
 			decl.Type = nil
 		}
+	} else {
+		decl.Type = nil
 	}
 
+	// Children
 	decl.AcceptChildren(t)
 }
 

@@ -20,6 +20,8 @@ func (c *codegen) VisitImpl(impl *ast.Impl) {
 
 func (c *codegen) VisitEnum(_ *ast.Enum) {}
 
+func (c *codegen) VisitInterface(_ *ast.Interface) {}
+
 func (c *codegen) VisitFunc(decl *ast.Func) {
 	if !decl.HasBody() {
 		return

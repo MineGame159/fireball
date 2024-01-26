@@ -569,19 +569,24 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Load arguments
+	hasThis := function.Method() != nil
+	if _, ok := function.Parent().(*ast.Interface); ok {
+		hasThis = true
+	}
+
 	argCount := len(expr.Args)
-	if function.Method() != nil {
+	if hasThis {
 		argCount++
 	}
 
 	args := make([]ir.Value, argCount)
 
-	if function.Method() != nil {
+	if hasThis {
 		args[0] = c.this.v
 	}
 
 	for i, arg := range expr.Args {
-		if function.Method() != nil {
+		if hasThis {
 			args[i+1] = c.loadExpr(arg).v
 		} else if i >= len(function.Params) {
 			args[i] = c.loadExpr(arg).v
@@ -599,6 +604,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	// Call
 	result := c.block.Add(&ir.CallInst{
+		Typ:    c.types.get(function).(*ir.FuncType),
 		Callee: callee.v,
 		Args:   args,
 	})
@@ -719,6 +725,54 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			}
 
 		case *ast.Func:
+			// Interface
+			if inter, ok := ast.As[*ast.Interface](expr.Value.Result().Type); ok {
+				if value.addressable {
+					value = c.load(value, expr.Value.Result().Type)
+				}
+
+				vtablePtr := c.block.Add(&ir.ExtractValueInst{
+					Value:   value.v,
+					Indices: []uint32{uint32(0)},
+				})
+
+				_, index := inter.GetMethod(expr.Name.String())
+
+				void := ast.Primitive{Kind: ast.Void}
+				fnPtr := ast.Pointer{Pointee: &void}
+
+				typ := ast.Array{Base: &fnPtr, Count: uint32(len(inter.Methods))}
+				typPtr := ast.Pointer{Pointee: &typ}
+
+				functionPtr := c.block.Add(&ir.GetElementPtrInst{
+					PointerTyp: c.types.get(&typPtr),
+					Typ:        c.types.get(&typ),
+					Pointer:    vtablePtr,
+					Indices: []ir.Value{
+						&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(0)},
+						&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(uint64(index))},
+					},
+					Inbounds: true,
+				})
+
+				function := c.block.Add(&ir.LoadInst{
+					Typ:     c.types.get(&fnPtr),
+					Pointer: functionPtr,
+					Align:   fnPtr.Align(),
+				})
+
+				dataPtr := c.block.Add(&ir.ExtractValueInst{
+					Value:   value.v,
+					Indices: []uint32{uint32(1)},
+				})
+
+				c.exprResult = exprValue{v: function}
+				c.this = exprValue{v: dataPtr, addressable: true}
+
+				return
+			}
+
+			// Struct
 			if expr.Value.Result().Type != nil {
 				value, _ = c.memberLoad(expr.Value.Result().Type, value)
 			}
@@ -776,6 +830,34 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 // Utils
 
 func (c *codegen) binaryLoad(left, right ast.Expr, operator *ast.Token) exprValue {
+	// Interface == Pointer
+	if operator.Token().Kind == scanner.EqualEqual || operator.Token().Kind == scanner.BangEqual {
+		if _, ok := ast.As[*ast.Interface](left.Result().Type); ok {
+			if _, ok := ast.As[*ast.Pointer](right.Result().Type); ok {
+				left := c.loadExpr(left)
+				right := c.loadExpr(right)
+
+				kind := ir.Eq
+				if operator.Token().Kind == scanner.BangEqual {
+					kind = ir.Ne
+				}
+
+				result := c.block.Add(&ir.ICmpInst{
+					Kind:   kind,
+					Signed: false,
+					Left: c.block.Add(&ir.ExtractValueInst{
+						Value:   left.v,
+						Indices: []uint32{1},
+					}),
+					Right: right.v,
+				})
+
+				c.setLocationMeta(result, operator)
+				return exprValue{v: result}
+			}
+		}
+	}
+
 	// Left -> Right
 	cast, castOk := ast.GetImplicitCast(left.Result().Type, right.Result().Type)
 

@@ -142,11 +142,8 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 		w.writeString("extractvalue ")
 		w.writeValue(inst.Value)
 
-		for i, index := range inst.Indices {
-			if i > 0 {
-				w.writeString(", ")
-			}
-
+		for _, index := range inst.Indices {
+			w.writeString(", ")
 			w.writeUint(uint64(index), 10)
 		}
 
@@ -363,7 +360,13 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 		w.writeValue(inst.False)
 
 	case *ir.CallInst:
-		type_ := inst.Callee.Type().(*ir.FuncType)
+		var type_ *ir.FuncType
+
+		if inst.Typ != nil {
+			type_ = inst.Typ
+		} else {
+			type_ = inst.Callee.Type().(*ir.FuncType)
+		}
 
 		w.writeString("call ")
 		w.writeType(type_.Returns)

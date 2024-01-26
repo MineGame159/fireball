@@ -147,11 +147,20 @@ func (w *textWriter) writeMeta(meta ir.Meta) {
 		w.writeString(", baseType: ")
 		w.writeMetaRef(meta.BaseType)
 
-		w.writeString(", size: ")
-		w.writeUint(uint64(meta.Size), 10)
+		if meta.Size != 0 {
+			w.writeString(", size: ")
+			w.writeUint(uint64(meta.Size), 10)
+		}
 
-		w.writeString(", align: ")
-		w.writeUint(uint64(meta.Align), 10)
+		if meta.Align != 0 {
+			w.writeString(", align: ")
+			w.writeUint(uint64(meta.Align), 10)
+		}
+
+		if meta.Offset != 0 {
+			w.writeString(", offset: ")
+			w.writeUint(uint64(meta.Offset), 10)
+		}
 
 		w.writeRune(')')
 

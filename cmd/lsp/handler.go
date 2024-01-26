@@ -102,6 +102,7 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 						protocol.SemanticTokenProperty,
 						protocol.SemanticTokenEnumMember,
 						protocol.SemanticTokenNamespace,
+						protocol.SemanticTokenInterface,
 					},
 					TokenModifiers: []protocol.SemanticTokenModifiers{},
 				},
@@ -114,6 +115,7 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 			InlayHintProvider:       true,
 			WorkspaceSymbolProvider: true,
 			DefinitionProvider:      true,
+			ImplementationProvider:  true,
 			CompletionProvider: &protocol.CompletionOptions{
 				ResolveProvider:   false,
 				TriggerCharacters: []string{" ", ".", ":", "=", "*", "&", ">", "<", "!"},
@@ -464,6 +466,27 @@ func (h *handler) Definition(_ context.Context, params *protocol.DefinitionParam
 
 	// Get declaration
 	return getDefinition(file.Ast, pos), nil
+}
+
+func (h *handler) Implementation(_ context.Context, params *protocol.ImplementationParams) (result []protocol.Location, err error) {
+	defer stop(start(h, "Implementation"))
+
+	// Get document
+	file := h.getFile(params.TextDocument.URI)
+	if file == nil {
+		return nil, nil
+	}
+
+	file.EnsureChecked()
+
+	// Get position
+	pos := core.Pos{
+		Line:   uint16(params.Position.Line + 1),
+		Column: uint16(params.Position.Character),
+	}
+
+	// Get declaration
+	return getImplementations(file.Ast, pos, file.Project.GetResolverRoot()), nil
 }
 
 func (h *handler) Completion(_ context.Context, params *protocol.CompletionParams) (result *protocol.CompletionList, err error) {

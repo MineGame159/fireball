@@ -120,7 +120,7 @@
       "name": "string.quoted.double.fb"
     },
     "keyword": {
-      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|static|func|continue|break|return|namespace|using|struct|impl|enum|new|fn)\\b",
+      "match": "\\b(nil|true|false|and|or|var|if|else|while|for|as|static|func|continue|break|return|namespace|using|struct|impl|enum|interface|new|fn)\\b",
       "name": "keyword.fb"
     },
     "attribute": {

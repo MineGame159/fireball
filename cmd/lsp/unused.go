@@ -107,11 +107,6 @@ func (h *handler) Formatting(ctx context.Context, params *protocol.DocumentForma
 }
 
 //goland:noinspection GoUnusedParameter
-func (h *handler) Implementation(ctx context.Context, params *protocol.ImplementationParams) (result []protocol.Location, err error) {
-	return nil, errors.New("not implemented")
-}
-
-//goland:noinspection GoUnusedParameter
 func (h *handler) OnTypeFormatting(ctx context.Context, params *protocol.DocumentOnTypeFormattingParams) (result []protocol.TextEdit, err error) {
 	return nil, errors.New("not implemented")
 }

@@ -14,6 +14,7 @@ type TypeVisitor interface {
 	VisitResolvable(type_ *Resolvable)
 	VisitStruct(type_ *Struct)
 	VisitEnum(type_ *Enum)
+	VisitInterface(type_ *Interface)
 	VisitFunc(type_ *Func)
 }
 
