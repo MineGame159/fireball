@@ -190,7 +190,7 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 		c.block.Add(&ir.StoreInst{
 			Pointer: pointer,
 			Value:   result,
-			Align:   struct_.Align() * 8,
+			Align:   struct_.Align(),
 		})
 
 		c.exprResult = exprValue{v: pointer}
@@ -285,7 +285,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 				result = c.block.Add(&ir.LoadInst{
 					Typ:     result.Type().(*ir.PointerType).Pointee,
 					Pointer: result,
-					Align:   expr.Result().Type.Align() * 8,
+					Align:   expr.Result().Type.Align(),
 				})
 			}
 
@@ -314,7 +314,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			c.block.Add(&ir.StoreInst{
 				Pointer: value.v,
 				Value:   newValue.v,
-				Align:   expr.Value.Result().Type.Align() * 8,
+				Align:   expr.Value.Result().Type.Align(),
 			})
 
 			result = newValue.v
@@ -356,7 +356,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			c.block.Add(&ir.StoreInst{
 				Pointer: value.v,
 				Value:   newValue.v,
-				Align:   expr.Value.Result().Type.Align() * 8,
+				Align:   expr.Value.Result().Type.Align(),
 			})
 
 			result = prevValue.v
@@ -514,7 +514,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	store := c.block.Add(&ir.StoreInst{
 		Pointer: assignee.v,
 		Value:   value.v,
-		Align:   expr.Result().Type.Align() * 8,
+		Align:   expr.Result().Type.Align(),
 	})
 
 	c.setLocationMeta(store, expr)
@@ -667,7 +667,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 		c.block.Add(&ir.StoreInst{
 			Pointer: pointer.v,
 			Value:   c.exprResult.v,
-			Align:   function.Returns.Align() * 8,
+			Align:   function.Returns.Align(),
 		})
 
 		c.exprResult = pointer
@@ -682,7 +682,7 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 		value = exprValue{v: c.block.Add(&ir.LoadInst{
 			Typ:     value.v.Type().(*ir.PointerType).Pointee,
 			Pointer: value.v,
-			Align:   pointer.Pointee.Align() * 8,
+			Align:   pointer.Pointee.Align(),
 		})}
 	}
 
@@ -834,7 +834,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 				c.block.Add(&ir.StoreInst{
 					Pointer: pointer.v,
 					Value:   value.v,
-					Align:   node.Align() * 8,
+					Align:   node.Align(),
 				})
 
 				value = pointer
@@ -865,7 +865,7 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 			load := c.block.Add(&ir.LoadInst{
 				Typ:     value.v.Type().(*ir.PointerType).Pointee,
 				Pointer: value.v,
-				Align:   v.Align() * 8,
+				Align:   v.Align(),
 			})
 
 			return exprValue{

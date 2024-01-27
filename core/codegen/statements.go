@@ -36,7 +36,7 @@ func (c *codegen) VisitVar(stmt *ast.Var) {
 	store := c.block.Add(&ir.StoreInst{
 		Pointer: pointer.v,
 		Value:   initializer,
-		Align:   stmt.ActualType.Align() * 8,
+		Align:   stmt.ActualType.Align(),
 	})
 
 	c.setLocationMeta(store, stmt)

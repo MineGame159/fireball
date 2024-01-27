@@ -8,7 +8,7 @@ import (
 func (c *codegen) alloca(type_ ast.Type, name string, node ast.Node) ir.Value {
 	pointer := c.block.Add(&ir.AllocaInst{
 		Typ:   c.types.get(type_),
-		Align: type_.Align() * 8,
+		Align: type_.Align(),
 	})
 
 	if name != "" {

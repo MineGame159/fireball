@@ -178,7 +178,7 @@ func (c *codegen) load(value exprValue, type_ ast.Type) exprValue {
 			v: c.block.Add(&ir.LoadInst{
 				Typ:     value.v.Type().(*ir.PointerType).Pointee,
 				Pointer: value.v,
-				Align:   type_.Align() * 8,
+				Align:   type_.Align(),
 			}),
 			addressable: false,
 		}

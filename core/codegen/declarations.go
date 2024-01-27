@@ -57,7 +57,7 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 		c.block.Add(&ir.StoreInst{
 			Pointer: pointer,
 			Value:   function.Typ.Params[index],
-			Align:   param.Type.Align() * 8,
+			Align:   param.Type.Align(),
 		})
 
 		c.scopes.addVariable(param.Name, param.Type, exprValue{v: pointer}, uint32(index+1))
