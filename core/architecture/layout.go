@@ -13,7 +13,7 @@ type CLayout struct {
 func (l *CLayout) Add(size, align uint32) uint32 {
 	l.biggestAlign = max(l.biggestAlign, align)
 
-	offset := alignValue(l.offset, l.biggestAlign)
+	offset := alignValue(l.offset, align)
 	l.offset = offset + size
 
 	return offset
