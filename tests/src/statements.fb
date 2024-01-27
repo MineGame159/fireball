@@ -100,3 +100,16 @@ func _for4() bool {
 
     return a == 4;
 }
+
+#[Test("continue")]
+func _continue() bool {
+    var count = 0;
+    
+    for (var i = 0; i < 5; i++) {
+        if (i == 2) continue;
+
+        count++;
+    }
+
+    return count == 4;
+}

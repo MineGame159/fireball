@@ -78,17 +78,17 @@ func (c *codegen) VisitIf(stmt *ast.If) {
 
 func (c *codegen) VisitWhile(stmt *ast.While) {
 	// Get blocks
-	prevLoopStart := c.loopStart
+	prevLoopSkip := c.loopSkip
 	prevLoopEnd := c.loopEnd
 
-	c.loopStart = c.function.Block("while.start")
+	c.loopSkip = c.function.Block("while.condition")
 	body := c.function.Block("while.body")
 	c.loopEnd = c.function.Block("while.end")
 
-	c.block.Add(&ir.BrInst{True: c.loopStart})
+	c.block.Add(&ir.BrInst{True: c.loopSkip})
 
 	// Condition
-	c.beginBlock(c.loopStart)
+	c.beginBlock(c.loopSkip)
 
 	required := ast.Primitive{Kind: ast.Bool}
 	condition := c.implicitCastLoadExpr(&required, stmt.Condition)
@@ -97,65 +97,67 @@ func (c *codegen) VisitWhile(stmt *ast.While) {
 
 	// Body
 	c.beginBlock(body)
+
 	if c.acceptStmt(stmt.Body) {
-		c.block.Add(&ir.BrInst{True: c.loopStart})
+		c.block.Add(&ir.BrInst{True: c.loopSkip})
 	}
 
 	// End
 	c.beginBlock(c.loopEnd)
 
 	// Reset basic block names
-	c.loopStart = prevLoopStart
+	c.loopSkip = prevLoopSkip
 	c.loopEnd = prevLoopEnd
 }
 
 func (c *codegen) VisitFor(stmt *ast.For) {
 	// Get blocks
-	prevLoopStart := c.loopStart
+	prevLoopSkip := c.loopSkip
 	prevLoopEnd := c.loopEnd
 
-	c.loopStart = c.function.Block("for.start")
+	condition := c.function.Block("for.condition")
+	body := c.function.Block("for.body")
+	c.loopSkip = c.function.Block("for.increment")
 	c.loopEnd = c.function.Block("for.end")
-	body := c.loopStart
-
-	if stmt.Condition != nil {
-		body = c.function.Block("for.body")
-	}
 
 	// Initializer
 	c.scopes.pushBlock(stmt)
 
 	if c.acceptStmt(stmt.Initializer) {
-		c.block.Add(&ir.BrInst{True: c.loopStart})
+		c.block.Add(&ir.BrInst{True: condition})
 	}
 
 	// Condition
-	c.beginBlock(c.loopStart)
+	c.beginBlock(condition)
 
 	if stmt.Condition != nil {
 		required := ast.Primitive{Kind: ast.Bool}
-		condition := c.implicitCastLoadExpr(&required, stmt.Condition)
+		cond := c.implicitCastLoadExpr(&required, stmt.Condition)
 
-		c.block.Add(&ir.BrInst{Condition: condition.v, True: body, False: c.loopEnd})
+		c.block.Add(&ir.BrInst{Condition: cond.v, True: body, False: c.loopEnd})
+	} else {
+		c.block.Add(&ir.BrInst{True: body})
 	}
 
-	// Body and increment
-	if c.loopStart != body {
-		c.beginBlock(body)
-	}
+	// Body
+	c.beginBlock(body)
 
 	if c.acceptStmt(stmt.Body) {
-		c.acceptExpr(stmt.Increment)
-
-		c.block.Add(&ir.BrInst{True: c.loopStart})
+		c.block.Add(&ir.BrInst{True: c.loopSkip})
 	}
+
+	// Increment
+	c.beginBlock(c.loopSkip)
+
+	c.acceptExpr(stmt.Increment)
+	c.block.Add(&ir.BrInst{True: condition})
 
 	// End
 	c.scopes.pop()
 	c.beginBlock(c.loopEnd)
 
 	// Reset basic block names
-	c.loopStart = prevLoopStart
+	c.loopSkip = prevLoopSkip
 	c.loopEnd = prevLoopEnd
 }
 
@@ -190,7 +192,7 @@ func (c *codegen) VisitBreak(stmt *ast.Break) {
 
 func (c *codegen) VisitContinue(stmt *ast.Continue) {
 	c.setLocationMeta(
-		c.block.Add(&ir.BrInst{True: c.loopStart}),
+		c.block.Add(&ir.BrInst{True: c.loopSkip}),
 		stmt,
 	)
 

@@ -24,8 +24,8 @@ type codegen struct {
 	function    *ir.Func
 	block       *ir.Block
 
-	loopStart *ir.Block
-	loopEnd   *ir.Block
+	loopSkip *ir.Block
+	loopEnd  *ir.Block
 
 	exprResult exprValue
 	this       exprValue
