@@ -144,6 +144,11 @@ func (w *textWriter) writeMeta(meta ir.Meta) {
 		w.writeString("tag: ")
 		w.writeString(meta.Tag.String())
 
+		if meta.Name != "" {
+			w.writeString(", name: ")
+			w.writeQuotedString(meta.Name)
+		}
+
 		w.writeString(", baseType: ")
 		w.writeMetaRef(meta.BaseType)
 
@@ -340,7 +345,7 @@ func (w *textWriter) writeMeta(meta ir.Meta) {
 		w.writeUint(uint64(meta.Line), 10)
 
 		w.writeString(", column: ")
-		w.writeUint(uint64(meta.Column), 10)
+		w.writeUint(uint64(meta.Column)+1, 10)
 
 		w.writeRune(')')
 

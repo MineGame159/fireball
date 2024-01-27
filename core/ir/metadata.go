@@ -261,6 +261,7 @@ type DerivedTypeMeta struct {
 	baseMeta
 
 	Tag      DerivedTagKind
+	Name     string
 	BaseType MetaID
 
 	Size  uint32

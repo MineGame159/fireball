@@ -269,11 +269,13 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 				Elements: []ir.MetaID{
 					t.module.Meta(&ir.DerivedTypeMeta{
 						Tag:      ir.MemberTag,
+						Name:     "vtable",
 						BaseType: t.getMeta(&ptr),
 						Offset:   0,
 					}),
 					t.module.Meta(&ir.DerivedTypeMeta{
 						Tag:      ir.MemberTag,
+						Name:     "data",
 						BaseType: t.getMeta(&ptr),
 						Offset:   ptr.Size() * 8,
 					}),
@@ -380,6 +382,7 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 
 			fields[i] = t.module.Meta(&ir.DerivedTypeMeta{
 				Tag:      ir.MemberTag,
+				Name:     field.Name.String(),
 				BaseType: t.getMeta(field.Type),
 				Offset:   offset * 8,
 			})

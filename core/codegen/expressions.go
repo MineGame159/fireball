@@ -635,7 +635,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	for i, arg := range expr.Args {
 		if hasThis {
-			args[i+1] = c.loadExpr(arg).v
+			args[i+1] = c.implicitCastLoadExpr(function.Params[i].Type, arg).v
 		} else if i >= len(function.Params) {
 			args[i] = c.loadExpr(arg).v
 		} else {
@@ -657,7 +657,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 		Args:   args,
 	})
 
-	c.setLocationMeta(result, expr)
+	c.setLocationMetaCst(result, expr, scanner.LeftParen)
 	c.exprResult = exprValue{v: result}
 
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
@@ -696,7 +696,7 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 		Inbounds:   true,
 	})
 
-	c.setLocationMeta(result, expr)
+	c.setLocationMetaCst(result, expr, scanner.LeftBracket)
 
 	c.exprResult = exprValue{
 		v:           result,
@@ -739,7 +739,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 						Inbounds: true,
 					})
 
-					c.setLocationMeta(result, expr)
+					c.setLocationMeta(result, expr.Name)
 
 					c.exprResult = exprValue{
 						v:           result,
@@ -751,7 +751,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 						Indices: []uint32{uint32(node.Index())},
 					})
 
-					c.setLocationMeta(result, expr)
+					c.setLocationMeta(result, expr.Name)
 					c.exprResult = exprValue{v: result}
 				}
 			}
