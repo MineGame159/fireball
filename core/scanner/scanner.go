@@ -178,7 +178,7 @@ func (s *Scanner) identifierKind() TokenKind {
 			case 'a':
 				return s.checkKeyword(2, "lse", False)
 			case 'n':
-				return Fn
+				return s.checkKeyword(2, "", Fn)
 			case 'o':
 				return s.checkKeyword(2, "r", For)
 			case 'u':
@@ -189,13 +189,13 @@ func (s *Scanner) identifierKind() TokenKind {
 		if s.currentI-s.startI > 1 {
 			switch s.text[s.startI+1] {
 			case 'f':
-				return If
+				return s.checkKeyword(2, "", If)
 			case 'm':
 				return s.checkKeyword(2, "pl", Impl)
 			case 'n':
 				return s.checkKeyword(2, "terface", Interface)
 			case 's':
-				return Is
+				return s.checkKeyword(2, "", Is)
 			}
 		}
 	case 'n':
