@@ -67,7 +67,7 @@ jobs:
           version: "17.0.2"
 
       - name: Install build dependencies
-        run: apt install build-essential
+        run: sudo apt install build-essential
 
       - name: Run tests
         run: |
