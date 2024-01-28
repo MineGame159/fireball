@@ -1,0 +1,13 @@
+namespace Tests.Namespaces;
+
+#[Test]
+func typeSimple() bool {
+    var _ Child.Foo;
+    return true;
+}
+
+#[Test]
+func typeStructInit() bool {
+    var _ = Child.Foo {};
+    return true;
+}

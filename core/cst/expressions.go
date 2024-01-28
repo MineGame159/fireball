@@ -2,6 +2,7 @@ package cst
 
 import (
 	"fireball/core/scanner"
+	"fireball/core/utils"
 )
 
 var canStartExpr = []scanner.TokenKind{
@@ -108,24 +109,6 @@ func parsePrefixExprPratt(p *parser) Node {
 				return p.end()
 			}
 			if p.consume(scanner.RightBracket) {
-				return p.end()
-			}
-
-			return p.end()
-		}
-
-		if p.peek2() == scanner.LeftBrace {
-			p.begin(StructExprNode)
-
-			p.begin(IdentifierTypeNode)
-			p.advanceAddChild()
-			p.childAdd(p.end())
-
-			p.advanceAddChild()
-			if p.repeatSeparated(parseStructFieldExpr, canStartStructFieldExpr, scanner.Comma) {
-				return p.end()
-			}
-			if p.consume(scanner.RightBrace) {
 				return p.end()
 			}
 
@@ -277,6 +260,24 @@ func parsePostfixExprPratt(p *parser, op scanner.TokenKind, lhs Node) Node {
 
 		return p.end()
 
+	case scanner.LeftBrace:
+		p.begin(StructExprNode)
+
+		if p.childAdd(convertExprToIdentifierType(p, lhs)) {
+			return p.end()
+		}
+		if p.consume(scanner.LeftBrace) {
+			return p.end()
+		}
+		if p.repeatSeparated(parseStructFieldExpr, canStartStructFieldExpr, scanner.Comma) {
+			return p.end()
+		}
+		if p.consume(scanner.RightBrace) {
+			return p.end()
+		}
+
+		return p.end()
+
 	default:
 		p.begin(UnaryExprNode)
 
@@ -285,6 +286,42 @@ func parsePostfixExprPratt(p *parser, op scanner.TokenKind, lhs Node) Node {
 
 		return p.end()
 	}
+}
+
+func convertExprToIdentifierType(p *parser, node Node) Node {
+	p.begin(IdentifierTypeNode)
+
+	convertExprToIdentifierTypePart(p, node)
+
+	return p.end()
+}
+
+func convertExprToIdentifierTypePart(p *parser, node Node) {
+	//goland:noinspection GoSwitchMissingCasesForIotaConsts
+	switch node.Kind {
+	case IdentifierNode:
+		p.childAdd(node)
+		return
+
+	case BinaryExprNode:
+		if node.Contains(scanner.Dot) {
+			convertExprToIdentifierTypePart(p, node.Children[0])
+
+			p.childAdd(node.Children[1])
+
+			if len(node.Children) == 3 {
+				convertExprToIdentifierTypePart(p, node.Children[2])
+			}
+
+			return
+		}
+	}
+
+	p.reporter.Report(utils.Diagnostic{
+		Kind:    utils.ErrorKind,
+		Range:   node.Range,
+		Message: "Invalid type",
+	})
 }
 
 // Powers
@@ -338,8 +375,8 @@ func init() {
 	prefix(scanner.Minus, scanner.Bang, scanner.PlusPlus, scanner.MinusMinus, scanner.Ampersand, scanner.Star, scanner.FuncPtr)
 	// x++, x--
 	postfix(scanner.PlusPlus, scanner.MinusMinus)
-	// x[], x()
-	postfix(scanner.LeftBracket, scanner.LeftParen)
+	// x[], x(), x {}
+	postfix(scanner.LeftBracket, scanner.LeftParen, scanner.LeftBrace)
 	// x.y
 	infix(false, scanner.Dot)
 }
