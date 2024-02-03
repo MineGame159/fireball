@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"fireball/core/architecture"
 	"fmt"
 	"slices"
 )
@@ -28,41 +27,11 @@ func As[T Type](type_ Type) (T, bool) {
 
 // Primitive
 
-func (p *Primitive) Size() uint32 {
-	switch p.Kind {
-	case Void:
-		return 0
-	case Bool, U8, I8:
-		return 1
-	case U16, I16:
-		return 2
-	case U32, I32, F32:
-		return 4
-	case U64, I64, F64:
-		return 8
-
-	default:
-		panic("ast.Primitive.Size() - Not implemented")
-	}
-}
-
-func (p *Primitive) Align() uint32 {
-	return p.Size()
-}
-
 func (p *Primitive) Equals(other Type) bool {
 	return IsPrimitive(other, p.Kind)
 }
 
 // Pointer
-
-func (p *Pointer) Size() uint32 {
-	return 8
-}
-
-func (p *Pointer) Align() uint32 {
-	return 8
-}
 
 func (p *Pointer) Equals(other Type) bool {
 	if p2, ok := As[*Pointer](other); ok {
@@ -74,14 +43,6 @@ func (p *Pointer) Equals(other Type) bool {
 
 // Array
 
-func (a *Array) Size() uint32 {
-	return a.Base.Size() * a.Count
-}
-
-func (a *Array) Align() uint32 {
-	return a.Base.Align()
-}
-
 func (a *Array) Equals(other Type) bool {
 	if a2, ok := As[*Array](other); ok {
 		return typesEquals(a.Base, a2.Base) && a.Count == a2.Count
@@ -92,22 +53,6 @@ func (a *Array) Equals(other Type) bool {
 
 // Resolvable
 
-func (r *Resolvable) Size() uint32 {
-	if r.Resolved() == nil {
-		panic("ast.Resolvable.Size() - Not resolved")
-	}
-
-	return r.Resolved().Size()
-}
-
-func (r *Resolvable) Align() uint32 {
-	if r.Resolved() == nil {
-		panic("ast.Resolvable.Align() - Not resolved")
-	}
-
-	return r.Resolved().Align()
-}
-
 func (r *Resolvable) Equals(other Type) bool {
 	if r.Resolved() == nil {
 		panic("ast.Resolvable.Equals() - Not resolved")
@@ -117,26 +62,6 @@ func (r *Resolvable) Equals(other Type) bool {
 }
 
 // Struct
-
-func (s *Struct) Size() uint32 {
-	layout := architecture.CLayout{}
-
-	for _, field := range s.Fields {
-		layout.Add(field.Type.Size(), field.Type.Align())
-	}
-
-	return layout.Size()
-}
-
-func (s *Struct) Align() uint32 {
-	align := uint32(0)
-
-	for _, field := range s.Fields {
-		align = max(align, field.Type.Align())
-	}
-
-	return align
-}
 
 func (s *Struct) Equals(other Type) bool {
 	return other != nil && s == other.Resolved()
@@ -152,14 +77,6 @@ func (s *Struct) AcceptType(visitor TypeVisitor) {
 
 // Enum
 
-func (e *Enum) Size() uint32 {
-	return e.ActualType.Size()
-}
-
-func (e *Enum) Align() uint32 {
-	return e.ActualType.Align()
-}
-
 func (e *Enum) Equals(other Type) bool {
 	return e == other.Resolved()
 }
@@ -174,14 +91,6 @@ func (e *Enum) AcceptType(visitor TypeVisitor) {
 
 // Interface
 
-func (i *Interface) Size() uint32 {
-	return 8 * 2
-}
-
-func (i *Interface) Align() uint32 {
-	return 8
-}
-
 func (i *Interface) Equals(other Type) bool {
 	return other != nil && i == other.Resolved()
 }
@@ -195,14 +104,6 @@ func (i *Interface) AcceptType(visitor TypeVisitor) {
 }
 
 // Func
-
-func (f *Func) Size() uint32 {
-	return 8
-}
-
-func (f *Func) Align() uint32 {
-	return 8
-}
 
 func (f *Func) Equals(other Type) bool {
 	if f2, ok := As[*Func](other); ok {

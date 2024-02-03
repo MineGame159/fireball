@@ -11,12 +11,17 @@ type Group struct {
 }
 
 type Node struct {
-	name   string
-	fields []Field
+	name       string
+	fields     []Field
+	allowEmpty bool
 }
 
 func node(name string, fields ...Field) Node {
 	return Node{name: name, fields: fields}
+}
+
+func nodeAllowEmpty(name string, fields ...Field) Node {
+	return Node{name: name, fields: fields, allowEmpty: true}
 }
 
 func (n *Node) tokenField() *Field {

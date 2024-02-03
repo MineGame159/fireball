@@ -156,7 +156,6 @@ func getLinker() string {
 	switch runtime.GOOS {
 	case "linux":
 		return "ld.lld"
-
 	case "darwin":
 		return "ld"
 

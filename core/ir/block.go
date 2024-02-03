@@ -1,5 +1,7 @@
 package ir
 
+import "slices"
+
 type Block struct {
 	name string
 
@@ -8,6 +10,16 @@ type Block struct {
 
 func (b *Block) Add(inst Inst) Inst {
 	b.Instructions = append(b.Instructions, inst)
+	return inst
+}
+
+func (b *Block) Insert(index int, inst Inst) Inst {
+	if len(b.Instructions) == 0 {
+		b.Instructions = append(b.Instructions, inst)
+		return inst
+	}
+
+	b.Instructions = slices.Insert(b.Instructions, index, inst)
 	return inst
 }
 

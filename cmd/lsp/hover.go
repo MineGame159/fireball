@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"fireball/core"
+	"fireball/core/abi"
 	"fireball/core/ast"
 	"github.com/MineGame159/protocol"
 	"strconv"
@@ -66,9 +67,9 @@ func getHoverToken(token *ast.Token) *protocol.Hover {
 		value := uint32(0)
 
 		if parent.Callee.String() == "sizeof" {
-			value = parent.Arg.Size()
+			value = abi.GetTargetAbi().Size(parent.Arg)
 		} else {
-			value = parent.Arg.Align()
+			value = abi.GetTargetAbi().Align(parent.Arg)
 		}
 
 		return newHover(token, strconv.FormatUint(uint64(value), 10))

@@ -1,7 +1,9 @@
 package codegen
 
 import (
+	"fireball/core/abi"
 	"fireball/core/ast"
+	"fireball/core/common"
 	"fireball/core/ir"
 	"fireball/core/scanner"
 	"log"
@@ -183,14 +185,14 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 			Callee: malloc.v,
 			Args: []ir.Value{&ir.IntConst{
 				Typ:   c.types.get(mallocFunc.Params[0].Type),
-				Value: ir.Unsigned(uint64(struct_.Size())),
+				Value: ir.Unsigned(uint64(abi.GetTargetAbi().Size(struct_))),
 			}},
 		})
 
 		c.block.Add(&ir.StoreInst{
 			Pointer: pointer,
 			Value:   result,
-			Align:   struct_.Align(),
+			Align:   abi.GetTargetAbi().Align(struct_),
 		})
 
 		c.exprResult = exprValue{v: pointer}
@@ -231,7 +233,7 @@ func (c *codegen) VisitAllocateArray(expr *ast.AllocateArray) {
 		Callee: malloc.v,
 		Args: []ir.Value{&ir.IntConst{
 			Typ:   c.types.get(mallocFunc.Params[0].Type),
-			Value: ir.Unsigned(uint64(expr.Type.Size())),
+			Value: ir.Unsigned(uint64(abi.GetTargetAbi().Size(expr.Type))),
 		}},
 	})
 
@@ -285,7 +287,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 				result = c.block.Add(&ir.LoadInst{
 					Typ:     result.Type().(*ir.PointerType).Pointee,
 					Pointer: result,
-					Align:   expr.Result().Type.Align(),
+					Align:   abi.GetTargetAbi().Align(expr.Result().Type),
 				})
 			}
 
@@ -314,7 +316,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			c.block.Add(&ir.StoreInst{
 				Pointer: value.v,
 				Value:   newValue.v,
-				Align:   expr.Value.Result().Type.Align(),
+				Align:   abi.GetTargetAbi().Align(expr.Value.Result().Type),
 			})
 
 			result = newValue.v
@@ -356,7 +358,7 @@ func (c *codegen) VisitUnary(expr *ast.Unary) {
 			c.block.Add(&ir.StoreInst{
 				Pointer: value.v,
 				Value:   newValue.v,
-				Align:   expr.Value.Result().Type.Align(),
+				Align:   abi.GetTargetAbi().Align(expr.Value.Result().Type),
 			})
 
 			result = prevValue.v
@@ -514,7 +516,7 @@ func (c *codegen) VisitAssignment(expr *ast.Assignment) {
 	store := c.block.Add(&ir.StoreInst{
 		Pointer: assignee.v,
 		Value:   value.v,
-		Align:   expr.Result().Type.Align(),
+		Align:   abi.GetTargetAbi().Align(expr.Result().Type),
 	})
 
 	c.setLocationMeta(store, expr)
@@ -580,9 +582,9 @@ func (c *codegen) VisitTypeCall(expr *ast.TypeCall) {
 
 	switch expr.Callee.String() {
 	case "sizeof":
-		value = expr.Arg.Size()
+		value = abi.GetTargetAbi().Size(expr.Arg)
 	case "alignof":
-		value = expr.Arg.Align()
+		value = abi.GetTargetAbi().Align(expr.Arg)
 
 	default:
 		panic("codegen.VisitTypeCall() - Not implemented")
@@ -627,19 +629,38 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 		argCount++
 	}
 
-	args := make([]ir.Value, argCount)
+	funcAbi := abi.GetFuncAbi(function)
+	returnArgs := funcAbi.Classify(function.Returns, nil)
+
+	args := make([]ir.Value, 0, argCount)
+	hasReturnPtr := false
+
+	if len(returnArgs) == 1 && returnArgs[0].Class == abi.Memory {
+		pointer := c.allocas.get(function.Returns, "")
+		pointer.TypPtr.SRet = c.types.get(function.Returns)
+
+		args = append(args, pointer)
+		hasReturnPtr = true
+	}
 
 	if hasThis {
-		args[0] = c.this.v
+		args = append(args, c.this.v)
 	}
 
 	for i, arg := range expr.Args {
-		if hasThis {
-			args[i+1] = c.implicitCastLoadExpr(function.Params[i].Type, arg).v
-		} else if i >= len(function.Params) {
-			args[i] = c.loadExpr(arg).v
+		if i >= len(function.Params) {
+			args = append(args, c.loadExpr(arg).v)
 		} else {
-			args[i] = c.implicitCastLoadExpr(function.Params[i].Type, arg).v
+			param := function.Params[i]
+			var value exprValue
+
+			if needsImplicitCast(arg.Result().Type, param.Type) {
+				value = c.implicitCastLoadExpr(param.Type, arg)
+			} else {
+				value = c.acceptExpr(arg)
+			}
+
+			args = c.valueToParams(funcAbi, value, param.Type, args)
 		}
 	}
 
@@ -651,26 +672,43 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Call
-	result := c.block.Add(&ir.CallInst{
+	call := c.block.Add(&ir.CallInst{
 		Typ:    c.types.get(function).(*ir.FuncType),
 		Callee: callee.v,
 		Args:   args,
 	})
 
-	c.setLocationMetaCst(result, expr, scanner.LeftParen)
-	c.exprResult = exprValue{v: result}
+	c.setLocationMetaCst(call, expr, scanner.LeftParen)
+
+	if ast.IsPrimitive(function.Returns, ast.Void) {
+		c.exprResult = exprValue{v: call}
+	} else {
+		result := exprValue{v: call}
+
+		if hasReturnPtr {
+			result = exprValue{
+				v:           args[0],
+				addressable: true,
+			}
+		}
+
+		c.exprResult = c.returnValueToValue(funcAbi, result, function.Returns)
+	}
 
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
 	if callNeedsTempVariable(expr) {
-		pointer := c.allocas[expr]
+		pointer := c.allocas.get(function.Returns, "")
 
 		c.block.Add(&ir.StoreInst{
-			Pointer: pointer.v,
+			Pointer: pointer,
 			Value:   c.exprResult.v,
-			Align:   function.Returns.Align(),
+			Align:   abi.GetTargetAbi().Align(function.Returns),
 		})
 
-		c.exprResult = pointer
+		c.exprResult = exprValue{
+			v:           pointer,
+			addressable: true,
+		}
 	}
 }
 
@@ -682,7 +720,7 @@ func (c *codegen) VisitIndex(expr *ast.Index) {
 		value = exprValue{v: c.block.Add(&ir.LoadInst{
 			Typ:     value.v.Type().(*ir.PointerType).Pointee,
 			Pointer: value.v,
-			Align:   pointer.Pointee.Align(),
+			Align:   abi.GetTargetAbi().Align(pointer.Pointee),
 		})}
 	}
 
@@ -829,15 +867,18 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			}
 
 			if node.Method() != nil && !value.addressable {
-				pointer := c.allocas[expr]
+				pointer := c.allocas.get(expr.Value.Result().Type, "")
 
 				c.block.Add(&ir.StoreInst{
-					Pointer: pointer.v,
+					Pointer: pointer,
 					Value:   value.v,
-					Align:   node.Align(),
+					Align:   abi.GetTargetAbi().Align(node),
 				})
 
-				value = pointer
+				value = exprValue{
+					v:           pointer,
+					addressable: true,
+				}
 			}
 
 			c.exprResult = c.getFunction(node)
@@ -865,7 +906,7 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 			load := c.block.Add(&ir.LoadInst{
 				Typ:     value.v.Type().(*ir.PointerType).Pointee,
 				Pointer: value.v,
-				Align:   v.Align(),
+				Align:   abi.GetTargetAbi().Align(v),
 			})
 
 			return exprValue{
@@ -910,7 +951,7 @@ func (c *codegen) binaryLoad(left, right ast.Expr, operator *ast.Token) exprValu
 	}
 
 	// Left -> Right
-	cast, castOk := ast.GetImplicitCast(left.Result().Type, right.Result().Type)
+	cast, castOk := common.GetImplicitCast(left.Result().Type, right.Result().Type)
 
 	if castOk {
 		to := right.Result().Type
@@ -922,7 +963,7 @@ func (c *codegen) binaryLoad(left, right ast.Expr, operator *ast.Token) exprValu
 	}
 
 	// Right -> Left
-	cast, castOk = ast.GetImplicitCast(right.Result().Type, left.Result().Type)
+	cast, castOk = common.GetImplicitCast(right.Result().Type, left.Result().Type)
 
 	if castOk {
 		to := left.Result().Type

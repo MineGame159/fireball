@@ -149,6 +149,7 @@ func (w *textWriter) writeNameImpl(name Name) {
 		w.writeString(name.named)
 
 		if name.namedSuffix > 0 {
+			w.writeRune('.')
 			w.writeUint(name.namedSuffix, 10)
 		}
 	}

@@ -46,6 +46,16 @@ func (w *textWriter) writeType(t ir.Type) {
 	case *ir.PointerType:
 		w.writeString("ptr")
 
+		if t.ByVal != nil && w.isArgument {
+			w.writeString(" byval(")
+			w.writeType(t.ByVal)
+			w.writeRune(')')
+		} else if t.SRet != nil && w.isArgument {
+			w.writeString(" sret(")
+			w.writeType(t.SRet)
+			w.writeRune(')')
+		}
+
 	case *ir.ArrayType:
 		w.writeRune('[')
 		w.writeInt(int64(t.Count))

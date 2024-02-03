@@ -147,7 +147,7 @@ func (s *scopes) getVariable(name scanner.Token) *variable {
 	return nil
 }
 
-func (s *scopes) addVariable(name ast.Node, type_ ast.Type, value exprValue, arg uint32) *variable {
+func (s *scopes) addVariable(name ast.Node, type_ ast.Type, value ir.Value, arg uint32) *variable {
 	if s.declare == nil {
 		s.declare = s.c.module.Declare(
 			"llvm.dbg.declare",
@@ -177,7 +177,7 @@ func (s *scopes) addVariable(name ast.Node, type_ ast.Type, value exprValue, arg
 	declare := s.c.block.Add(&ir.CallInst{
 		Callee: s.declare,
 		Args: []ir.Value{
-			value.v,
+			value,
 			s.c.module.Meta(meta),
 			s.c.module.Meta(&ir.ExpressionMeta{}),
 		},
@@ -185,11 +185,12 @@ func (s *scopes) addVariable(name ast.Node, type_ ast.Type, value exprValue, arg
 
 	s.c.setLocationMeta(declare, name)
 
-	value.addressable = true
-
 	s.variables = append(s.variables, variable{
-		name:  name,
-		value: value,
+		name: name,
+		value: exprValue{
+			v:           value,
+			addressable: true,
+		},
 	})
 
 	s.get().variableCount++

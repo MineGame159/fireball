@@ -14,6 +14,8 @@ type textWriter struct {
 	w      *bufio.Writer
 	buffer [65]byte
 
+	isArgument bool
+
 	// Names
 
 	globalUnnamedCount int64

@@ -3,6 +3,7 @@ package checker
 import (
 	"fireball/core"
 	"fireball/core/ast"
+	"fireball/core/common"
 	"fireball/core/utils"
 	"fmt"
 )
@@ -152,7 +153,7 @@ func (c *checker) checkRequired(required ast.Type, expr ast.Expr) {
 		return
 	}
 
-	if _, ok := ast.GetImplicitCast(expr.Result().Type, required); !ok {
+	if _, ok := common.GetImplicitCast(expr.Result().Type, required); !ok {
 		c.error(expr, "Expected a '%s' but got a '%s'", ast.PrintType(required), ast.PrintType(expr.Result().Type))
 	}
 }

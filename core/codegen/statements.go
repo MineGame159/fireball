@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fireball/core/abi"
 	"fireball/core/ast"
 	"fireball/core/ir"
 )
@@ -21,7 +22,9 @@ func (c *codegen) VisitExpression(stmt *ast.Expression) {
 
 func (c *codegen) VisitVar(stmt *ast.Var) {
 	// Variable
-	pointer := c.allocas[stmt]
+	pointer := c.allocas.get(stmt.ActualType, stmt.Name.String()+".var")
+	c.setLocationMeta(pointer, stmt)
+
 	c.scopes.addVariable(stmt.Name, stmt.ActualType, pointer, 0)
 
 	// Initializer
@@ -34,9 +37,9 @@ func (c *codegen) VisitVar(stmt *ast.Var) {
 	}
 
 	store := c.block.Add(&ir.StoreInst{
-		Pointer: pointer.v,
+		Pointer: pointer,
 		Value:   initializer,
-		Align:   stmt.ActualType.Align(),
+		Align:   abi.GetTargetAbi().Align(stmt.ActualType),
 	})
 
 	c.setLocationMeta(store, stmt)
@@ -170,12 +173,22 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		)
 	} else {
 		// Other
-		value := c.implicitCastLoadExpr(c.astFunction.Returns, stmt.Value)
+		funcAbi := abi.GetFuncAbi(c.astFunction)
 
-		c.setLocationMeta(
-			c.block.Add(&ir.RetInst{Value: value.v}),
-			stmt,
-		)
+		value := c.implicitCastLoadExpr(c.astFunction.Returns, stmt.Value)
+		value = c.valueToReturnValue(funcAbi, value, c.astFunction.Returns, c.function.Typ.Params)
+
+		if value.v == nil {
+			c.setLocationMeta(
+				c.block.Add(&ir.RetInst{}),
+				stmt,
+			)
+		} else {
+			c.setLocationMeta(
+				c.block.Add(&ir.RetInst{Value: value.v}),
+				stmt,
+			)
+		}
 	}
 
 	c.block = nil

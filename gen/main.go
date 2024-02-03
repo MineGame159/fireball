@@ -70,9 +70,6 @@ func genVisitor(w *Writer, group Group) {
 	w.write("")
 
 	if group.name == "Type" {
-		w.write("Size() uint32")
-		w.write("Align() uint32")
-		w.write("")
 		w.write("Equals(other Type) bool")
 		w.write("")
 		w.write("Resolved() Type")
@@ -313,7 +310,7 @@ func genConstructor(w *Writer, node Node, this string) {
 
 	// Check if the node will be empty and return nil
 
-	if node.name != "File" {
+	if !node.allowEmpty {
 		sb.Reset()
 
 		i := 0

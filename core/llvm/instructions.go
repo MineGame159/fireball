@@ -1,6 +1,9 @@
 package llvm
 
-import "fireball/core/ir"
+import (
+	"fireball/core/ir"
+	"strings"
+)
 
 func (w *textWriter) writeInstruction(inst ir.Inst) {
 	// Value
@@ -111,9 +114,9 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 
 	case *ir.ShrInst:
 		if inst.SignExtend {
-			w.writeString("ashr")
+			w.writeString("ashr ")
 		} else {
-			w.writeString("lshr")
+			w.writeString("lshr ")
 		}
 
 		w.writeValue(inst.Left)
@@ -374,6 +377,10 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 		w.writeName(inst.Callee)
 		w.writeRune('(')
 
+		if !strings.HasPrefix(inst.Callee.Name(), "llvm.dbg") {
+			w.isArgument = true
+		}
+
 		for i, arg := range inst.Args {
 			if i > 0 {
 				w.writeString(", ")
@@ -391,6 +398,8 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 
 			w.writeValue(arg)
 		}
+
+		w.isArgument = false
 
 		w.writeRune(')')
 

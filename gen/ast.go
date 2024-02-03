@@ -141,7 +141,7 @@ var statements = Group{
 			field("increment", type_("Expr")),
 			field("body", type_("Stmt")),
 		),
-		node(
+		nodeAllowEmpty(
 			"Return",
 			field("value", type_("Expr")),
 		),
@@ -249,7 +249,7 @@ var other = Group{
 	name: "",
 
 	nodes: []Node{
-		node(
+		nodeAllowEmpty(
 			"File",
 			field("path", type_("string")),
 			field("namespace", type_("Namespace")),

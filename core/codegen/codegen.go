@@ -1,7 +1,9 @@
 package codegen
 
 import (
+	"fireball/core/abi"
 	"fireball/core/ast"
+	"fireball/core/common"
 	"fireball/core/ir"
 	"fmt"
 )
@@ -14,11 +16,10 @@ type codegen struct {
 	types   types
 	vtables vtables
 	scopes  scopes
+	allocas allocas
 
 	staticVariables map[ast.Node]exprValue
 	functions       map[*ast.Func]*ir.Func
-
-	allocas map[ast.Node]exprValue
 
 	astFunction *ast.Func
 	function    *ir.Func
@@ -54,9 +55,10 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 	// File
 	c.module.Path = path
 
-	c.types.module = c.module
+	c.types.c = c
 	c.vtables.c = c
 	c.scopes.c = c
+	c.allocas.c = c
 
 	c.scopes.pushFile(path)
 
@@ -172,13 +174,13 @@ func (c *codegen) getMangledName(function *ast.Func) string {
 
 // IR
 
-func (c *codegen) load(value exprValue, type_ ast.Type) exprValue {
+func (c *codegen) load(value exprValue, valueType ast.Type) exprValue {
 	if value.addressable {
 		return exprValue{
 			v: c.block.Add(&ir.LoadInst{
 				Typ:     value.v.Type().(*ir.PointerType).Pointee,
 				Pointer: value.v,
-				Align:   type_.Align(),
+				Align:   abi.GetTargetAbi().Align(valueType),
 			}),
 			addressable: false,
 		}
@@ -192,11 +194,19 @@ func (c *codegen) loadExpr(expr ast.Expr) exprValue {
 }
 
 func (c *codegen) implicitCast(required ast.Type, value exprValue, valueType ast.Type) exprValue {
-	if kind, ok := ast.GetImplicitCast(valueType, required); ok && kind != ast.None {
+	if needsImplicitCast(valueType, required) {
 		return c.cast(value, valueType, required, nil)
 	}
 
 	return value
+}
+
+func needsImplicitCast(from, to ast.Type) bool {
+	if kind, ok := common.GetImplicitCast(from, to); ok {
+		return kind != common.None
+	}
+
+	return false
 }
 
 func (c *codegen) implicitCastLoadExpr(required ast.Type, expr ast.Expr) exprValue {
@@ -204,7 +214,7 @@ func (c *codegen) implicitCastLoadExpr(required ast.Type, expr ast.Expr) exprVal
 }
 
 func (c *codegen) cast(value exprValue, from, to ast.Type, location ast.Node) exprValue {
-	kind, ok := ast.GetCast(from, to)
+	kind, ok := common.GetCast(from, to)
 	if !ok {
 		panic("codegen.convertAstCastKind() - ast.GetCast() returned false")
 	}
@@ -212,8 +222,8 @@ func (c *codegen) cast(value exprValue, from, to ast.Type, location ast.Node) ex
 	return c.convertCast(value, kind, from, to, location)
 }
 
-func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.Type, location ast.Node) exprValue {
-	if kind == ast.None {
+func (c *codegen) convertCast(value exprValue, kind common.CastKind, from, to ast.Type, location ast.Node) exprValue {
+	if kind == common.None {
 		return value
 	}
 
@@ -221,7 +231,7 @@ func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.T
 	toIr := c.types.get(to)
 
 	switch kind {
-	case ast.Truncate:
+	case common.Truncate:
 		result := c.block.Add(&ir.TruncInst{
 			Value: value.v,
 			Typ:   toIr,
@@ -230,7 +240,7 @@ func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.T
 		c.setLocationMeta(result, location)
 		return exprValue{v: result}
 
-	case ast.Extend:
+	case common.Extend:
 		var result ir.MetaValue
 
 		if ast.IsFloating(to.Resolved().(*ast.Primitive).Kind) {
@@ -255,7 +265,7 @@ func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.T
 		c.setLocationMeta(result, location)
 		return exprValue{v: result}
 
-	case ast.Int2Float:
+	case common.Int2Float:
 		result := c.block.Add(&ir.I2FInst{
 			Signed: ast.IsSigned(from.Resolved().(*ast.Primitive).Kind),
 			Value:  value.v,
@@ -265,7 +275,7 @@ func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.T
 		c.setLocationMeta(result, location)
 		return exprValue{v: result}
 
-	case ast.Float2Int:
+	case common.Float2Int:
 		result := c.block.Add(&ir.F2IInst{
 			Signed: ast.IsSigned(to.Resolved().(*ast.Primitive).Kind),
 			Value:  value.v,
@@ -275,7 +285,7 @@ func (c *codegen) convertCast(value exprValue, kind ast.CastKind, from, to ast.T
 		c.setLocationMeta(result, location)
 		return exprValue{v: result}
 
-	case ast.Pointer2Interface:
+	case common.Pointer2Interface:
 		type_ := from.Resolved().(*ast.Pointer).Pointee
 
 		result := c.block.Add(&ir.InsertValueInst{
@@ -428,51 +438,6 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 
 func (c *codegen) beginBlock(block *ir.Block) {
 	c.block = block
-}
-
-func (c *codegen) findAllocas(function *ast.Func) {
-	c.allocas = make(map[ast.Node]exprValue)
-
-	a := &allocaFinder{c: c}
-	a.VisitNode(function)
-}
-
-type allocaFinder struct {
-	c *codegen
-}
-
-func (a *allocaFinder) VisitNode(node ast.Node) {
-	switch node := node.(type) {
-	case *ast.Var:
-		a.c.allocas[node] = exprValue{
-			v:           a.c.alloca(node.ActualType, node.Name.String()+".var", node),
-			addressable: true,
-		}
-
-	case *ast.Call:
-		if callNeedsTempVariable(node) {
-			returns := node.Callee.Result().Type.(*ast.Func).Returns
-
-			a.c.allocas[node] = exprValue{
-				v:           a.c.alloca(returns, "", node),
-				addressable: true,
-			}
-		}
-
-	case *ast.Member:
-		if node.Value.Result().Kind != ast.TypeResultKind && node.Result().Kind == ast.CallableResultKind && !node.Value.Result().IsAddressable() {
-			type_ := node.Value.Result().Type
-
-			if type_ != nil {
-				a.c.allocas[node] = exprValue{
-					v:           a.c.alloca(type_, "", node),
-					addressable: true,
-				}
-			}
-		}
-	}
-
-	node.AcceptChildren(a)
 }
 
 func callNeedsTempVariable(expr *ast.Call) bool {

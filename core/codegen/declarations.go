@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fireball/core/abi"
 	"fireball/core/ast"
 	"fireball/core/cst"
 	"fireball/core/ir"
@@ -37,36 +38,45 @@ func (c *codegen) VisitFunc(decl *ast.Func) {
 	c.beginBlock(function.Block("entry"))
 
 	c.scopes.push(function.Meta())
+	c.allocas.reset()
 
 	// Add this variable
 	if struct_ := decl.Method(); struct_ != nil {
 		name := scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}
 		node := cst.Node{Kind: cst.IdentifierNode, Token: name, Range: decl.Name.Cst().Range}
 
-		c.scopes.addVariable(ast.NewToken(node, name), struct_, exprValue{v: function.Typ.Params[0]}, 1)
+		c.scopes.addVariable(ast.NewToken(node, name), struct_, function.Typ.Params[0], 1)
 	}
 
 	// Copy parameters
-	for i, param := range decl.Params {
-		index := i
-		if decl.Method() != nil {
-			index++
-		}
+	funcAbi := abi.GetFuncAbi(decl)
+	returnArgs := funcAbi.Classify(decl.Returns, nil)
 
-		pointer := c.alloca(param.Type, param.Name.String()+".var", param)
+	index := 0
+	if len(returnArgs) == 1 && returnArgs[0].Class == abi.Memory {
+		index++
+	}
+	if decl.Method() != nil {
+		index++
+	}
 
-		c.block.Add(&ir.StoreInst{
-			Pointer: pointer,
-			Value:   function.Typ.Params[index],
-			Align:   param.Type.Align(),
-		})
+	paramI := index
 
-		c.scopes.addVariable(param.Name, param.Type, exprValue{v: pointer}, uint32(index+1))
+	for _, param := range decl.Params {
+		pointer := c.allocas.get(param.Type, param.Name.String()+".var")
+		c.setLocationMeta(pointer, param)
+
+		args := funcAbi.Classify(param.Type, nil)
+		params := function.Typ.Params[index : index+len(args)]
+		index += len(args)
+
+		c.paramsToVariable(args, params, pointer, param.Type)
+
+		paramI++
+		c.scopes.addVariable(param.Name, param.Type, pointer, uint32(paramI))
 	}
 
 	// Body
-	c.findAllocas(decl)
-
 	for _, stmt := range decl.Body {
 		c.acceptStmt(stmt)
 	}

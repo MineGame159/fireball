@@ -6,23 +6,6 @@ import (
 	"fireball/core/scanner"
 )
 
-func (c *codegen) alloca(type_ ast.Type, name string, node ast.Node) ir.Value {
-	pointer := c.block.Add(&ir.AllocaInst{
-		Typ:   c.types.get(type_),
-		Align: type_.Align(),
-	})
-
-	if name != "" {
-		pointer.SetName(name)
-	}
-
-	if node != nil {
-		c.setLocationMeta(pointer, node)
-	}
-
-	return pointer
-}
-
 func (c *codegen) setLocationMeta(value ir.MetaValue, node ast.Node) {
 	if node == nil {
 		return

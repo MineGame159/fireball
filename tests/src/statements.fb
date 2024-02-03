@@ -113,3 +113,19 @@ func _continue() bool {
 
     return count == 4;
 }
+
+#[Test("return")]
+func _return() bool {
+    var ok = true;
+    setFalse(&ok);
+
+    return ok;
+}
+
+func setFalse(ptr *bool) {
+    if (true) {
+        return;
+    }
+
+    *ptr = false;
+}

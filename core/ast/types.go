@@ -21,9 +21,6 @@ type TypeVisitor interface {
 type Type interface {
 	Node
 
-	Size() uint32
-	Align() uint32
-
 	Equals(other Type) bool
 
 	Resolved() Type

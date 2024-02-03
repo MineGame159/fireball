@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fireball/core/ast"
+	"fireball/core/common"
 	"fireball/core/scanner"
 	"fireball/core/utils"
 	"strconv"
@@ -553,7 +554,7 @@ func (c *checker) VisitCast(expr *ast.Cast) {
 	// Check based on the operator
 	switch expr.Operator.Token().Kind {
 	case scanner.As:
-		if _, ok := ast.GetCast(expr.Value.Result().Type, expr.Target); !ok {
+		if _, ok := common.GetCast(expr.Value.Result().Type, expr.Target); !ok {
 			c.error(expr, "Cannot cast type '%s' to type '%s'", ast.PrintType(expr.Value.Result().Type), ast.PrintType(expr.Target))
 		}
 
@@ -893,7 +894,7 @@ func (c *checker) checkBinary(expr, left, right ast.Expr, operator *ast.Token, a
 	rightType := right.Result().Type
 
 	castType := leftType
-	_, castOk := ast.GetImplicitCast(rightType, leftType)
+	_, castOk := common.GetImplicitCast(rightType, leftType)
 
 	if !castOk {
 		if assignment {
@@ -902,7 +903,7 @@ func (c *checker) checkBinary(expr, left, right ast.Expr, operator *ast.Token, a
 		}
 
 		castType = rightType
-		_, castOk = ast.GetImplicitCast(leftType, rightType)
+		_, castOk = common.GetImplicitCast(leftType, rightType)
 	}
 
 	// Arithmetic

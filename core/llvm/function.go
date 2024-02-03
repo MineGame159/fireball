@@ -74,6 +74,7 @@ func (w *textWriter) writeFunction(function *ir.Func) {
 
 	// Parameters
 	w.writeRune('(')
+	w.isArgument = true
 
 	for i, param := range function.Typ.Params {
 		if i > 0 {
@@ -93,6 +94,7 @@ func (w *textWriter) writeFunction(function *ir.Func) {
 		}
 	}
 
+	w.isArgument = false
 	w.writeRune(')')
 
 	// Flags

@@ -600,10 +600,6 @@ type Return struct {
 }
 
 func NewReturn(node cst.Node, value Expr) *Return {
-	if value == nil {
-		return nil
-	}
-
 	r := &Return{
 		cst:   node,
 		Value: value,
