@@ -149,7 +149,7 @@ func (c *checker) expectPrimitiveValue(expr ast.Expr, kind ast.PrimitiveKind) {
 }
 
 func (c *checker) checkRequired(required ast.Type, expr ast.Expr) {
-	if required == nil || expr == nil || expr.Result().Kind == ast.InvalidResultKind {
+	if required == nil || expr == nil || expr.Result().Kind == ast.InvalidResultKind || expr.Result().Type == nil {
 		return
 	}
 

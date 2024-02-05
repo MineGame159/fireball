@@ -111,9 +111,8 @@ func GetImplicitCast(from, to ast.Type) (CastKind, bool) {
 				return Extend, true
 			}
 
-			// Primitive (same integer) -> Primitive (same floating)
-			// TODO: Allow converting a smaller integer to the next bigger floating (eg. i16 -> f32)
-			if ast.IsInteger(from.Kind) && ast.IsFloating(to.Kind) && toSize == fromSize {
+			// Primitive (smaller or equal integer) -> Primitive (bigger or equal floating)
+			if ast.IsInteger(from.Kind) && ast.IsFloating(to.Kind) && toSize >= fromSize {
 				return Int2Float, true
 			}
 		}

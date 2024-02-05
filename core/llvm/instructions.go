@@ -124,7 +124,7 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 		w.writeValueValue(inst.Right)
 
 	case *ir.AndInst:
-		w.writeString("add ")
+		w.writeString("and ")
 		w.writeValue(inst.Left)
 		w.writeString(", ")
 		w.writeValueValue(inst.Right)

@@ -162,6 +162,10 @@ var expressions = Group{
 			field("expr", type_("Expr")),
 		),
 		node(
+			"Literal",
+			field("token", type_("scanner.Token")),
+		),
+		node(
 			"Unary",
 			field("prefix", type_("bool")),
 			field("operator", type_("Token")),
@@ -234,10 +238,6 @@ var expressions = Group{
 		node(
 			"Identifier",
 			field("name", type_("scanner.Token")),
-		),
-		node(
-			"Literal",
-			field("token", type_("scanner.Token")),
 		),
 	},
 }

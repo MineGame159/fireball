@@ -28,6 +28,14 @@ func int2float() bool {
 }
 
 #[Test]
+func int2float_differentSize() bool {
+    var a u8 = 6 as u8;
+    var b f64 = a;
+
+    return b == 6.0;
+}
+
+#[Test]
 func long2double() bool {
     var a i64 = 5;
     var b f64 = a;
