@@ -19,7 +19,7 @@ func Build(project *workspace.Project, entrypoint *ir.Module, optimizationLevel 
 	irPaths := make([]string, 0, len(project.Files))
 
 	for _, file := range project.Files {
-		path := strings.ReplaceAll(file.Path, "/", "-")
+		path := strings.ReplaceAll(file.Path, string(os.PathSeparator), "-")
 		path = filepath.Join(project.Path, "build", path[:len(path)-3]+".ll")
 
 		irFile, err := os.Create(path)
@@ -56,18 +56,12 @@ func Build(project *workspace.Project, entrypoint *ir.Module, optimizationLevel 
 		c.AddInput(irPath)
 	}
 
-	if runtime.GOOS == "darwin" {
-		c.AddLibrary("System")
-	} else {
-		c.AddLibrary("m")
-		c.AddLibrary("c")
-	}
-
 	for _, library := range project.Config.LinkLibraries {
 		c.AddLibrary(library)
 	}
 
 	output := filepath.Join(project.Path, "build", outputName)
+	output = withExecutableExtension(output)
 
 	err = c.Compile(output)
 	if err != nil {
@@ -75,4 +69,12 @@ func Build(project *workspace.Project, entrypoint *ir.Module, optimizationLevel 
 	}
 
 	return output, nil
+}
+
+func withExecutableExtension(path string) string {
+	if runtime.GOOS == "windows" {
+		return path + ".exe"
+	}
+
+	return path
 }

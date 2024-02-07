@@ -34,6 +34,8 @@ type Abi interface {
 
 func GetTargetAbi() Abi {
 	switch runtime.GOOS {
+	case "windows":
+		return WIN64
 	case "linux", "darwin":
 		return AMD64
 
