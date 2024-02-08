@@ -9,5 +9,11 @@ type Layout interface {
 }
 
 func GetStructLayout(s *ast.Struct) Layout {
-	return CLayout
+	for _, attribute := range s.Attributes {
+		if attribute.Name.String() == "C" {
+			return CLayout
+		}
+	}
+
+	return FbLayout
 }

@@ -706,6 +706,8 @@ func IsNil(node Node) bool {
 		return node == nil
 	case *Paren:
 		return node == nil
+	case *Literal:
+		return node == nil
 	case *Unary:
 		return node == nil
 	case *Binary:
@@ -733,8 +735,6 @@ func IsNil(node Node) bool {
 	case *AllocateArray:
 		return node == nil
 	case *Identifier:
-		return node == nil
-	case *Literal:
 		return node == nil
 	case *File:
 		return node == nil

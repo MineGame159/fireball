@@ -79,3 +79,40 @@ func method() bool {
 func staticMethod() bool {
     return Vec2.something() == 13;
 }
+
+struct FbLayout {
+    a u8,
+    b u64,
+    c u8,
+    d u64,
+}
+
+#[Test]
+func fireballLayoutSize() bool {
+    return sizeof(FbLayout) == 24;
+}
+
+#[Test]
+func fireballLayoutOrder() bool {
+    var s = FbLayout { d: 5 };
+    return s.d == 5;
+}
+
+#[C]
+struct CLayout {
+    a u8,
+    b u64,
+    c u8,
+    d u64,
+}
+
+#[Test]
+func cLayoutSize() bool {
+    return sizeof(CLayout) == 32;
+}
+
+#[Test]
+func cLayoutOrder() bool {
+    var s = CLayout { d: 5 };
+    return s.d == 5;
+}

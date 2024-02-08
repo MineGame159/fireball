@@ -154,15 +154,15 @@ func convertString(s string) *ir.StringConst {
 func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Value
 	struct_, _ := ast.As[*ast.Struct](expr.Type)
+	fields, _ := abi.GetStructLayout(struct_).Fields(abi.GetTargetAbi(), struct_)
+
 	type_ := c.types.get(struct_)
 
 	var result ir.Value = &ir.ZeroInitConst{Typ: type_}
 
 	for _, initField := range expr.Fields {
-		_, field := struct_.GetField(initField.Name.String())
-
+		field, i := getField(fields, initField.Name)
 		element := c.implicitCastLoadExpr(field.Type, initField.Value)
-		i, _ := struct_.GetField(initField.Name.String())
 
 		r := c.block.Add(&ir.InsertValueInst{
 			Value:   result,
@@ -761,6 +761,10 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			if node.IsStatic() {
 				c.exprResult = c.getStaticVariable(node)
 			} else {
+				struct_ := node.Parent().(*ast.Struct)
+				fields, _ := abi.GetStructLayout(struct_).Fields(abi.GetTargetAbi(), struct_)
+				_, i := getField(fields, node.Name)
+
 				value, s := c.memberLoad(expr.Value.Result().Type, value)
 
 				if value.addressable {
@@ -772,7 +776,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 						Pointer:    value.v,
 						Indices: []ir.Value{
 							&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(0)},
-							&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(uint64(node.Index()))},
+							&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(uint64(i))},
 						},
 						Inbounds: true,
 					})
@@ -786,7 +790,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 				} else {
 					result := c.block.Add(&ir.ExtractValueInst{
 						Value:   value.v,
-						Indices: []uint32{uint32(node.Index())},
+						Indices: []uint32{uint32(i)},
 					})
 
 					c.setLocationMeta(result, expr.Name)
@@ -920,6 +924,16 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 }
 
 // Utils
+
+func getField(fields []*ast.Field, name ast.Node) (*ast.Field, int) {
+	for i, field := range fields {
+		if field.Name.String() == name.String() {
+			return field, i
+		}
+	}
+
+	panic("codegen.getField() - Slice doesn't contain a field with the name")
+}
 
 func (c *codegen) binaryLoad(left, right ast.Expr, operator *ast.Token) exprValue {
 	// Interface == Pointer

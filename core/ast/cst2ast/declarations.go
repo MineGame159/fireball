@@ -92,6 +92,7 @@ func (c *converter) convertNamespaceName(node cst.Node) *ast.NamespaceName {
 // Struct
 
 func (c *converter) convertStructDecl(node cst.Node) ast.Decl {
+	var attributes []*ast.Attribute
 	var name *ast.Token
 	var fields []*ast.Field
 	var staticFields []*ast.Field
@@ -110,11 +111,11 @@ func (c *converter) convertStructDecl(node cst.Node) ast.Decl {
 				}
 			}
 		} else if child.Kind == cst.AttributesNode {
-			c.error(child.Children[0], "Structs cannot have attributes")
+			attributes = c.convertAttributes(child)
 		}
 	}
 
-	if s := ast.NewStruct(node, name, fields, staticFields); s != nil {
+	if s := ast.NewStruct(node, attributes, name, fields, staticFields); s != nil {
 		return s
 	}
 

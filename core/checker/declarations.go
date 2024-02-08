@@ -17,6 +17,11 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 
 	c.checkNameCollision(decl, decl.Name)
 
+	// Check attributes
+	for _, attribute := range decl.Attributes {
+		c.visitStructAttribute(attribute)
+	}
+
 	// Check static fields
 	fields := utils.NewSet[string]()
 
@@ -216,7 +221,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 
 	// Check attributes
 	for _, attribute := range decl.Attributes {
-		c.visitAttribute(decl, attribute)
+		c.visitFuncAttribute(decl, attribute)
 	}
 
 	if decl.Name == nil {

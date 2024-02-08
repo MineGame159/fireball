@@ -9,6 +9,7 @@ import (
 
 type ExprVisitor interface {
 	VisitParen(expr *Paren)
+	VisitLiteral(expr *Literal)
 	VisitUnary(expr *Unary)
 	VisitBinary(expr *Binary)
 	VisitLogical(expr *Logical)
@@ -23,7 +24,6 @@ type ExprVisitor interface {
 	VisitArrayInitializer(expr *ArrayInitializer)
 	VisitAllocateArray(expr *AllocateArray)
 	VisitIdentifier(expr *Identifier)
-	VisitLiteral(expr *Literal)
 }
 
 type Expr interface {
@@ -115,6 +115,78 @@ func (p *Paren) AcceptExpr(visitor ExprVisitor) {
 
 func (p *Paren) Result() *ExprResult {
 	return &p.result
+}
+
+// Literal
+
+type Literal struct {
+	cst    cst.Node
+	parent Node
+
+	Token_ scanner.Token
+
+	result ExprResult
+}
+
+func NewLiteral(node cst.Node, token scanner.Token) *Literal {
+	if token.IsEmpty() {
+		return nil
+	}
+
+	l := &Literal{
+		cst:    node,
+		Token_: token,
+	}
+
+	return l
+}
+
+func (l *Literal) Cst() *cst.Node {
+	if l.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &l.cst
+}
+
+func (l *Literal) Token() scanner.Token {
+	return l.Token_
+}
+
+func (l *Literal) Parent() Node {
+	return l.parent
+}
+
+func (l *Literal) SetParent(parent Node) {
+	if parent != nil && l.parent != nil {
+		panic("ast.Literal.SetParent() - Parent is already set")
+	}
+
+	l.parent = parent
+}
+
+func (l *Literal) AcceptChildren(visitor Visitor) {
+}
+
+func (l *Literal) Clone() Node {
+	l2 := &Literal{
+		cst:    l.cst,
+		Token_: l.Token_,
+	}
+
+	return l2
+}
+
+func (l *Literal) String() string {
+	return l.Token_.String()
+}
+
+func (l *Literal) AcceptExpr(visitor ExprVisitor) {
+	visitor.VisitLiteral(l)
+}
+
+func (l *Literal) Result() *ExprResult {
+	return &l.result
 }
 
 // Unary
@@ -1467,76 +1539,4 @@ func (i *Identifier) AcceptExpr(visitor ExprVisitor) {
 
 func (i *Identifier) Result() *ExprResult {
 	return &i.result
-}
-
-// Literal
-
-type Literal struct {
-	cst    cst.Node
-	parent Node
-
-	Token_ scanner.Token
-
-	result ExprResult
-}
-
-func NewLiteral(node cst.Node, token scanner.Token) *Literal {
-	if token.IsEmpty() {
-		return nil
-	}
-
-	l := &Literal{
-		cst:    node,
-		Token_: token,
-	}
-
-	return l
-}
-
-func (l *Literal) Cst() *cst.Node {
-	if l.cst.Kind == cst.UnknownNode {
-		return nil
-	}
-
-	return &l.cst
-}
-
-func (l *Literal) Token() scanner.Token {
-	return l.Token_
-}
-
-func (l *Literal) Parent() Node {
-	return l.parent
-}
-
-func (l *Literal) SetParent(parent Node) {
-	if parent != nil && l.parent != nil {
-		panic("ast.Literal.SetParent() - Parent is already set")
-	}
-
-	l.parent = parent
-}
-
-func (l *Literal) AcceptChildren(visitor Visitor) {
-}
-
-func (l *Literal) Clone() Node {
-	l2 := &Literal{
-		cst:    l.cst,
-		Token_: l.Token_,
-	}
-
-	return l2
-}
-
-func (l *Literal) String() string {
-	return l.Token_.String()
-}
-
-func (l *Literal) AcceptExpr(visitor ExprVisitor) {
-	visitor.VisitLiteral(l)
-}
-
-func (l *Literal) Result() *ExprResult {
-	return &l.result
 }

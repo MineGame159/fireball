@@ -184,23 +184,28 @@ type Struct struct {
 	cst    cst.Node
 	parent Node
 
+	Attributes   []*Attribute
 	Name         *Token
 	Fields       []*Field
 	StaticFields []*Field
 }
 
-func NewStruct(node cst.Node, name *Token, fields []*Field, staticfields []*Field) *Struct {
-	if name == nil && fields == nil && staticfields == nil {
+func NewStruct(node cst.Node, attributes []*Attribute, name *Token, fields []*Field, staticfields []*Field) *Struct {
+	if attributes == nil && name == nil && fields == nil && staticfields == nil {
 		return nil
 	}
 
 	s := &Struct{
 		cst:          node,
+		Attributes:   attributes,
 		Name:         name,
 		Fields:       fields,
 		StaticFields: staticfields,
 	}
 
+	for _, child := range attributes {
+		child.SetParent(s)
+	}
 	if name != nil {
 		name.SetParent(s)
 	}
@@ -239,6 +244,9 @@ func (s *Struct) SetParent(parent Node) {
 }
 
 func (s *Struct) AcceptChildren(visitor Visitor) {
+	for _, child := range s.Attributes {
+		visitor.VisitNode(child)
+	}
 	if s.Name != nil {
 		visitor.VisitNode(s.Name)
 	}
@@ -255,6 +263,11 @@ func (s *Struct) Clone() Node {
 		cst: s.cst,
 	}
 
+	s2.Attributes = make([]*Attribute, len(s.Attributes))
+	for i, child := range s2.Attributes {
+		s2.Attributes[i] = child.Clone().(*Attribute)
+		s2.Attributes[i].SetParent(s2)
+	}
 	if s.Name != nil {
 		s2.Name = s.Name.Clone().(*Token)
 		s2.Name.SetParent(s2)

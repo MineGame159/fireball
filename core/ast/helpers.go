@@ -84,26 +84,6 @@ func (f *Field) IsStatic() bool {
 	return false
 }
 
-func (f *Field) Index() int {
-	if f.IsStatic() {
-		for i, field := range f.Parent().(*Struct).StaticFields {
-			if field == f {
-				return i
-			}
-		}
-
-		panic("ast.Field.Index() - Static field not found")
-	}
-
-	for i, field := range f.Parent().(*Struct).Fields {
-		if field == f {
-			return i
-		}
-	}
-
-	panic("ast.Field.Index() - Field not found")
-}
-
 func (f *Field) MangledName() string {
 	sb := strings.Builder{}
 	sb.WriteString("fb$")

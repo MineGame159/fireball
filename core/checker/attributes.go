@@ -2,7 +2,23 @@ package checker
 
 import "fireball/core/ast"
 
-func (c *checker) visitAttribute(decl *ast.Func, attribute *ast.Attribute) {
+func (c *checker) visitStructAttribute(attribute *ast.Attribute) {
+	if attribute.Name == nil {
+		return
+	}
+
+	switch attribute.Name.String() {
+	case "C":
+		if len(attribute.Args) > 0 {
+			c.error(attribute.Name, "C doesn't have any arguments")
+		}
+
+	default:
+		c.error(attribute.Name, "Struct attribute with this name doesn't exist")
+	}
+}
+
+func (c *checker) visitFuncAttribute(decl *ast.Func, attribute *ast.Attribute) {
 	if attribute.Name == nil {
 		return
 	}
@@ -39,7 +55,7 @@ func (c *checker) visitAttribute(decl *ast.Func, attribute *ast.Attribute) {
 		}
 
 	default:
-		c.error(attribute.Name, "Attribute with this name doesn't exist")
+		c.error(attribute.Name, "Function attribute with this name doesn't exist")
 	}
 }
 

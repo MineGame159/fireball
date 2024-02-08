@@ -61,6 +61,7 @@ var declarations = Group{
 		),
 		node(
 			"Struct",
+			field("attributes", array("Attribute")),
 			field("name", type_("Token")),
 			field("fields", array("Field")),
 			field("staticFields", array("Field")),

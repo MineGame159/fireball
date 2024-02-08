@@ -76,9 +76,10 @@ func (t *types) get(type_ ast.Type) ir.Type {
 			return typ
 		}
 
-		fields := make([]ir.Type, len(type_.Fields))
+		astFields, _ := abi.GetStructLayout(type_).Fields(abi.GetTargetAbi(), type_)
+		fields := make([]ir.Type, len(astFields))
 
-		for i, field := range type_.Fields {
+		for i, field := range astFields {
 			fields[i] = t.get(field.Type)
 		}
 
