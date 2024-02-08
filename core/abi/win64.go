@@ -9,32 +9,11 @@ var WIN64 Abi = &win64{}
 type win64 struct{}
 
 func (w *win64) Size(type_ ast.Type) uint32 {
-	if type_, ok := ast.As[*ast.Struct](type_); ok {
-		layout := cLayout{}
-
-		for _, field := range type_.Fields {
-			layout.add(w.Size(field.Type), w.Align(field.Type))
-		}
-
-		return layout.size()
-	}
-
 	return getX64Size(w, type_)
 }
 
 func (w *win64) Align(type_ ast.Type) uint32 {
 	return getX64Align(type_)
-}
-
-func (w *win64) Fields(decl *ast.Struct) ([]*ast.Field, []uint32) {
-	layout := cLayout{}
-	offsets := make([]uint32, len(decl.Fields))
-
-	for i, field := range decl.Fields {
-		offsets[i] = layout.add(w.Size(field.Type), w.Align(field.Type))
-	}
-
-	return decl.Fields, offsets
 }
 
 func (w *win64) Classify(type_ ast.Type, args []Arg) []Arg {

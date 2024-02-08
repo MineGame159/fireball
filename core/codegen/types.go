@@ -448,7 +448,7 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 		return t.cacheMeta(type_, typ)
 
 	case *ast.Struct:
-		fields, offsets := abi.GetTargetAbi().Fields(type_)
+		fields, offsets := abi.GetStructLayout(type_).Fields(abi.GetTargetAbi(), type_)
 		fieldsMeta := make([]ir.MetaID, len(fields))
 
 		for i, field := range fields {

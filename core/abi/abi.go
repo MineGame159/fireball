@@ -27,8 +27,6 @@ type Abi interface {
 	Size(type_ ast.Type) uint32
 	Align(type_ ast.Type) uint32
 
-	Fields(decl *ast.Struct) ([]*ast.Field, []uint32)
-
 	Classify(type_ ast.Type, args []Arg) []Arg
 }
 

@@ -13,6 +13,9 @@ func getX64Size(abi Abi, type_ ast.Type) uint32 {
 	case *ast.Array:
 		return abi.Size(type_.Base) * type_.Count
 
+	case *ast.Struct:
+		return GetStructLayout(type_).Size(abi, type_)
+
 	case *ast.Enum:
 		return abi.Size(type_.ActualType)
 

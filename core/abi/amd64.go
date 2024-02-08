@@ -9,32 +9,11 @@ var AMD64 Abi = &amd64{}
 type amd64 struct{}
 
 func (a *amd64) Size(type_ ast.Type) uint32 {
-	if type_, ok := ast.As[*ast.Struct](type_); ok {
-		layout := cLayout{}
-
-		for _, field := range type_.Fields {
-			layout.add(a.Size(field.Type), a.Align(field.Type))
-		}
-
-		return layout.size()
-	}
-
 	return getX64Size(a, type_)
 }
 
 func (a *amd64) Align(type_ ast.Type) uint32 {
 	return getX64Align(type_)
-}
-
-func (a *amd64) Fields(decl *ast.Struct) ([]*ast.Field, []uint32) {
-	layout := cLayout{}
-	offsets := make([]uint32, len(decl.Fields))
-
-	for i, field := range decl.Fields {
-		offsets[i] = layout.add(a.Size(field.Type), a.Align(field.Type))
-	}
-
-	return decl.Fields, offsets
 }
 
 func (a *amd64) Classify(type_ ast.Type, args []Arg) []Arg {
@@ -120,7 +99,7 @@ func (a *amd64) flatten(type_ ast.Type, baseOffset uint32, args []Arg) []Arg {
 		return args
 
 	case *ast.Struct:
-		fields, offsets := a.Fields(type_)
+		fields, offsets := GetStructLayout(type_).Fields(a, type_)
 
 		for i, field := range fields {
 			offset := baseOffset + offsets[i]
