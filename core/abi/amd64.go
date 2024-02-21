@@ -17,7 +17,7 @@ func (a *amd64) Align(type_ ast.Type) uint32 {
 }
 
 func (a *amd64) Classify(type_ ast.Type, args []Arg) []Arg {
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Primitive:
 		var arg Arg
 
@@ -48,7 +48,7 @@ func (a *amd64) Classify(type_ ast.Type, args []Arg) []Arg {
 	case *ast.Pointer:
 		return append(args, ptr)
 
-	case *ast.Struct, *ast.Array:
+	case ast.StructType, *ast.Array:
 		if a.Size(type_) > 64 {
 			return append(args, memory)
 		}
@@ -77,7 +77,7 @@ func (a *amd64) Classify(type_ ast.Type, args []Arg) []Arg {
 		args = append(args, ptr)
 		return append(args, ptr)
 
-	case *ast.Func:
+	case ast.FuncType:
 		return append(args, ptr)
 
 	default:
@@ -86,7 +86,7 @@ func (a *amd64) Classify(type_ ast.Type, args []Arg) []Arg {
 }
 
 func (a *amd64) flatten(type_ ast.Type, baseOffset uint32, args []Arg) []Arg {
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Array:
 		baseSize := a.Size(type_.Base)
 		baseAlign := a.Align(type_.Base)
@@ -98,12 +98,12 @@ func (a *amd64) flatten(type_ ast.Type, baseOffset uint32, args []Arg) []Arg {
 
 		return args
 
-	case *ast.Struct:
-		fields, offsets := GetStructLayout(type_).Fields(a, type_)
+	case ast.StructType:
+		fields, offsets := GetStructLayout(type_.Underlying()).Fields(a, type_)
 
 		for i, field := range fields {
 			offset := baseOffset + offsets[i]
-			args = a.flatten(field.Type, offset, args)
+			args = a.flatten(field.Type(), offset, args)
 		}
 
 		return args

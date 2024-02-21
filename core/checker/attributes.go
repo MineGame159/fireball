@@ -46,7 +46,7 @@ func (c *checker) visitFuncAttribute(decl *ast.Func, attribute *ast.Attribute) {
 			c.error(attribute.Name, "Test attribute can only have one argument")
 		}
 
-		if !ast.IsPrimitive(decl.Returns, ast.Bool) {
+		if !ast.IsPrimitive(decl.Returns(), ast.Bool) {
 			c.error(attribute.Name, "Tests need to return a boolean")
 		}
 
@@ -129,7 +129,7 @@ func isSimpleIntrinsic(decl *ast.Func, paramCount int, predicate simpleIntrinsic
 		}
 	}
 
-	if !isSimpleIntrinsicType(decl.Returns, predicate) {
+	if !isSimpleIntrinsicType(decl.Returns(), predicate) {
 		return false
 	}
 
@@ -141,7 +141,7 @@ func isSimpleIntrinsic(decl *ast.Func, paramCount int, predicate simpleIntrinsic
 		}
 	}
 
-	if !decl.Returns.Equals(decl.Params[0].Type) {
+	if !decl.Returns().Equals(decl.Params[0].Type) {
 		return false
 	}
 
@@ -181,7 +181,7 @@ func isExactIntrinsic(decl *ast.Func, params ...ast.PrimitiveKind) bool {
 		}
 	}
 
-	if !ast.IsPrimitive(decl.Returns, ast.Void) {
+	if !ast.IsPrimitive(decl.Returns(), ast.Void) {
 		return false
 	}
 

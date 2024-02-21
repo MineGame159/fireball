@@ -6,6 +6,7 @@ import (
 	"fireball/core/ir"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 type cachedType struct {
@@ -22,7 +23,9 @@ type types struct {
 	c *codegen
 
 	interfaceType ir.Type
-	types         []cachedType
+
+	types   []cachedType
+	structs map[string]ir.Type
 
 	interfaceMetadata ir.MetaID
 	metadata          []cachedTypeMeta
@@ -31,7 +34,7 @@ type types struct {
 // Types
 
 func (t *types) get(type_ ast.Type) ir.Type {
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Primitive:
 		switch type_.Kind {
 		case ast.Void:
@@ -71,25 +74,31 @@ func (t *types) get(type_ ast.Type) ir.Type {
 
 		return t.cacheType(type_, &ir.ArrayType{Count: type_.Count, Base: t.get(type_.Base)})
 
-	case *ast.Struct:
-		if typ := t.getCachedType(type_); typ != nil {
+	case ast.StructType:
+		var nameSb strings.Builder
+		type_.MangledName(&nameSb)
+		name := nameSb.String()
+
+		if typ, ok := t.structs[name]; ok {
 			return typ
 		}
 
-		astFields, _ := abi.GetStructLayout(type_).Fields(abi.GetTargetAbi(), type_)
+		astFields, _ := abi.GetStructLayout(type_.Underlying()).Fields(abi.GetTargetAbi(), type_)
 		fields := make([]ir.Type, len(astFields))
 
 		for i, field := range astFields {
-			fields[i] = t.get(field.Type)
+			fields[i] = t.get(field.Type())
 		}
 
 		typ := &ir.StructType{
-			Name:   type_.Name.String(),
+			Name:   name,
 			Fields: fields,
 		}
 
 		t.c.module.Struct(typ)
-		return t.cacheType(type_, typ)
+		t.structs[name] = typ
+
+		return typ
 
 	case *ast.Enum:
 		return t.get(type_.ActualType)
@@ -113,7 +122,7 @@ func (t *types) get(type_ ast.Type) ir.Type {
 
 		return t.interfaceType
 
-	case *ast.Func:
+	case ast.FuncType:
 		if typ := t.getCachedType(type_); typ != nil {
 			return typ
 		}
@@ -126,30 +135,30 @@ func (t *types) get(type_ ast.Type) ir.Type {
 	}
 }
 
-func (t *types) createFuncType(f *ast.Func) *ir.FuncType {
+func (t *types) createFuncType(f ast.FuncType) *ir.FuncType {
 	// Intrinsic
-	if f.IntrinsicName() != "" {
-		return t.createIntrinsicFuncType(f)
+	if f.Underlying().IntrinsicName() != "" {
+		return t.createIntrinsicFuncType(f.Underlying())
 	}
 
 	// Normal
-	this := f.Method()
+	receiver := f.Receiver()
 
-	parameterCount := len(f.Params)
-	if this != nil {
+	parameterCount := f.ParameterCount()
+	if receiver != nil {
 		parameterCount++
 	}
 
 	params := make([]*ir.Param, 0, parameterCount)
 
-	funcAbi := abi.GetFuncAbi(f)
-	returnArgs := funcAbi.Classify(f.Returns, nil)
+	funcAbi := abi.GetFuncAbi(f.Underlying())
+	returnArgs := funcAbi.Classify(f.Returns(), nil)
 
 	if len(returnArgs) == 1 && returnArgs[0].Class == abi.Memory {
 		params = append(params, &ir.Param{
 			Typ: &ir.PointerType{
 				Pointee: ir.Void,
-				SRet:    t.get(f.Returns),
+				SRet:    t.get(f.Returns()),
 			},
 			Name_: "__return",
 		})
@@ -157,8 +166,8 @@ func (t *types) createFuncType(f *ast.Func) *ir.FuncType {
 		returnArgs = nil
 	}
 
-	if this != nil {
-		type_ := ast.Pointer{Pointee: this}
+	if receiver != nil {
+		type_ := ast.Pointer{Pointee: receiver}
 
 		params = append(params, &ir.Param{
 			Typ:   t.get(&type_),
@@ -166,7 +175,9 @@ func (t *types) createFuncType(f *ast.Func) *ir.FuncType {
 		})
 	}
 
-	for _, param := range f.Params {
+	for i := 0; i < f.ParameterCount(); i++ {
+		param := f.ParameterIndex(i)
+
 		args := funcAbi.Classify(param.Type, nil)
 		if len(args) == 0 {
 			panic("codegen.types.createFuncType() - Failed to classify parameter type")
@@ -176,7 +187,7 @@ func (t *types) createFuncType(f *ast.Func) *ir.FuncType {
 			typ := t.getAbiArgType(arg, param.Type)
 
 			if typ != nil {
-				name := param.Name.String()
+				name := param.Param.Name.String()
 
 				if len(args) > 1 {
 					name += "." + strconv.Itoa(i)
@@ -191,9 +202,9 @@ func (t *types) createFuncType(f *ast.Func) *ir.FuncType {
 	}
 
 	return &ir.FuncType{
-		Returns:  t.createReturnType(returnArgs, f.Returns),
+		Returns:  t.createReturnType(returnArgs, f.Returns()),
 		Params:   params,
-		Variadic: f.IsVariadic(),
+		Variadic: f.Underlying().IsVariadic(),
 	}
 }
 
@@ -369,7 +380,7 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 	}
 
 	// Create
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Primitive:
 		if type_.Kind == ast.Void {
 			return 0
@@ -448,22 +459,22 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 
 		return t.cacheMeta(type_, typ)
 
-	case *ast.Struct:
-		fields, offsets := abi.GetStructLayout(type_).Fields(abi.GetTargetAbi(), type_)
+	case ast.StructType:
+		fields, offsets := abi.GetStructLayout(type_.Underlying()).Fields(abi.GetTargetAbi(), type_)
 		fieldsMeta := make([]ir.MetaID, len(fields))
 
 		for i, field := range fields {
 			fieldsMeta[i] = t.c.module.Meta(&ir.DerivedTypeMeta{
 				Tag:      ir.MemberTag,
-				Name:     field.Name.String(),
-				BaseType: t.getMeta(field.Type),
+				Name:     field.Name().String(),
+				BaseType: t.getMeta(field.Type()),
 				Offset:   offsets[i] * 8,
 			})
 		}
 
 		typ := &ir.CompositeTypeMeta{
 			Tag:      ir.StructureTypeTag,
-			Name:     type_.Name.String(),
+			Name:     type_.Underlying().Name.String(),
 			Size:     abi.GetTargetAbi().Size(type_) * 8,
 			Align:    abi.GetTargetAbi().Align(type_) * 8,
 			Elements: fieldsMeta,
@@ -492,24 +503,26 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 
 		return t.cacheMeta(type_, typ)
 
-	case *ast.Func:
-		this := type_.Method()
+	case ast.FuncType:
+		receiver := type_.Receiver()
 
-		parameterCount := len(type_.Params)
-		if this != nil {
+		parameterCount := type_.ParameterCount()
+		if receiver != nil {
 			parameterCount++
 		}
 
 		params := make([]ir.MetaID, parameterCount)
 
-		if this != nil {
-			type_ := ast.Pointer{Pointee: this}
+		if receiver != nil {
+			type_ := ast.Pointer{Pointee: receiver}
 			params[0] = t.getMeta(&type_)
 		}
 
-		for index, param := range type_.Params {
+		for index := 0; index < type_.ParameterCount(); index++ {
+			param := type_.ParameterIndex(index)
+
 			i := index
-			if this != nil {
+			if receiver != nil {
 				i++
 			}
 
@@ -517,7 +530,7 @@ func (t *types) getMeta(type_ ast.Type) ir.MetaID {
 		}
 
 		typ := &ir.SubroutineTypeMeta{
-			Returns: t.getMeta(type_.Returns),
+			Returns: t.getMeta(type_.Returns()),
 			Params:  params,
 		}
 

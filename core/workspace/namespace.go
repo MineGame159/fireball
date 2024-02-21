@@ -143,11 +143,23 @@ func (n *namespace) GetVariable(name string) *ast.GlobalVar {
 	return nil
 }
 
-func (n *namespace) GetMethod(type_ ast.Type, name string, static bool) *ast.Func {
+func (n *namespace) GetMethod(type_ ast.Type, name string, static bool) ast.FuncType {
+	guh := type_
+
+	if s, ok := guh.(ast.StructType); ok {
+		guh = s.Underlying()
+	}
+
+	// Find method
 	for _, file := range n.files {
 		for _, decl := range file.Ast.Decls {
-			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(type_) {
+			if impl, ok := decl.(*ast.Impl); ok && impl.Type != nil && impl.Type.Equals(guh) {
 				if method := impl.GetMethod(name, static); method != nil {
+					// Specialize if needed
+					if s, ok := type_.(*ast.SpecializedStruct); ok && !static {
+						return s.SpecializeMethod(method)
+					}
+
 					return method
 				}
 			}
@@ -158,6 +170,10 @@ func (n *namespace) GetMethod(type_ ast.Type, name string, static bool) *ast.Fun
 }
 
 func (n *namespace) GetMethods(type_ ast.Type, static bool) []*ast.Func {
+	if s, ok := type_.(ast.StructType); ok {
+		type_ = s.Underlying()
+	}
+
 	var methods []*ast.Func
 
 	for _, file := range n.files {

@@ -8,6 +8,13 @@ var groups = []Group{
 	other,
 }
 
+var externalNodes = []string{
+	"SpecializedField",
+	"SpecializedStruct",
+	"SpecializedFunc",
+	"PartiallySpecializedFunc",
+}
+
 // Types
 
 var types = Group{
@@ -32,6 +39,12 @@ var types = Group{
 		node(
 			"Resolvable",
 			field("parts", array("Token")),
+			field("genericArgs", array("Type")),
+			field("Type", type_("Type")),
+		),
+		nodeSkipResolved(
+			"Generic",
+			field("name", type_("scanner.Token")),
 			field("Type", type_("Type")),
 		),
 	},
@@ -63,8 +76,12 @@ var declarations = Group{
 			"Struct",
 			field("attributes", array("Attribute")),
 			field("name", type_("Token")),
+			field("genericParams", array("Generic")),
 			field("fields", array("Field")),
 			field("staticFields", array("Field")),
+
+			field("Specializations", array("*SpecializedStruct")),
+			field("Type", type_("Type")),
 		),
 		node(
 			"Enum",
@@ -90,9 +107,12 @@ var declarations = Group{
 			field("attributes", array("Attribute")),
 			field("flags", type_("FuncFlags")),
 			field("name", type_("Token")),
+			field("genericParams", array("Generic")),
 			field("params", array("Param")),
-			field("returns", type_("Type")),
+			field("returns_", type_("Type")),
 			field("body", array("Stmt")),
+
+			field("Specializations", array("*SpecializedFunc")),
 		),
 		node(
 			"GlobalVar",
@@ -194,6 +214,7 @@ var expressions = Group{
 			"Member",
 			field("value", type_("Expr")),
 			field("name", type_("Token")),
+			field("genericArgs", array("Type")),
 		),
 		node(
 			"Index",
@@ -238,7 +259,8 @@ var expressions = Group{
 		),
 		node(
 			"Identifier",
-			field("name", type_("scanner.Token")),
+			field("name", type_("Token")),
+			field("genericArgs", array("Type")),
 		),
 	},
 }
@@ -263,8 +285,8 @@ var other = Group{
 		),
 		node(
 			"Field",
-			field("name", type_("Token")),
-			field("type", type_("Type")),
+			field("name_", type_("Token")),
+			field("type_", type_("Type")),
 		),
 		node(
 			"InitField",

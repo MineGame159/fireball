@@ -66,9 +66,9 @@ func getCallSignature(pos core.Pos, call *ast.Call) (protocol.SignatureInformati
 	}
 
 	// Get function
-	var function *ast.Func
+	var function ast.FuncType
 
-	if f, ok := ast.As[*ast.Func](call.Callee.Result().Type); ok {
+	if f, ok := ast.As[ast.FuncType](call.Callee.Result().Type); ok {
 		function = f
 	} else {
 		return protocol.SignatureInformation{}, false
@@ -76,18 +76,20 @@ func getCallSignature(pos core.Pos, call *ast.Call) (protocol.SignatureInformati
 
 	// Get label and parameters
 	label := strings.Builder{}
-	parameters := make([]protocol.ParameterInformation, 0, len(function.Params)+1)
+	parameters := make([]protocol.ParameterInformation, 0, function.ParameterCount()+1)
 	activeParameter := -1
 
-	if function.Name != nil {
-		label.WriteString(function.Name.String())
+	if function.Underlying().Name != nil {
+		label.WriteString(function.Underlying().Name.String())
 	}
 
 	label.WriteRune('(')
 
-	for i, param := range function.Params {
+	for i := 0; i < function.ParameterCount(); i++ {
+		param := function.ParameterIndex(i)
+
 		// Label
-		paramLabel := fmt.Sprintf("%s %s", param.Name, ast.PrintType(param.Type))
+		paramLabel := fmt.Sprintf("%s %s", param.Param.Name, ast.PrintType(param.Type))
 
 		if len(parameters) > 0 {
 			label.WriteString(", ")
@@ -111,7 +113,7 @@ func getCallSignature(pos core.Pos, call *ast.Call) (protocol.SignatureInformati
 		}
 	}
 
-	if function.IsVariadic() {
+	if function.Underlying().IsVariadic() {
 		if len(parameters) > 0 {
 			label.WriteString(", ")
 		}
@@ -130,9 +132,9 @@ func getCallSignature(pos core.Pos, call *ast.Call) (protocol.SignatureInformati
 
 	label.WriteRune(')')
 
-	if !ast.IsPrimitive(function.Returns, ast.Void) {
+	if !ast.IsPrimitive(function.Returns(), ast.Void) {
 		label.WriteRune(' ')
-		label.WriteString(ast.PrintType(function.Returns))
+		label.WriteString(ast.PrintType(function.Returns()))
 	}
 
 	// Return

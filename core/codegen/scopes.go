@@ -3,7 +3,6 @@ package codegen
 import (
 	"fireball/core/ast"
 	"fireball/core/ir"
-	"fireball/core/scanner"
 )
 
 type scope struct {
@@ -137,9 +136,9 @@ func (s *scopes) getMeta() ir.MetaID {
 
 // Variables
 
-func (s *scopes) getVariable(name scanner.Token) *variable {
+func (s *scopes) getVariable(name *ast.Token) *variable {
 	for i := len(s.variables) - 1; i >= 0; i-- {
-		if s.variables[i].name.String() == name.Lexeme {
+		if s.variables[i].name.String() == name.String() {
 			return &s.variables[i]
 		}
 	}
@@ -158,7 +157,7 @@ func (s *scopes) addVariable(name ast.Node, type_ ast.Type, value ir.Value, arg 
 			}})
 	}
 
-	if _, ok := ast.As[*ast.Func](type_); ok {
+	if _, ok := ast.As[ast.FuncType](type_); ok {
 		type_ = &ast.Pointer{Pointee: type_}
 	}
 

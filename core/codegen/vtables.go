@@ -102,8 +102,8 @@ func writeFullTypeName(sb *strings.Builder, type_ ast.Type) {
 	sb.WriteRune('_')
 
 	switch type_ := type_.Resolved().(type) {
-	case *ast.Struct:
-		sb.WriteString(type_.Name.String())
+	case ast.StructType:
+		sb.WriteString(type_.Underlying().Name.String())
 	case *ast.Interface:
 		sb.WriteString(type_.Name.String())
 

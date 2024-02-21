@@ -72,8 +72,8 @@ func testCmd(_ *cobra.Command, _ []string) {
 			_, _ = namespaceStyle.Printf("%s.", part)
 		}
 
-		if s := test.Method(); s != nil {
-			_, _ = namespaceStyle.Printf("%s.", s.Name)
+		if receiver := test.Receiver(); receiver != nil {
+			_, _ = namespaceStyle.Printf("%s.", receiver.Underlying().Name)
 		}
 
 		_, _ = testStyle.Print(test.TestName())
@@ -166,10 +166,13 @@ func generateTestsEntrypoint(tests []*ast.Func) *ir.Module {
 	mainBlock := main.Block("entry")
 
 	for i, test := range tests {
+		var name strings.Builder
+		test.MangledName(&name)
+
 		mainBlock.Add(&ir.CallInst{
 			Callee: run,
 			Args: []ir.Value{
-				m.Declare(test.MangledName(), testType),
+				m.Declare(name.String(), testType),
 				&ir.IntConst{Typ: ir.I32, Value: ir.Unsigned(uint64(i))},
 			},
 		})

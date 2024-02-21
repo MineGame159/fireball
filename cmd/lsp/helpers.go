@@ -7,6 +7,25 @@ import (
 	"fireball/core/scanner"
 )
 
+func buildResolverStack(resolver *ast.Resolver, node ast.Node) {
+	if !ast.IsNil(node.Parent()) {
+		buildResolverStack(resolver, node.Parent())
+	}
+
+	switch node := node.(type) {
+	case *ast.Struct:
+		*resolver = ast.NewGenericResolver(*resolver, node.GenericParams)
+
+	case *ast.Impl:
+		if s, ok := ast.As[*ast.Struct](node.Type); ok && len(s.GenericParams) > 0 {
+			*resolver = ast.NewGenericResolver(*resolver, s.GenericParams)
+		}
+
+	case *ast.Func:
+		*resolver = ast.NewGenericResolver(*resolver, node.GenericParams)
+	}
+}
+
 func printType(type_ ast.Type) string {
 	return ast.PrintTypeOptions(type_, ast.TypePrintOptions{ParamNames: true})
 }

@@ -6,8 +6,8 @@ import (
 
 func (w *textWriter) writeStructs() {
 	for _, s := range w.m.Structs {
-		w.writeString("%struct.")
-		w.writeString(s.Name)
+		w.writeRune('%')
+		w.writeString(surroundName("struct." + s.Name))
 		w.writeString(" = type ")
 		w.writeStruct(s)
 		w.writeRune('\n')
@@ -66,8 +66,8 @@ func (w *textWriter) writeType(t ir.Type) {
 	case *ir.StructType:
 		for _, s := range w.m.Structs {
 			if s == t {
-				w.writeString("%struct.")
-				w.writeString(s.Name)
+				w.writeRune('%')
+				w.writeString(surroundName("struct." + s.Name))
 
 				return
 			}

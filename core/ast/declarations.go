@@ -184,23 +184,27 @@ type Struct struct {
 	cst    cst.Node
 	parent Node
 
-	Attributes   []*Attribute
-	Name         *Token
-	Fields       []*Field
-	StaticFields []*Field
+	Attributes      []*Attribute
+	Name            *Token
+	GenericParams   []*Generic
+	Fields          []*Field
+	StaticFields    []*Field
+	Specializations []*SpecializedStruct
+	Type            Type
 }
 
-func NewStruct(node cst.Node, attributes []*Attribute, name *Token, fields []*Field, staticfields []*Field) *Struct {
-	if attributes == nil && name == nil && fields == nil && staticfields == nil {
+func NewStruct(node cst.Node, attributes []*Attribute, name *Token, genericparams []*Generic, fields []*Field, staticfields []*Field) *Struct {
+	if attributes == nil && name == nil && genericparams == nil && fields == nil && staticfields == nil {
 		return nil
 	}
 
 	s := &Struct{
-		cst:          node,
-		Attributes:   attributes,
-		Name:         name,
-		Fields:       fields,
-		StaticFields: staticfields,
+		cst:           node,
+		Attributes:    attributes,
+		Name:          name,
+		GenericParams: genericparams,
+		Fields:        fields,
+		StaticFields:  staticfields,
 	}
 
 	for _, child := range attributes {
@@ -208,6 +212,9 @@ func NewStruct(node cst.Node, attributes []*Attribute, name *Token, fields []*Fi
 	}
 	if name != nil {
 		name.SetParent(s)
+	}
+	for _, child := range genericparams {
+		child.SetParent(s)
 	}
 	for _, child := range fields {
 		child.SetParent(s)
@@ -250,6 +257,9 @@ func (s *Struct) AcceptChildren(visitor Visitor) {
 	if s.Name != nil {
 		visitor.VisitNode(s.Name)
 	}
+	for _, child := range s.GenericParams {
+		visitor.VisitNode(child)
+	}
 	for _, child := range s.Fields {
 		visitor.VisitNode(child)
 	}
@@ -260,7 +270,9 @@ func (s *Struct) AcceptChildren(visitor Visitor) {
 
 func (s *Struct) Clone() Node {
 	s2 := &Struct{
-		cst: s.cst,
+		cst:             s.cst,
+		Specializations: s.Specializations,
+		Type:            s.Type,
 	}
 
 	s2.Attributes = make([]*Attribute, len(s.Attributes))
@@ -272,6 +284,11 @@ func (s *Struct) Clone() Node {
 		s2.Name = s.Name.Clone().(*Token)
 		s2.Name.SetParent(s2)
 	}
+	s2.GenericParams = make([]*Generic, len(s.GenericParams))
+	for i, child := range s2.GenericParams {
+		s2.GenericParams[i] = child.Clone().(*Generic)
+		s2.GenericParams[i].SetParent(s2)
+	}
 	s2.Fields = make([]*Field, len(s.Fields))
 	for i, child := range s2.Fields {
 		s2.Fields[i] = child.Clone().(*Field)
@@ -281,6 +298,10 @@ func (s *Struct) Clone() Node {
 	for i, child := range s2.StaticFields {
 		s2.StaticFields[i] = child.Clone().(*Field)
 		s2.StaticFields[i].SetParent(s2)
+	}
+	if s.Type != nil {
+		s2.Type = s.Type.Clone().(Type)
+		s2.Type.SetParent(s2)
 	}
 
 	return s2
@@ -606,27 +627,30 @@ type Func struct {
 	cst    cst.Node
 	parent Node
 
-	Attributes []*Attribute
-	Flags      FuncFlags
-	Name       *Token
-	Params     []*Param
-	Returns    Type
-	Body       []Stmt
+	Attributes      []*Attribute
+	Flags           FuncFlags
+	Name            *Token
+	GenericParams   []*Generic
+	Params          []*Param
+	Returns_        Type
+	Body            []Stmt
+	Specializations []*SpecializedFunc
 }
 
-func NewFunc(node cst.Node, attributes []*Attribute, flags FuncFlags, name *Token, params []*Param, returns Type, body []Stmt) *Func {
-	if attributes == nil && flags == 0 && name == nil && params == nil && returns == nil && body == nil {
+func NewFunc(node cst.Node, attributes []*Attribute, flags FuncFlags, name *Token, genericparams []*Generic, params []*Param, returns_ Type, body []Stmt) *Func {
+	if attributes == nil && flags == 0 && name == nil && genericparams == nil && params == nil && returns_ == nil && body == nil {
 		return nil
 	}
 
 	f := &Func{
-		cst:        node,
-		Attributes: attributes,
-		Flags:      flags,
-		Name:       name,
-		Params:     params,
-		Returns:    returns,
-		Body:       body,
+		cst:           node,
+		Attributes:    attributes,
+		Flags:         flags,
+		Name:          name,
+		GenericParams: genericparams,
+		Params:        params,
+		Returns_:      returns_,
+		Body:          body,
 	}
 
 	for _, child := range attributes {
@@ -635,11 +659,14 @@ func NewFunc(node cst.Node, attributes []*Attribute, flags FuncFlags, name *Toke
 	if name != nil {
 		name.SetParent(f)
 	}
+	for _, child := range genericparams {
+		child.SetParent(f)
+	}
 	for _, child := range params {
 		child.SetParent(f)
 	}
-	if returns != nil {
-		returns.SetParent(f)
+	if returns_ != nil {
+		returns_.SetParent(f)
 	}
 	for _, child := range body {
 		child.SetParent(f)
@@ -679,11 +706,14 @@ func (f *Func) AcceptChildren(visitor Visitor) {
 	if f.Name != nil {
 		visitor.VisitNode(f.Name)
 	}
+	for _, child := range f.GenericParams {
+		visitor.VisitNode(child)
+	}
 	for _, child := range f.Params {
 		visitor.VisitNode(child)
 	}
-	if f.Returns != nil {
-		visitor.VisitNode(f.Returns)
+	if f.Returns_ != nil {
+		visitor.VisitNode(f.Returns_)
 	}
 	for _, child := range f.Body {
 		visitor.VisitNode(child)
@@ -692,8 +722,9 @@ func (f *Func) AcceptChildren(visitor Visitor) {
 
 func (f *Func) Clone() Node {
 	f2 := &Func{
-		cst:   f.cst,
-		Flags: f.Flags,
+		cst:             f.cst,
+		Flags:           f.Flags,
+		Specializations: f.Specializations,
 	}
 
 	f2.Attributes = make([]*Attribute, len(f.Attributes))
@@ -705,14 +736,19 @@ func (f *Func) Clone() Node {
 		f2.Name = f.Name.Clone().(*Token)
 		f2.Name.SetParent(f2)
 	}
+	f2.GenericParams = make([]*Generic, len(f.GenericParams))
+	for i, child := range f2.GenericParams {
+		f2.GenericParams[i] = child.Clone().(*Generic)
+		f2.GenericParams[i].SetParent(f2)
+	}
 	f2.Params = make([]*Param, len(f.Params))
 	for i, child := range f2.Params {
 		f2.Params[i] = child.Clone().(*Param)
 		f2.Params[i].SetParent(f2)
 	}
-	if f.Returns != nil {
-		f2.Returns = f.Returns.Clone().(Type)
-		f2.Returns.SetParent(f2)
+	if f.Returns_ != nil {
+		f2.Returns_ = f.Returns_.Clone().(Type)
+		f2.Returns_.SetParent(f2)
 	}
 	f2.Body = make([]Stmt, len(f.Body))
 	for i, child := range f2.Body {

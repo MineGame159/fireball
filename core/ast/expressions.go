@@ -614,21 +614,23 @@ type Member struct {
 	cst    cst.Node
 	parent Node
 
-	Value Expr
-	Name  *Token
+	Value       Expr
+	Name        *Token
+	GenericArgs []Type
 
 	result ExprResult
 }
 
-func NewMember(node cst.Node, value Expr, name *Token) *Member {
-	if value == nil && name == nil {
+func NewMember(node cst.Node, value Expr, name *Token, genericargs []Type) *Member {
+	if value == nil && name == nil && genericargs == nil {
 		return nil
 	}
 
 	m := &Member{
-		cst:   node,
-		Value: value,
-		Name:  name,
+		cst:         node,
+		Value:       value,
+		Name:        name,
+		GenericArgs: genericargs,
 	}
 
 	if value != nil {
@@ -636,6 +638,9 @@ func NewMember(node cst.Node, value Expr, name *Token) *Member {
 	}
 	if name != nil {
 		name.SetParent(m)
+	}
+	for _, child := range genericargs {
+		child.SetParent(m)
 	}
 
 	return m
@@ -672,6 +677,9 @@ func (m *Member) AcceptChildren(visitor Visitor) {
 	if m.Name != nil {
 		visitor.VisitNode(m.Name)
 	}
+	for _, child := range m.GenericArgs {
+		visitor.VisitNode(child)
+	}
 }
 
 func (m *Member) Clone() Node {
@@ -686,6 +694,11 @@ func (m *Member) Clone() Node {
 	if m.Name != nil {
 		m2.Name = m.Name.Clone().(*Token)
 		m2.Name.SetParent(m2)
+	}
+	m2.GenericArgs = make([]Type, len(m.GenericArgs))
+	for i, child := range m2.GenericArgs {
+		m2.GenericArgs[i] = child.Clone().(Type)
+		m2.GenericArgs[i].SetParent(m2)
 	}
 
 	return m2
@@ -1475,19 +1488,28 @@ type Identifier struct {
 	cst    cst.Node
 	parent Node
 
-	Name scanner.Token
+	Name        *Token
+	GenericArgs []Type
 
 	result ExprResult
 }
 
-func NewIdentifier(node cst.Node, name scanner.Token) *Identifier {
-	if name.IsEmpty() {
+func NewIdentifier(node cst.Node, name *Token, genericargs []Type) *Identifier {
+	if name == nil && genericargs == nil {
 		return nil
 	}
 
 	i := &Identifier{
-		cst:  node,
-		Name: name,
+		cst:         node,
+		Name:        name,
+		GenericArgs: genericargs,
+	}
+
+	if name != nil {
+		name.SetParent(i)
+	}
+	for _, child := range genericargs {
+		child.SetParent(i)
 	}
 
 	return i
@@ -1502,7 +1524,7 @@ func (i *Identifier) Cst() *cst.Node {
 }
 
 func (i *Identifier) Token() scanner.Token {
-	return i.Name
+	return scanner.Token{}
 }
 
 func (i *Identifier) Parent() Node {
@@ -1518,19 +1540,34 @@ func (i *Identifier) SetParent(parent Node) {
 }
 
 func (i *Identifier) AcceptChildren(visitor Visitor) {
+	if i.Name != nil {
+		visitor.VisitNode(i.Name)
+	}
+	for _, child := range i.GenericArgs {
+		visitor.VisitNode(child)
+	}
 }
 
 func (i *Identifier) Clone() Node {
 	i2 := &Identifier{
-		cst:  i.cst,
-		Name: i.Name,
+		cst: i.cst,
+	}
+
+	if i.Name != nil {
+		i2.Name = i.Name.Clone().(*Token)
+		i2.Name.SetParent(i2)
+	}
+	i2.GenericArgs = make([]Type, len(i.GenericArgs))
+	for i, child := range i2.GenericArgs {
+		i2.GenericArgs[i] = child.Clone().(Type)
+		i2.GenericArgs[i].SetParent(i2)
 	}
 
 	return i2
 }
 
 func (i *Identifier) String() string {
-	return i.Name.String()
+	return ""
 }
 
 func (i *Identifier) AcceptExpr(visitor ExprVisitor) {

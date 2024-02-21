@@ -13,8 +13,6 @@ func getDefinition(node ast.Node, pos core.Pos) []protocol.Location {
 
 	// Get definition based on the leaf node
 	switch node := node.(type) {
-	case *ast.Identifier:
-		return getDefinitionExprResult(node.Result())
 	case *ast.Resolvable:
 		return newDefinition(node.Resolved())
 	case *ast.Token:
@@ -32,12 +30,15 @@ func getDefinitionToken(token *ast.Token) []protocol.Location {
 			return newDefinition(parent.Resolved())
 		}
 
+	case *ast.Identifier:
+		return getDefinitionExprResult(parent.Result())
+
 	case *ast.Member:
 		return getDefinitionExprResult(parent.Result())
 
 	case *ast.InitField:
-		if s, ok := ast.As[*ast.Struct](parent.Parent().(*ast.StructInitializer).Type); ok {
-			if _, field := s.GetField(token.String()); field != nil {
+		if s, ok := ast.As[ast.StructType](parent.Parent().(*ast.StructInitializer).Type); ok {
+			if field := s.FieldName(token.String()); field != nil {
 				return newDefinition(field)
 			}
 		}

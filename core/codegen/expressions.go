@@ -153,8 +153,8 @@ func convertString(s string) *ir.StringConst {
 
 func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 	// Value
-	struct_, _ := ast.As[*ast.Struct](expr.Type)
-	fields, _ := abi.GetStructLayout(struct_).Fields(abi.GetTargetAbi(), struct_)
+	struct_, _ := ast.As[ast.StructType](expr.Type)
+	fields, _ := abi.GetStructLayout(struct_.Underlying()).Fields(abi.GetTargetAbi(), struct_)
 
 	type_ := c.types.get(struct_)
 
@@ -162,7 +162,7 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 
 	for _, initField := range expr.Fields {
 		field, i := getField(fields, initField.Name)
-		element := c.implicitCastLoadExpr(field.Type, initField.Value)
+		element := c.implicitCastLoadExpr(field.Type(), initField.Value)
 
 		r := c.block.Add(&ir.InsertValueInst{
 			Value:   result,
@@ -184,7 +184,7 @@ func (c *codegen) VisitStructInitializer(expr *ast.StructInitializer) {
 		pointer := c.block.Add(&ir.CallInst{
 			Callee: malloc.v,
 			Args: []ir.Value{&ir.IntConst{
-				Typ:   c.types.get(mallocFunc.Params[0].Type),
+				Typ:   c.types.get(mallocFunc.ParameterIndex(0).Type),
 				Value: ir.Unsigned(uint64(abi.GetTargetAbi().Size(struct_))),
 			}},
 		})
@@ -227,12 +227,12 @@ func (c *codegen) VisitAllocateArray(expr *ast.AllocateArray) {
 	malloc := c.getFunction(mallocFunc)
 
 	count := c.loadExpr(expr.Count)
-	count = c.cast(count, expr.Count.Result().Type, mallocFunc.Params[0].Type, expr)
+	count = c.cast(count, expr.Count.Result().Type, mallocFunc.ParameterIndex(0).Type, expr)
 
 	pointer := c.block.Add(&ir.CallInst{
 		Callee: malloc.v,
 		Args: []ir.Value{&ir.IntConst{
-			Typ:   c.types.get(mallocFunc.Params[0].Type),
+			Typ:   c.types.get(mallocFunc.ParameterIndex(0).Type),
 			Value: ir.Unsigned(uint64(abi.GetTargetAbi().Size(expr.Type))),
 		}},
 	})
@@ -479,8 +479,8 @@ func (c *codegen) VisitIdentifier(expr *ast.Identifier) {
 
 	case ast.CallableResultKind:
 		switch node := expr.Result().Callable().(type) {
-		case *ast.Func:
-			c.exprResult = c.getFunction(node)
+		case ast.FuncType:
+			c.exprResult = c.getFunction(expr.Result().Type.(ast.FuncType))
 
 		case *ast.GlobalVar:
 			c.exprResult = c.getGlobalVariable(node)
@@ -607,51 +607,51 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	// Get type
 	callee := c.acceptExpr(expr.Callee)
 
-	var function *ast.Func
+	var function ast.FuncType
 
-	if f, ok := expr.Callee.Result().Callable().(*ast.Func); ok {
-		function = f
+	if _, ok := expr.Callee.Result().Callable().(*ast.Func); ok {
+		function = expr.Callee.Result().Type.(ast.FuncType)
 	}
 
-	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok && function == nil {
+	if f, ok := ast.As[ast.FuncType](expr.Callee.Result().Type); ok && function == nil {
 		function = f
 		callee = c.load(callee, expr.Callee.Result().Type)
 	}
 
 	// Load arguments
-	hasThis := function.Method() != nil
+	hasReceiver := function.Receiver() != nil
 	if _, ok := function.Parent().(*ast.Interface); ok {
-		hasThis = true
+		hasReceiver = true
 	}
 
 	argCount := len(expr.Args)
-	if hasThis {
+	if hasReceiver {
 		argCount++
 	}
 
-	funcAbi := abi.GetFuncAbi(function)
-	returnArgs := funcAbi.Classify(function.Returns, nil)
+	funcAbi := abi.GetFuncAbi(function.Underlying())
+	returnArgs := funcAbi.Classify(function.Returns(), nil)
 
 	args := make([]ir.Value, 0, argCount)
 	hasReturnPtr := false
 
 	if len(returnArgs) == 1 && returnArgs[0].Class == abi.Memory {
-		pointer := c.allocas.get(function.Returns, "")
-		pointer.TypPtr.SRet = c.types.get(function.Returns)
+		pointer := c.allocas.get(function.Returns(), "")
+		pointer.TypPtr.SRet = c.types.get(function.Returns())
 
 		args = append(args, pointer)
 		hasReturnPtr = true
 	}
 
-	if hasThis {
+	if hasReceiver {
 		args = append(args, c.this.v)
 	}
 
 	for i, arg := range expr.Args {
-		if i >= len(function.Params) {
+		if i >= function.ParameterCount() {
 			args = append(args, c.loadExpr(arg).v)
 		} else {
-			param := function.Params[i]
+			param := function.ParameterIndex(i)
 			var value exprValue
 
 			if needsImplicitCast(arg.Result().Type, param.Type) {
@@ -665,10 +665,10 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 	}
 
 	// Intrinsic
-	intrinsicName := function.IntrinsicName()
+	intrinsicName := function.Underlying().IntrinsicName()
 
 	if intrinsicName != "" {
-		args = c.modifyIntrinsicArgs(function, intrinsicName, args)
+		args = c.modifyIntrinsicArgs(function.Underlying(), intrinsicName, args)
 	}
 
 	// Call
@@ -680,7 +680,7 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 
 	c.setLocationMetaCst(call, expr, scanner.LeftParen)
 
-	if ast.IsPrimitive(function.Returns, ast.Void) {
+	if ast.IsPrimitive(function.Returns(), ast.Void) {
 		c.exprResult = exprValue{v: call}
 	} else {
 		result := exprValue{v: call}
@@ -692,17 +692,17 @@ func (c *codegen) VisitCall(expr *ast.Call) {
 			}
 		}
 
-		c.exprResult = c.returnValueToValue(funcAbi, result, function.Returns)
+		c.exprResult = c.returnValueToValue(funcAbi, result, function.Returns())
 	}
 
 	// If the function returns a constant-sized array and the array is immediately indexed then store it in an alloca first
 	if callNeedsTempVariable(expr) {
-		pointer := c.allocas.get(function.Returns, "")
+		pointer := c.allocas.get(function.Returns(), "")
 
 		c.block.Add(&ir.StoreInst{
 			Pointer: pointer,
 			Value:   c.exprResult.v,
-			Align:   abi.GetTargetAbi().Align(function.Returns),
+			Align:   abi.GetTargetAbi().Align(function.Returns()),
 		})
 
 		c.exprResult = exprValue{
@@ -757,18 +757,18 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 				Value: ir.Signed(node.ActualValue),
 			}}
 
-		case *ast.Field:
-			if node.IsStatic() {
+		case ast.FieldLike:
+			if node.Underlying().IsStatic() {
 				c.exprResult = c.getStaticVariable(node)
 			} else {
-				struct_ := node.Parent().(*ast.Struct)
-				fields, _ := abi.GetStructLayout(struct_).Fields(abi.GetTargetAbi(), struct_)
-				_, i := getField(fields, node.Name)
+				struct_ := expr.Value.Result().Type.(ast.StructType)
+				fields, _ := abi.GetStructLayout(struct_.Underlying()).Fields(abi.GetTargetAbi(), struct_)
+				_, i := getField(fields, node.Name())
 
 				value, s := c.memberLoad(expr.Value.Result().Type, value)
 
 				if value.addressable {
-					ptrType := ast.Pointer{Pointee: node.Type}
+					ptrType := ast.Pointer{Pointee: node.Type()}
 
 					result := c.block.Add(&ir.GetElementPtrInst{
 						PointerTyp: c.types.get(&ptrType),
@@ -810,11 +810,11 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			} else {
 				value, _ := c.memberLoad(expr.Value.Result().Type, value)
 
-				c.exprResult = c.getFunction(expr.Result().Type.(*ast.Func))
+				c.exprResult = c.getFunction(expr.Result().Type.(ast.FuncType))
 				c.this = value
 			}
 
-		case *ast.Func:
+		case ast.FuncType:
 			// Interface
 			if inter, ok := ast.As[*ast.Interface](expr.Value.Result().Type); ok {
 				if value.addressable {
@@ -870,7 +870,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 				value, _ = c.memberLoad(expr.Value.Result().Type, value)
 			}
 
-			if node.Method() != nil && !value.addressable {
+			if node.Receiver() != nil && !value.addressable {
 				pointer := c.allocas.get(expr.Value.Result().Type, "")
 
 				c.block.Add(&ir.StoreInst{
@@ -900,13 +900,13 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 	}
 }
 
-func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.Struct) {
-	if s, ok := ast.As[*ast.Struct](type_); ok {
+func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, ast.StructType) {
+	if s, ok := ast.As[ast.StructType](type_); ok {
 		return value, s
 	}
 
 	if v, ok := ast.As[*ast.Pointer](type_); ok {
-		if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
+		if v, ok := ast.As[ast.StructType](v.Pointee); ok {
 			load := c.block.Add(&ir.LoadInst{
 				Typ:     value.v.Type().(*ir.PointerType).Pointee,
 				Pointer: value.v,
@@ -925,9 +925,9 @@ func (c *codegen) memberLoad(type_ ast.Type, value exprValue) (exprValue, *ast.S
 
 // Utils
 
-func getField(fields []*ast.Field, name ast.Node) (*ast.Field, int) {
+func getField(fields []ast.FieldLike, name ast.Node) (ast.FieldLike, int) {
 	for i, field := range fields {
-		if field.Name.String() == name.String() {
+		if field.Name().String() == name.String() {
 			return field, i
 		}
 	}

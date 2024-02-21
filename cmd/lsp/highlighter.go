@@ -42,7 +42,7 @@ func (h *highlighter) VisitStruct(decl *ast.Struct) {
 	h.add(decl.Name, classKind)
 
 	for _, field := range decl.Fields {
-		h.add(field.Name, propertyKind)
+		h.add(field.Name(), propertyKind)
 	}
 
 	decl.AcceptChildren(h)
@@ -163,7 +163,7 @@ func (h *highlighter) VisitLogical(expr *ast.Logical) {
 }
 
 func (h *highlighter) VisitIdentifier(expr *ast.Identifier) {
-	h.visitExprResult(expr, expr.Result())
+	h.visitExprResult(expr.Name, expr.Result())
 
 	expr.AcceptChildren(h)
 }
@@ -209,7 +209,7 @@ func (h *highlighter) visitExprResult(node ast.Node, result *ast.ExprResult) {
 		switch result.Type.(type) {
 		case *ast.Primitive:
 			h.add(node, typeKind)
-		case *ast.Struct:
+		case ast.StructType:
 			h.add(node, classKind)
 		case *ast.Enum:
 			h.add(node, enumKind)
@@ -250,14 +250,21 @@ func (h *highlighter) visitType(type_ ast.Type) {
 				h.add(type_.Parts[i], namespaceKind)
 			}
 
+			last := type_.Parts[len(type_.Parts)-1]
+
 			switch type_.Resolved().(type) {
-			case *ast.Struct:
-				h.add(type_.Parts[len(type_.Parts)-1], classKind)
+			case *ast.Generic:
+				h.add(last, genericKind)
+			case ast.StructType:
+				h.add(last, classKind)
 			case *ast.Enum:
-				h.add(type_.Parts[len(type_.Parts)-1], enumKind)
+				h.add(last, enumKind)
 			case *ast.Interface:
-				h.add(type_.Parts[len(type_.Parts)-1], interfaceKind)
+				h.add(last, interfaceKind)
 			}
+
+		case *ast.Generic:
+			h.add(type_, genericKind)
 		}
 	}
 
@@ -298,6 +305,7 @@ const (
 	enumMemberKind
 	namespaceKind
 	interfaceKind
+	genericKind
 )
 
 type semantic struct {

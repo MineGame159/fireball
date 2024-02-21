@@ -2,6 +2,19 @@ package cst
 
 import "fireball/core/scanner"
 
+func identifierExprOrTokenLexeme(node Node) string {
+	switch node.Kind {
+	case TokenNode:
+		return node.Token.Lexeme
+
+	case IdentifierExprNode:
+		return node.Children[0].Token.Lexeme
+
+	default:
+		return ""
+	}
+}
+
 func (p *parser) advanceWrap(kind NodeKind) Node {
 	p.begin(kind)
 

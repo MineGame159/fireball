@@ -74,7 +74,7 @@ func (c *converter) convertVarStmt(node cst.Node) ast.Stmt {
 	var value ast.Expr
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			if name == nil {
 				name = c.convertToken(child)
 			} else {

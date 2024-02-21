@@ -77,7 +77,7 @@ func (c *converter) convertNamespaceName(node cst.Node) *ast.NamespaceName {
 	var parts []*ast.Token
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			part := c.convertToken(child)
 
 			if part != nil {
@@ -94,12 +94,19 @@ func (c *converter) convertNamespaceName(node cst.Node) *ast.NamespaceName {
 func (c *converter) convertStructDecl(node cst.Node) ast.Decl {
 	var attributes []*ast.Attribute
 	var name *ast.Token
+	var genericParams []*ast.Generic
 	var fields []*ast.Field
 	var staticFields []*ast.Field
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
+		} else if child.Kind == cst.GenericParamNode {
+			param := c.convertGenericParam(child)
+
+			if param != nil {
+				genericParams = append(genericParams, param)
+			}
 		} else if child.Kind == cst.StructFieldNode {
 			field, static := c.convertStructField(child)
 
@@ -115,7 +122,7 @@ func (c *converter) convertStructDecl(node cst.Node) ast.Decl {
 		}
 	}
 
-	if s := ast.NewStruct(node, attributes, name, fields, staticFields); s != nil {
+	if s := ast.NewStruct(node, attributes, name, genericParams, fields, staticFields); s != nil {
 		return s
 	}
 
@@ -131,7 +138,7 @@ func (c *converter) convertStructField(node cst.Node) (*ast.Field, bool) {
 	for _, child := range node.Children {
 		if child.Token.Kind == scanner.Static {
 			static = true
-		} else if child.Kind == cst.IdentifierNode {
+		} else if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			type_ = c.convertType(child)
@@ -149,7 +156,7 @@ func (c *converter) convertImplDecl(node cst.Node) ast.Decl {
 	var methods []*ast.Func
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			struct_ = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			implements = c.convertType(child)
@@ -179,7 +186,7 @@ func (c *converter) convertEnumDecl(node cst.Node) ast.Decl {
 	var cases []*ast.EnumCase
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			type_ = c.convertType(child)
@@ -206,7 +213,7 @@ func (c *converter) convertEnumCase(node cst.Node) *ast.EnumCase {
 	var value *ast.Token
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind == cst.NumberExprNode {
 			value = c.convertToken(child)
@@ -223,7 +230,7 @@ func (c *converter) convertInterfaceDecl(node cst.Node) ast.Decl {
 	var methods []*ast.Func
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind == cst.FuncDeclNode {
 			method := c.convertFuncDecl(child)
@@ -247,6 +254,7 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 	var attributes []*ast.Attribute
 	var flags ast.FuncFlags
 	var name *ast.Token
+	var genericParams []*ast.Generic
 	var params []*ast.Param
 	var returns ast.Type
 	var body []ast.Stmt
@@ -256,8 +264,14 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 	for _, child := range node.Children {
 		if child.Token.Kind == scanner.Static {
 			flags |= ast.Static
-		} else if child.Kind == cst.IdentifierNode {
+		} else if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
+		} else if child.Kind == cst.GenericParamNode {
+			param := c.convertGenericParam(child)
+
+			if param != nil {
+				genericParams = append(genericParams, param)
+			}
 		} else if child.Kind == cst.FuncParamNode {
 			param, varArgs := c.convertFuncParam(child)
 
@@ -288,7 +302,19 @@ func (c *converter) convertFuncDecl(node cst.Node) *ast.Func {
 		returns = ast.NewPrimitive(cst.Node{}, ast.Void, scanner.Token{})
 	}
 
-	return ast.NewFunc(node, attributes, flags, name, params, returns, body)
+	return ast.NewFunc(node, attributes, flags, name, genericParams, params, returns, body)
+}
+
+func (c *converter) convertGenericParam(node cst.Node) *ast.Generic {
+	var name scanner.Token
+
+	for _, child := range node.Children {
+		if child.Kind == cst.TokenNode {
+			name = child.Token
+		}
+	}
+
+	return ast.NewGeneric(node, name)
 }
 
 func (c *converter) convertFuncParam(node cst.Node) (*ast.Param, bool) {
@@ -298,7 +324,7 @@ func (c *converter) convertFuncParam(node cst.Node) (*ast.Param, bool) {
 	varArgs := false
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			type_ = c.convertType(child)
@@ -321,7 +347,7 @@ func (c *converter) convertVarDecl(node cst.Node) ast.Decl {
 	var type_ ast.Type
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind.IsType() {
 			type_ = c.convertType(child)
@@ -360,7 +386,7 @@ func (c *converter) convertAttribute(node cst.Node) *ast.Attribute {
 	var args []*ast.Token
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			name = c.convertToken(child)
 		} else if child.Kind == cst.StringExprNode {
 			arg := c.convertToken(child)

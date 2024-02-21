@@ -103,6 +103,7 @@ func (h *handler) Initialize(_ context.Context, params *protocol.InitializeParam
 						protocol.SemanticTokenEnumMember,
 						protocol.SemanticTokenNamespace,
 						protocol.SemanticTokenInterface,
+						protocol.SemanticTokenTypeParameter,
 					},
 					TokenModifiers: []protocol.SemanticTokenModifiers{},
 				},

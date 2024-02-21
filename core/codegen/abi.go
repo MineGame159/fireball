@@ -303,7 +303,7 @@ func (c *codegen) toAddressable(value exprValue, valueType ast.Type) exprValue {
 
 func typeIsAbiStruct(type_ ast.Type) bool {
 	switch type_.Resolved().(type) {
-	case *ast.Struct, *ast.Interface:
+	case ast.StructType, *ast.Interface:
 		return true
 	default:
 		return false

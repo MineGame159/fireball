@@ -69,14 +69,21 @@ func (c *converter) convertIdentifierType(node cst.Node) ast.Type {
 	}
 
 	var parts []*ast.Token
+	var genericArgs []ast.Type
 
 	for _, child := range node.Children {
-		if child.Kind == cst.IdentifierNode {
+		if child.Kind == cst.TokenNode {
 			parts = append(parts, c.convertToken(child))
+		} else if child.Kind.IsType() {
+			arg := c.convertType(child)
+
+			if arg != nil {
+				genericArgs = append(genericArgs, arg)
+			}
 		}
 	}
 
-	if r := ast.NewResolvable(node, parts); r != nil {
+	if r := ast.NewResolvable(node, parts, genericArgs); r != nil {
 		return r
 	}
 
@@ -145,7 +152,7 @@ func (c *converter) convertFuncType(node cst.Node) ast.Type {
 		}
 	}
 
-	if f := ast.NewFunc(node, nil, flags, nil, params, returns, nil); f != nil {
+	if f := ast.NewFunc(node, nil, flags, nil, nil, params, returns, nil); f != nil {
 		return f
 	}
 

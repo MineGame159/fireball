@@ -12,6 +12,7 @@ type TypeVisitor interface {
 	VisitPointer(type_ *Pointer)
 	VisitArray(type_ *Array)
 	VisitResolvable(type_ *Resolvable)
+	VisitGeneric(type_ *Generic)
 	VisitStruct(type_ *Struct)
 	VisitEnum(type_ *Enum)
 	VisitInterface(type_ *Interface)
@@ -272,21 +273,26 @@ type Resolvable struct {
 	cst    cst.Node
 	parent Node
 
-	Parts []*Token
-	Type  Type
+	Parts       []*Token
+	GenericArgs []Type
+	Type        Type
 }
 
-func NewResolvable(node cst.Node, parts []*Token) *Resolvable {
-	if parts == nil {
+func NewResolvable(node cst.Node, parts []*Token, genericargs []Type) *Resolvable {
+	if parts == nil && genericargs == nil {
 		return nil
 	}
 
 	r := &Resolvable{
-		cst:   node,
-		Parts: parts,
+		cst:         node,
+		Parts:       parts,
+		GenericArgs: genericargs,
 	}
 
 	for _, child := range parts {
+		child.SetParent(r)
+	}
+	for _, child := range genericargs {
 		child.SetParent(r)
 	}
 
@@ -321,6 +327,9 @@ func (r *Resolvable) AcceptChildren(visitor Visitor) {
 	for _, child := range r.Parts {
 		visitor.VisitNode(child)
 	}
+	for _, child := range r.GenericArgs {
+		visitor.VisitNode(child)
+	}
 }
 
 func (r *Resolvable) Clone() Node {
@@ -333,6 +342,11 @@ func (r *Resolvable) Clone() Node {
 	for i, child := range r2.Parts {
 		r2.Parts[i] = child.Clone().(*Token)
 		r2.Parts[i].SetParent(r2)
+	}
+	r2.GenericArgs = make([]Type, len(r.GenericArgs))
+	for i, child := range r2.GenericArgs {
+		r2.GenericArgs[i] = child.Clone().(Type)
+		r2.GenericArgs[i].SetParent(r2)
 	}
 	if r.Type != nil {
 		r2.Type = r.Type.Clone().(Type)
@@ -352,4 +366,77 @@ func (r *Resolvable) AcceptType(visitor TypeVisitor) {
 
 func (r *Resolvable) Resolved() Type {
 	return r.Type
+}
+
+// Generic
+
+type Generic struct {
+	cst    cst.Node
+	parent Node
+
+	Name scanner.Token
+	Type Type
+}
+
+func NewGeneric(node cst.Node, name scanner.Token) *Generic {
+	if name.IsEmpty() {
+		return nil
+	}
+
+	g := &Generic{
+		cst:  node,
+		Name: name,
+	}
+
+	return g
+}
+
+func (g *Generic) Cst() *cst.Node {
+	if g.cst.Kind == cst.UnknownNode {
+		return nil
+	}
+
+	return &g.cst
+}
+
+func (g *Generic) Token() scanner.Token {
+	return g.Name
+}
+
+func (g *Generic) Parent() Node {
+	return g.parent
+}
+
+func (g *Generic) SetParent(parent Node) {
+	if parent != nil && g.parent != nil {
+		panic("ast.Generic.SetParent() - Parent is already set")
+	}
+
+	g.parent = parent
+}
+
+func (g *Generic) AcceptChildren(visitor Visitor) {
+}
+
+func (g *Generic) Clone() Node {
+	g2 := &Generic{
+		cst:  g.cst,
+		Name: g.Name,
+		Type: g.Type,
+	}
+
+	if g.Type != nil {
+		g2.Type = g.Type.Clone().(Type)
+		g2.Type.SetParent(g2)
+	}
+
+	return g2
+}
+
+func (g *Generic) String() string {
+	return g.Name.String()
+}
+
+func (g *Generic) AcceptType(visitor TypeVisitor) {
+	visitor.VisitGeneric(g)
 }

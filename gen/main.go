@@ -259,7 +259,7 @@ func genNode(w *Writer, node Node, visitor string) {
 
 	// Resolved()
 
-	if visitor == "Type" {
+	if visitor == "Type" && !node.skipResolved {
 		w.write("%s Resolved() Type {", method)
 
 		var resolved *Field
@@ -429,6 +429,14 @@ func genIsNil(w *Writer) {
 
 			w.write("return node == nil")
 		}
+	}
+
+	for _, node := range externalNodes {
+		w.depth--
+		w.write("case *%s:", node)
+		w.depth++
+
+		w.write("return node == nil")
 	}
 
 	w.write("")

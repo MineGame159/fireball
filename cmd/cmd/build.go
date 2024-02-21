@@ -9,6 +9,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -76,12 +77,16 @@ func generateEntrypoint(project *workspace.Project) *ir.Module {
 	mainBlock := main.Block("")
 
 	if function != nil {
+		f := function.Underlying()
 		var fbMain ir.Value
 
-		if ast.IsPrimitive(function.Returns, ast.I32) {
-			fbMain = m.Declare(function.MangledName(), &ir.FuncType{Returns: ir.I32})
+		var name strings.Builder
+		f.MangledName(&name)
+
+		if ast.IsPrimitive(f.Returns(), ast.I32) {
+			fbMain = m.Declare(name.String(), &ir.FuncType{Returns: ir.I32})
 		} else {
-			fbMain = m.Declare(function.MangledName(), &ir.FuncType{})
+			fbMain = m.Declare(name.String(), &ir.FuncType{})
 		}
 
 		call := mainBlock.Add(&ir.CallInst{
@@ -89,7 +94,7 @@ func generateEntrypoint(project *workspace.Project) *ir.Module {
 			Args:   nil,
 		})
 
-		if ast.IsPrimitive(function.Returns, ast.I32) {
+		if ast.IsPrimitive(f.Returns(), ast.I32) {
 			mainBlock.Add(&ir.RetInst{Value: call})
 		} else {
 			mainBlock.Add(&ir.RetInst{Value: &ir.IntConst{

@@ -77,6 +77,7 @@ const (
 	NamespaceDeclNode
 	UsingDeclNode
 	NamespaceNameNode
+	GenericParamNode
 	StructDeclNode
 	StructFieldNode
 	ImplDeclNode
@@ -98,6 +99,7 @@ const (
 	ContinueStmtNode
 
 	ParenExprNode
+	IdentifierExprNode
 	UnaryExprNode
 	BinaryExprNode
 	IndexExprNode
@@ -118,7 +120,7 @@ const (
 	AttributeNode
 
 	KeywordNode
-	IdentifierNode
+	TokenNode
 	CommentNode
 	MiscNode
 )
@@ -126,7 +128,7 @@ const (
 func NodeKindFromToken(token scanner.Token) NodeKind {
 	switch token.Kind {
 	case scanner.Identifier:
-		return IdentifierNode
+		return TokenNode
 
 	case scanner.Nil:
 		return NilExprNode
@@ -170,7 +172,7 @@ func (n NodeKind) IsStmt() bool {
 }
 
 func (n NodeKind) IsExpr() bool {
-	return (n >= ParenExprNode && n <= StringExprNode) || n == IdentifierNode
+	return n >= ParenExprNode && n <= StringExprNode
 }
 
 func (n NodeKind) String() string {
@@ -197,6 +199,8 @@ func (n NodeKind) String() string {
 		return "Using"
 	case NamespaceNameNode:
 		return "Namespace name"
+	case GenericParamNode:
+		return "Generic param"
 	case StructDeclNode:
 		return "Struct"
 	case StructFieldNode:
@@ -237,6 +241,8 @@ func (n NodeKind) String() string {
 
 	case ParenExprNode:
 		return "Paren"
+	case IdentifierExprNode:
+		return "Identifier"
 	case UnaryExprNode:
 		return "Unary"
 	case BinaryExprNode:
@@ -275,8 +281,8 @@ func (n NodeKind) String() string {
 
 	case KeywordNode:
 		return "Keyword"
-	case IdentifierNode:
-		return "Identifier"
+	case TokenNode:
+		return "Token"
 	case CommentNode:
 		return "Comment"
 	case MiscNode:

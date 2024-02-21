@@ -17,7 +17,7 @@ func (w *win64) Align(type_ ast.Type) uint32 {
 }
 
 func (w *win64) Classify(type_ ast.Type, args []Arg) []Arg {
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Primitive:
 		var arg Arg
 
@@ -45,10 +45,10 @@ func (w *win64) Classify(type_ ast.Type, args []Arg) []Arg {
 
 		return append(args, arg)
 
-	case *ast.Pointer, *ast.Func:
+	case *ast.Pointer, ast.FuncType:
 		return append(args, ptr)
 
-	case *ast.Array, *ast.Struct, *ast.Interface:
+	case *ast.Array, ast.StructType, *ast.Interface:
 		var arg Arg
 
 		switch w.Size(type_) {

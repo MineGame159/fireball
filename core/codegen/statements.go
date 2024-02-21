@@ -173,10 +173,10 @@ func (c *codegen) VisitReturn(stmt *ast.Return) {
 		)
 	} else {
 		// Other
-		funcAbi := abi.GetFuncAbi(c.astFunction)
+		funcAbi := abi.GetFuncAbi(c.astFunction.Underlying())
 
-		value := c.implicitCastLoadExpr(c.astFunction.Returns, stmt.Value)
-		value = c.valueToReturnValue(funcAbi, value, c.astFunction.Returns, c.function.Typ.Params)
+		value := c.implicitCastLoadExpr(c.astFunction.Returns(), stmt.Value)
+		value = c.valueToReturnValue(funcAbi, value, c.astFunction.Returns(), c.function.Typ.Params)
 
 		if value.v == nil {
 			c.setLocationMeta(

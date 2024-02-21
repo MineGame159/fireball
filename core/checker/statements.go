@@ -108,12 +108,12 @@ func (c *checker) VisitReturn(stmt *ast.Return) {
 			return
 		}
 
-		c.checkRequired(c.function.Returns, stmt.Value)
+		c.checkRequired(c.function.Returns(), stmt.Value)
 	} else {
 		type_ := ast.Primitive{Kind: ast.Void}
 
-		if !c.function.Returns.Equals(&type_) {
-			c.error(stmt, "Expected a '%s' but got a 'void'", ast.PrintType(c.function.Returns))
+		if !c.function.Returns().Equals(&type_) {
+			c.error(stmt, "Expected a '%s' but got a 'void'", ast.PrintType(c.function.Returns()))
 		}
 	}
 }

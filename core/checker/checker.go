@@ -19,7 +19,7 @@ type checker struct {
 	typeExpr ast.Expr
 
 	reporter utils.Reporter
-	resolver *ast.CombinedResolver
+	resolver ast.Resolver
 }
 
 type scope struct {
@@ -38,15 +38,17 @@ type variable struct {
 }
 
 func Check(reporter utils.Reporter, root ast.RootResolver, file *ast.File) {
+	resolver := ast.NewCombinedResolver(root)
+
 	c := &checker{
 		reporter: reporter,
-		resolver: ast.NewCombinedResolver(root),
+		resolver: resolver,
 	}
 
 	for _, decl := range file.Decls {
 		if using, ok := decl.(*ast.Using); ok {
-			if resolver := root.GetResolver(using.Name); resolver != nil {
-				c.resolver.Add(resolver)
+			if resolver2 := root.GetResolver(using.Name); resolver2 != nil {
+				resolver.Add(resolver2)
 			} else {
 				c.error(using.Name, "Unknown namespace")
 			}

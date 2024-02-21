@@ -37,6 +37,18 @@ func parseIdentifierType(p *parser) Node {
 		}
 	}
 
+	if p.peek() == scanner.Bang && p.peek2() == scanner.LeftBracket {
+		p.advanceAddChild()
+		p.advanceAddChild()
+
+		if p.repeatSeparated(parseType, canStartType, scanner.Comma) {
+			return p.end()
+		}
+		if p.consume(scanner.RightBracket) {
+			return p.end()
+		}
+	}
+
 	return p.end()
 }
 

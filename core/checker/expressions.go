@@ -108,9 +108,9 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 	}
 
 	// Check struct
-	var struct_ *ast.Struct
+	var struct_ ast.StructType
 
-	if s, ok := ast.As[*ast.Struct](expr.Type); ok {
+	if s, ok := ast.As[ast.StructType](expr.Type); ok {
 		struct_ = s
 	} else {
 		c.error(expr.Type, "Expected a struct")
@@ -139,7 +139,7 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 		}
 
 		// Check field
-		_, field := struct_.GetField(initField.Name.String())
+		field := struct_.FieldName(initField.Name.String())
 		if field == nil {
 			c.error(initField.Name, "Field with the name '%s' doesn't exist on the struct '%s'", initField.Name, struct_)
 			continue
@@ -156,7 +156,7 @@ func (c *checker) VisitStructInitializer(expr *ast.StructInitializer) {
 				continue
 			}
 
-			c.checkRequired(field.Type, initField.Value)
+			c.checkRequired(field.Type(), initField.Value)
 		}
 	}
 
@@ -332,7 +332,7 @@ func (c *checker) VisitUnary(expr *ast.Unary) {
 				return
 			}
 
-			if f, ok := result.Callable().(*ast.Func); ok && f.Method() != nil {
+			if f, ok := result.Callable().(*ast.Func); ok && f.Receiver() != nil {
 				c.error(expr.Value, "Cannot take address of a non-static method")
 			}
 
@@ -422,30 +422,49 @@ func (c *checker) VisitLogical(expr *ast.Logical) {
 func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 	expr.AcceptChildren(c)
 
+	if expr.Name == nil {
+		expr.Result().SetInvalid()
+		return
+	}
+
 	// Function / function pointer
 	if parentWantsFunction(expr) {
+		var function ast.FuncType
+		var node ast.Node
+
 		// Function
-		if f := c.resolver.GetFunction(expr.String()); f != nil {
-			expr.Result().SetCallable(f, f)
-			return
+		if f := c.resolver.GetFunction(expr.Name.String()); f != nil {
+			function = f
+			node = f
 		}
 
 		// Global variable
-		if variable := c.resolver.GetVariable(expr.String()); variable != nil && variable.Type != nil {
-			if f, ok := ast.As[*ast.Func](variable.Type); ok {
-				expr.Result().SetCallable(f, variable)
-				return
+		if variable := c.resolver.GetVariable(expr.Name.String()); variable != nil && variable.Type != nil {
+			if f, ok := ast.As[ast.FuncType](variable.Type); ok {
+				function = f
+				node = variable
 			}
 		}
 
 		// Variable
-		if variable := c.getVariable(expr.String()); variable != nil {
-			if f, ok := ast.As[*ast.Func](variable.type_); ok {
+		if variable := c.getVariable(expr.Name.String()); variable != nil {
+			if f, ok := ast.As[ast.FuncType](variable.type_); ok {
 				variable.used = true
 
-				expr.Result().SetCallable(f, variable.node)
-				return
+				function = f
+				node = variable.node
 			}
+		}
+
+		// Ok
+		if function != nil {
+			if f, ok := node.(*ast.Func); ok {
+				c.specializeFuncIfNeeded(expr, f, expr.GenericArgs)
+			} else {
+				expr.Result().SetCallable(function, node)
+			}
+
+			return
 		}
 
 		// Error
@@ -455,34 +474,38 @@ func (c *checker) VisitIdentifier(expr *ast.Identifier) {
 		return
 	}
 
+	if len(expr.GenericArgs) != 0 {
+		errorSlice(c, expr.GenericArgs, "This identifier doesn't have any generic parameters")
+	}
+
 	// Resolver
-	if r := c.resolver.GetChild(expr.String()); r != nil {
+	if r := c.resolver.GetChild(expr.Name.String()); r != nil {
 		expr.Result().SetResolver(r)
 		return
 	}
 
 	// Type
-	if t := c.resolver.GetType(expr.String()); t != nil {
+	if t := c.resolver.GetType(expr.Name.String()); t != nil {
 		expr.Result().SetType(t)
 		return
 	}
 
 	// Primitive type
 	for kind := ast.Void; kind <= ast.F64; kind++ {
-		if expr.String() == kind.String() {
+		if expr.Name.String() == kind.String() {
 			expr.Result().SetType(&ast.Primitive{Kind: kind})
 			return
 		}
 	}
 
 	// Global variable
-	if variable := c.resolver.GetVariable(expr.String()); variable != nil && variable.Type != nil {
+	if variable := c.resolver.GetVariable(expr.Name.String()); variable != nil && variable.Type != nil {
 		expr.Result().SetValue(variable.Type, ast.AssignableFlag|ast.AddressableFlag, variable)
 		return
 	}
 
 	// Variable
-	if variable := c.getVariable(expr.String()); variable != nil {
+	if variable := c.getVariable(expr.Name.String()); variable != nil {
 		variable.used = true
 
 		expr.Result().SetValue(variable.type_, ast.AssignableFlag|ast.AddressableFlag, variable.node)
@@ -598,9 +621,9 @@ func (c *checker) VisitCall(expr *ast.Call) {
 		return
 	}
 
-	var function *ast.Func
+	var function ast.FuncType
 
-	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok {
+	if f, ok := ast.As[ast.FuncType](expr.Callee.Result().Type); ok {
 		function = f
 	} else {
 		c.error(expr.Callee, "Cannot call this value")
@@ -608,25 +631,25 @@ func (c *checker) VisitCall(expr *ast.Call) {
 		return
 	}
 
-	expr.Result().SetValue(function.Returns, 0, nil)
+	expr.Result().SetValue(function.Returns(), 0, nil)
 
 	// Check argument count
-	if function.IsVariadic() {
-		if len(expr.Args) < len(function.Params) {
-			c.error(expr, "Got '%d' arguments but function takes at least '%d'", len(expr.Args), len(function.Params))
+	if function.Underlying().IsVariadic() {
+		if len(expr.Args) < function.ParameterCount() {
+			c.error(expr, "Got '%d' arguments but function takes at least '%d'", len(expr.Args), function.ParameterCount())
 		}
 	} else {
-		if len(function.Params) != len(expr.Args) {
-			c.error(expr, "Got '%d' arguments but function only takes '%d'", len(expr.Args), len(function.Params))
+		if function.ParameterCount() != len(expr.Args) {
+			c.error(expr, "Got '%d' arguments but function takes '%d'", len(expr.Args), function.ParameterCount())
 		}
 	}
 
 	// Check argument types
-	toCheck := min(len(function.Params), len(expr.Args))
+	toCheck := min(function.ParameterCount(), len(expr.Args))
 
 	for i := 0; i < toCheck; i++ {
 		arg := expr.Args[i]
-		param := function.Params[i]
+		param := function.ParameterIndex(i)
 
 		if arg.Result().Kind == ast.InvalidResultKind {
 			continue
@@ -708,38 +731,44 @@ func (c *checker) VisitMember(expr *ast.Member) {
 	switch expr.Value.Result().Kind {
 	case ast.TypeResultKind:
 		switch t := expr.Value.Result().Type.(type) {
-		case *ast.Struct:
+		case ast.StructType:
 			// Callable
 			if parentWantsFunction(expr) {
 				function := c.resolver.GetMethod(t, expr.Name.String(), true)
 
-				if function == nil {
-					_, field := t.GetStaticField(expr.Name.String())
-
-					if field != nil {
-						if f, ok := ast.As[*ast.Func](field.Type); ok {
-							expr.Result().SetCallable(f, field)
-							return
-						}
-					}
-
-					c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(t), expr.Name)
+				if function != nil {
+					c.specializeFuncIfNeeded(expr, function, expr.GenericArgs)
 					return
 				}
+			}
 
-				expr.Result().SetCallable(function, function)
+			if len(expr.GenericArgs) != 0 {
+				c.error(expr.Name, "")
+			}
+
+			if parentWantsFunction(expr) {
+				field := t.StaticFieldName(expr.Name.String())
+
+				if field != nil {
+					if f, ok := ast.As[ast.FuncType](field.Type()); ok {
+						expr.Result().SetCallable(f, field)
+						return
+					}
+				}
+
+				c.error(expr.Name, "Struct '%s' does not contain static method with the name '%s'", ast.PrintType(t), expr.Name)
 				return
 			}
 
 			// Field
-			_, field := t.GetStaticField(expr.Name.String())
+			field := t.StaticFieldName(expr.Name.String())
 
 			if field == nil {
 				c.error(expr.Name, "Struct '%s' does not contain static field '%s'", ast.PrintType(t), expr.Name)
 				return
 			}
 
-			expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag, field)
+			expr.Result().SetValue(field.Type(), ast.AssignableFlag|ast.AddressableFlag, field)
 			return
 
 		case *ast.Enum:
@@ -761,17 +790,23 @@ func (c *checker) VisitMember(expr *ast.Member) {
 	case ast.ResolverResultKind:
 		resolver := expr.Value.Result().Resolver()
 
-		// Function
+		// Callable
 		if parentWantsFunction(expr) {
 			// Function
 			if f := resolver.GetFunction(expr.Name.String()); f != nil {
-				expr.Result().SetCallable(f, f)
+				c.specializeFuncIfNeeded(expr, f, expr.GenericArgs)
 				return
 			}
+		}
 
+		if len(expr.GenericArgs) != 0 {
+			c.error(expr.Name, "")
+		}
+
+		if parentWantsFunction(expr) {
 			// Global variable
 			if variable := resolver.GetVariable(expr.Name.String()); variable != nil && variable.Type != nil {
-				if f, ok := ast.As[*ast.Func](variable.Type); ok {
+				if f, ok := ast.As[ast.FuncType](variable.Type); ok {
 					expr.Result().SetCallable(f, variable)
 					return
 				}
@@ -780,6 +815,8 @@ func (c *checker) VisitMember(expr *ast.Member) {
 			// Error
 			c.error(expr.Name, "Unknown identifier")
 			expr.Result().SetInvalid()
+
+			return
 		}
 
 		// Resolver
@@ -806,12 +843,12 @@ func (c *checker) VisitMember(expr *ast.Member) {
 
 	case ast.ValueResultKind:
 		// Get struct
-		var s *ast.Struct
+		var s ast.StructType
 
-		if v, ok := ast.As[*ast.Struct](expr.Value.Result().Type); ok {
+		if v, ok := ast.As[ast.StructType](expr.Value.Result().Type); ok {
 			s = v
 		} else if v, ok := ast.As[*ast.Pointer](expr.Value.Result().Type); ok {
-			if v, ok := ast.As[*ast.Struct](v.Pointee); ok {
+			if v, ok := ast.As[ast.StructType](v.Pointee); ok {
 				s = v
 			}
 		}
@@ -838,33 +875,39 @@ func (c *checker) VisitMember(expr *ast.Member) {
 		if parentWantsFunction(expr) {
 			function := c.resolver.GetMethod(s, expr.Name.String(), false)
 
-			if function == nil {
-				_, field := s.GetField(expr.Name.String())
-
-				if field != nil {
-					if f, ok := ast.As[*ast.Func](field.Type); ok {
-						expr.Result().SetCallable(f, field)
-						return
-					}
-				}
-
-				c.error(expr.Name, "Struct '%s' does not contain method with the name '%s'", ast.PrintType(s), expr.Name)
+			if function != nil {
+				c.specializeFuncIfNeeded(expr, function, expr.GenericArgs)
 				return
 			}
+		}
 
-			expr.Result().SetCallable(function, function)
+		if len(expr.GenericArgs) != 0 {
+			c.error(expr.Name, "")
+		}
+
+		if parentWantsFunction(expr) {
+			field := s.FieldName(expr.Name.String())
+
+			if field != nil {
+				if f, ok := ast.As[*ast.Func](field.Type()); ok {
+					expr.Result().SetCallable(f, field)
+					return
+				}
+			}
+
+			c.error(expr.Name, "Struct '%s' does not contain method with the name '%s'", ast.PrintType(s), expr.Name)
 			return
 		}
 
 		// Field
-		_, field := s.GetField(expr.Name.String())
+		field := s.FieldName(expr.Name.String())
 
 		if field == nil {
 			c.error(expr.Name, "Struct '%s' does not contain field '%s'", ast.PrintType(s), expr.Name)
 			return
 		}
 
-		expr.Result().SetValue(field.Type, ast.AssignableFlag|ast.AddressableFlag, field)
+		expr.Result().SetValue(field.Type(), ast.AssignableFlag|ast.AddressableFlag, field)
 		return
 
 	default:
@@ -885,6 +928,23 @@ func parentWantsFunction(expr ast.Expr) bool {
 
 	default:
 		return false
+	}
+}
+
+func (c *checker) specializeFuncIfNeeded(expr ast.Expr, f ast.FuncType, genericArgs []ast.Type) {
+	if sf, ok := f.(ast.SpecializableFunc); ok {
+		if len(genericArgs) != len(sf.Generics()) {
+			if genericArgs != nil {
+				errorSlice(c, genericArgs, "Got '%d' generic arguments but function takes '%d'", len(genericArgs), len(sf.Generics()))
+			} else {
+				c.error(expr, "Got '%d' generic arguments but function takes '%d'", len(genericArgs), len(sf.Generics()))
+			}
+		}
+
+		specialized := sf.Specialize(genericArgs)
+		expr.Result().SetCallable(specialized, specialized)
+	} else {
+		expr.Result().SetCallable(f, f)
 	}
 }
 
@@ -978,11 +1038,11 @@ func (c *checker) checkMalloc(expr ast.Expr) {
 		return
 	}
 
-	if len(function.Params) != 1 || !ast.IsPrimitive(function.Params[0].Type, ast.U64) {
+	if function.ParameterCount() != 1 || !ast.IsPrimitive(function.ParameterIndex(0).Type, ast.U64) {
 		c.error(expr, "Malloc parameter needs to be a u64")
 	}
 
-	if _, ok := ast.As[*ast.Pointer](function.Returns); !ok {
+	if _, ok := ast.As[*ast.Pointer](function.Returns()); !ok {
 		c.error(expr, "Malloc needs to return a pointer")
 	}
 }

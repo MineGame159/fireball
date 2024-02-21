@@ -17,32 +17,6 @@ func (n *NamespaceName) WriteTo(sb *strings.Builder) {
 	}
 }
 
-// Struct
-
-func (s *Struct) GetStaticField(name string) (int, *Field) {
-	for i := range s.StaticFields {
-		field := s.StaticFields[i]
-
-		if field.Name.String() == name {
-			return i, field
-		}
-	}
-
-	return 0, nil
-}
-
-func (s *Struct) GetField(name string) (int, *Field) {
-	for i := range s.Fields {
-		field := s.Fields[i]
-
-		if field.Name.String() == name {
-			return i, field
-		}
-	}
-
-	return 0, nil
-}
-
 // Impl
 
 func (i *Impl) GetMethod(name string, static bool) *Func {
@@ -100,8 +74,8 @@ func (f *Field) MangledName() string {
 	sb.WriteString(f.Parent().(*Struct).Name.String())
 	sb.WriteRune('.')
 
-	if f.Name != nil {
-		sb.WriteString(f.Name.String())
+	if f.Name() != nil {
+		sb.WriteString(f.Name().String())
 	}
 
 	return sb.String()
@@ -185,25 +159,37 @@ func (f *Func) HasBody() bool {
 	return true
 }
 
-func (f *Func) Signature(paramNames bool) string {
+func (f *Func) Struct() StructType {
+	if impl, ok := f.Parent().(*Impl); ok {
+		if s, ok := impl.Type.(StructType); ok {
+			return s
+		}
+	}
+
+	return nil
+}
+
+func Signature(f FuncType, paramNames bool) string {
 	signature := strings.Builder{}
 	signature.WriteRune('(')
 
-	for i, param := range f.Params {
+	for i := 0; i < f.ParameterCount(); i++ {
+		param := f.ParameterIndex(i)
+
 		if i > 0 {
 			signature.WriteString(", ")
 		}
 
 		if paramNames {
-			signature.WriteString(param.Name.String())
+			signature.WriteString(param.Param.Name.String())
 			signature.WriteRune(' ')
 		}
 
 		signature.WriteString(PrintType(param.Type))
 	}
 
-	if f.IsVariadic() {
-		if len(f.Params) > 0 {
+	if f.Underlying().IsVariadic() {
+		if f.ParameterCount() > 0 {
 			signature.WriteString(", ...")
 		} else {
 			signature.WriteString("...")
@@ -212,65 +198,12 @@ func (f *Func) Signature(paramNames bool) string {
 
 	signature.WriteRune(')')
 
-	if !IsPrimitive(f.Returns, Void) {
+	if !IsPrimitive(f.Returns(), Void) {
 		signature.WriteRune(' ')
-		signature.WriteString(PrintType(f.Returns))
+		signature.WriteString(PrintType(f.Returns()))
 	}
 
 	return signature.String()
-}
-
-func (f *Func) Receiver() *Struct {
-	if impl, ok := f.Parent().(*Impl); ok {
-		if s, ok := As[*Struct](impl.Type); ok {
-			return s
-		}
-	}
-
-	return nil
-}
-
-func (f *Func) Method() *Struct {
-	if impl, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
-		if s, ok := As[*Struct](impl.Type); ok {
-			return s
-		}
-	}
-
-	return nil
-}
-
-func (f *Func) MangledName() string {
-	// Extern
-	externName := f.ExternName()
-
-	if externName != "" {
-		return externName
-	}
-
-	// Normal
-	sb := strings.Builder{}
-	sb.WriteString("fb$")
-
-	file := GetParent[*File](f)
-	file.Namespace.Name.WriteTo(&sb)
-
-	if _, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
-		sb.WriteString(":m:")
-	} else {
-		sb.WriteString(":f:")
-	}
-
-	if struct_, ok := f.Parent().(*Impl); ok {
-		sb.WriteString(struct_.Struct.String())
-		sb.WriteRune('.')
-	}
-
-	if f.Name != nil {
-		sb.WriteString(f.Name.String())
-	}
-
-	return sb.String()
 }
 
 // GlobalVar

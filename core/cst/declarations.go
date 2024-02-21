@@ -122,6 +122,16 @@ func parseStructDecl(p *parser, attributes Node) Node {
 	if p.consume(scanner.Identifier) {
 		return p.end()
 	}
+
+	if p.optional(scanner.LeftBracket) {
+		if p.repeatSeparated(parseGenericParam, canStartGenericParam, scanner.Comma) {
+			return p.end()
+		}
+		if p.consume(scanner.RightBracket) {
+			return p.end()
+		}
+	}
+
 	if p.consume(scanner.LeftBrace) {
 		return p.end()
 	}
@@ -283,6 +293,16 @@ func parseFuncDecl(p *parser, attributes Node) Node {
 	if p.consume(scanner.Identifier) {
 		return p.end()
 	}
+
+	if p.optional(scanner.LeftBracket) {
+		if p.repeatSeparated(parseGenericParam, canStartGenericParam, scanner.Comma) {
+			return p.end()
+		}
+		if p.consume(scanner.RightBracket) {
+			return p.end()
+		}
+	}
+
 	if p.consume(scanner.LeftParen) {
 		return p.end()
 	}
@@ -396,4 +416,16 @@ func parseAttributeArg(p *parser) Node {
 	}
 
 	return p.error("Attribute argument needs to be a string")
+}
+
+// Generics
+
+var canStartGenericParam = []scanner.TokenKind{scanner.Identifier}
+
+func parseGenericParam(p *parser) Node {
+	p.begin(GenericParamNode)
+
+	p.consume(scanner.Identifier)
+
+	return p.end()
 }

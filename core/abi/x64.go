@@ -3,7 +3,7 @@ package abi
 import "fireball/core/ast"
 
 func getX64Size(abi Abi, type_ ast.Type) uint32 {
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Primitive:
 		return getX64PrimitiveSize(type_.Kind)
 
@@ -13,8 +13,8 @@ func getX64Size(abi Abi, type_ ast.Type) uint32 {
 	case *ast.Array:
 		return abi.Size(type_.Base) * type_.Count
 
-	case *ast.Struct:
-		return GetStructLayout(type_).Size(abi, type_)
+	case ast.StructType:
+		return GetStructLayout(type_.Underlying()).Size(abi, type_)
 
 	case *ast.Enum:
 		return abi.Size(type_.ActualType)
@@ -22,7 +22,7 @@ func getX64Size(abi Abi, type_ ast.Type) uint32 {
 	case *ast.Interface:
 		return 8 * 2
 
-	case *ast.Func:
+	case ast.FuncType:
 		return 8
 
 	default:
@@ -31,7 +31,7 @@ func getX64Size(abi Abi, type_ ast.Type) uint32 {
 }
 
 func getX64Align(type_ ast.Type) uint32 {
-	switch type_ := type_.Resolved().(type) {
+	switch type_ := ast.Resolved(type_).(type) {
 	case *ast.Primitive:
 		return getX64PrimitiveSize(type_.Kind)
 
@@ -41,11 +41,11 @@ func getX64Align(type_ ast.Type) uint32 {
 	case *ast.Array:
 		return getX64Align(type_.Base)
 
-	case *ast.Struct:
+	case ast.StructType:
 		maxAlign := uint32(0)
 
-		for _, field := range type_.Fields {
-			maxAlign = max(maxAlign, getX64Align(field.Type))
+		for i := 0; i < type_.FieldCount(); i++ {
+			maxAlign = max(maxAlign, getX64Align(type_.FieldIndex(i).Type()))
 		}
 
 		return maxAlign
@@ -56,7 +56,7 @@ func getX64Align(type_ ast.Type) uint32 {
 	case *ast.Interface:
 		return 8
 
-	case *ast.Func:
+	case ast.FuncType:
 		return 8
 
 	default:

@@ -1,6 +1,7 @@
 package typeresolver
 
 import (
+	"fireball/core"
 	"fireball/core/ast"
 	"fireball/core/utils"
 	"fmt"
@@ -11,19 +12,21 @@ type typeResolver struct {
 	expr ast.Expr
 
 	reporter utils.Reporter
-	resolver *ast.CombinedResolver
+	resolver ast.Resolver
 }
 
 func Resolve(reporter utils.Reporter, root ast.RootResolver, file *ast.File) {
+	resolver := ast.NewCombinedResolver(root)
+
 	r := typeResolver{
 		reporter: reporter,
-		resolver: ast.NewCombinedResolver(root),
+		resolver: resolver,
 	}
 
 	for _, decl := range file.Decls {
 		if using, ok := decl.(*ast.Using); ok {
-			if resolver := root.GetResolver(using.Name); resolver != nil {
-				r.resolver.Add(resolver)
+			if resolver2 := root.GetResolver(using.Name); resolver2 != nil {
+				resolver.Add(resolver2)
 			}
 		}
 	}
@@ -33,13 +36,30 @@ func Resolve(reporter utils.Reporter, root ast.RootResolver, file *ast.File) {
 
 // Declarations
 
+func (t *typeResolver) visitStruct(decl *ast.Struct) {
+	prevResolver := t.resolver
+	if len(decl.GenericParams) != 0 {
+		t.resolver = ast.NewGenericResolver(t.resolver, decl.GenericParams)
+	}
+
+	decl.AcceptChildren(t)
+
+	t.resolver = prevResolver
+}
+
 func (t *typeResolver) visitImpl(decl *ast.Impl) {
+	prevResolver := t.resolver
+
 	// Struct
 	if decl.Struct != nil {
 		type_ := t.resolver.GetType(decl.Struct.Token().Lexeme)
 
 		if s, ok := type_.(*ast.Struct); ok {
 			decl.Type = s
+
+			if len(s.GenericParams) > 0 {
+				t.resolver = ast.NewGenericResolver(t.resolver, s.GenericParams)
+			}
 		} else {
 			t.reporter.Report(utils.Diagnostic{
 				Kind:    utils.ErrorKind,
@@ -55,6 +75,19 @@ func (t *typeResolver) visitImpl(decl *ast.Impl) {
 
 	// Children
 	decl.AcceptChildren(t)
+
+	t.resolver = prevResolver
+}
+
+func (t *typeResolver) visitFunc(decl *ast.Func) {
+	prevResolver := t.resolver
+	if len(decl.GenericParams) != 0 {
+		t.resolver = ast.NewGenericResolver(t.resolver, decl.GenericParams)
+	}
+
+	decl.AcceptChildren(t)
+
+	t.resolver = prevResolver
 }
 
 // Types
@@ -62,7 +95,7 @@ func (t *typeResolver) visitImpl(decl *ast.Impl) {
 func (t *typeResolver) visitType(type_ ast.Type) {
 	if resolvable, ok := type_.(*ast.Resolvable); ok {
 		// Resolve type
-		var resolver ast.Resolver = t.resolver
+		resolver := t.resolver
 		var resolved ast.Type
 
 		for i, part := range resolvable.Parts {
@@ -76,8 +109,30 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 		}
 
 		if resolved != nil {
+			// Visit children
+			type_.AcceptChildren(t)
+
+			// Specialize struct if needed
+			if s, ok := ast.As[*ast.Struct](resolved); ok {
+				if len(resolvable.GenericArgs) != len(s.GenericParams) {
+					if resolvable.GenericArgs != nil {
+						errorSlice(t, resolvable.GenericArgs, "Got '%d' generic arguments but struct takes '%d'", len(resolvable.GenericArgs), len(s.GenericParams))
+					} else {
+						t.error(resolvable.Parts[len(resolvable.Parts)-1], "Got '%d' generic arguments but struct takes '%d'", len(resolvable.GenericArgs), len(s.GenericParams))
+					}
+				}
+
+				if len(resolvable.GenericArgs) != 0 {
+					resolved = s.Specialize(resolvable.GenericArgs)
+				}
+			} else if len(resolvable.GenericArgs) != 0 {
+				errorSlice(t, resolvable.GenericArgs, "This type doesn't have any generic parameters")
+			}
+
 			// Store resolved type
 			resolvable.Type = resolved
+
+			return
 		} else {
 			// Report an error
 			str := strings.Builder{}
@@ -90,12 +145,7 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 				str.WriteString(part.String())
 			}
 
-			t.reporter.Report(utils.Diagnostic{
-				Kind:    utils.ErrorKind,
-				Range:   resolvable.Cst().Range,
-				Message: fmt.Sprintf("Unknown type '%s'", str.String()),
-			})
-
+			t.error(resolvable, "Unknown type '%s'", str.String())
 			resolvable.Type = &ast.Primitive{Kind: ast.Void}
 
 			if t.expr != nil {
@@ -112,8 +162,14 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 
 func (t *typeResolver) VisitNode(node ast.Node) {
 	switch node := node.(type) {
+	case *ast.Struct:
+		t.visitStruct(node)
+
 	case *ast.Impl:
 		t.visitImpl(node)
+
+	case *ast.Func:
+		t.visitFunc(node)
 
 	case ast.Expr:
 		prevTypeExpr := t.expr
@@ -129,4 +185,32 @@ func (t *typeResolver) VisitNode(node ast.Node) {
 	default:
 		node.AcceptChildren(t)
 	}
+}
+
+// Utils
+
+func (t *typeResolver) error(node ast.Node, format string, args ...any) {
+	if ast.IsNil(node) {
+		return
+	}
+
+	t.reporter.Report(utils.Diagnostic{
+		Kind:    utils.ErrorKind,
+		Range:   node.Cst().Range,
+		Message: fmt.Sprintf(format, args...),
+	})
+}
+
+func errorSlice[T ast.Node](t *typeResolver, nodes []T, format string, args ...any) {
+	start := nodes[0].Cst().Range.Start
+	end := nodes[len(nodes)-1].Cst().Range.End
+
+	t.reporter.Report(utils.Diagnostic{
+		Kind: utils.ErrorKind,
+		Range: core.Range{
+			Start: start,
+			End:   end,
+		},
+		Message: fmt.Sprintf(format, args...),
+	})
 }

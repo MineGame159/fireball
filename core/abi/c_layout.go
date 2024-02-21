@@ -8,25 +8,31 @@ var CLayout Layout = &cLayout{}
 
 type cLayout struct{}
 
-func (c *cLayout) Size(abi Abi, decl *ast.Struct) uint32 {
+func (c *cLayout) Size(abi Abi, decl ast.StructType) uint32 {
 	layout := cFieldAligner{}
 
-	for _, field := range decl.Fields {
-		layout.add(abi.Size(field.Type), abi.Align(field.Type))
+	for i := 0; i < decl.FieldCount(); i++ {
+		type_ := decl.FieldIndex(i).Type()
+		layout.add(abi.Size(type_), abi.Align(type_))
 	}
 
 	return layout.size()
 }
 
-func (c *cLayout) Fields(abi Abi, decl *ast.Struct) ([]*ast.Field, []uint32) {
+func (c *cLayout) Fields(abi Abi, decl ast.StructType) ([]ast.FieldLike, []uint32) {
 	layout := cFieldAligner{}
-	offsets := make([]uint32, len(decl.Fields))
 
-	for i, field := range decl.Fields {
-		offsets[i] = layout.add(abi.Size(field.Type), abi.Align(field.Type))
+	fields := make([]ast.FieldLike, decl.FieldCount())
+	offsets := make([]uint32, len(fields))
+
+	for i := 0; i < decl.FieldCount(); i++ {
+		field := decl.FieldIndex(i)
+
+		fields[i] = field
+		offsets[i] = layout.add(abi.Size(field.Type()), abi.Align(field.Type()))
 	}
 
-	return decl.Fields, offsets
+	return fields, offsets
 }
 
 type cFieldAligner struct {

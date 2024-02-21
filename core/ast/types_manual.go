@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-	"slices"
 )
 
 // Helpers
@@ -15,13 +14,21 @@ func IsPrimitive(type_ Type, kind PrimitiveKind) bool {
 	return false
 }
 
+func Resolved(type_ Type) Type {
+	for type_ != type_.Resolved() {
+		type_ = type_.Resolved()
+	}
+
+	return type_
+}
+
 func As[T Type](type_ Type) (T, bool) {
-	if type_ == nil {
+	if IsNil(type_) {
 		var empty T
 		return empty, false
 	}
 
-	t, ok := type_.Resolved().(T)
+	t, ok := Resolved(type_).(T)
 	return t, ok
 }
 
@@ -61,6 +68,20 @@ func (r *Resolvable) Equals(other Type) bool {
 	return r.Resolved().Equals(other.Resolved())
 }
 
+// Generic
+
+func (g *Generic) Equals(other Type) bool {
+	return other != nil && g == other.Resolved()
+}
+
+func (g *Generic) Resolved() Type {
+	if g.Type != nil {
+		return g.Type
+	}
+
+	return g
+}
+
 // Struct
 
 func (s *Struct) Equals(other Type) bool {
@@ -68,6 +89,10 @@ func (s *Struct) Equals(other Type) bool {
 }
 
 func (s *Struct) Resolved() Type {
+	if s.Type != nil {
+		return s.Type
+	}
+
 	return s
 }
 
@@ -106,23 +131,33 @@ func (i *Interface) AcceptType(visitor TypeVisitor) {
 // Func
 
 func (f *Func) Equals(other Type) bool {
-	if f2, ok := As[*Func](other); ok {
-		if f.Name != nil && f2.Name != nil {
+	if f2, ok := As[FuncType](other); ok {
+		if f.Name != nil && f2.Underlying().Name != nil {
 			return f == f2
 		}
 
-		return typesEquals(f.Returns, f2.Returns) && slices.EqualFunc(f.Params, f2.Params, paramEquals)
+		return typesEquals(f.Returns(), f2.Returns()) && paramsEquals(f, f2)
 	}
 
 	return false
 }
 
-func (f *Func) NameAndSignatureEquals(other *Func) bool {
-	return tokensEquals(f.Name, other.Name) && typesEquals(f.Returns, other.Returns) && slices.EqualFunc(f.Params, other.Params, paramEquals)
+func (f *Func) NameAndSignatureEquals(other FuncType) bool {
+	return tokensEquals(f.Name, other.Underlying().Name) && typesEquals(f.Returns(), other.Returns()) && paramsEquals(f, other)
 }
 
-func paramEquals(v1, v2 *Param) bool {
-	return typesEquals(v1.Type, v2.Type)
+func paramsEquals(f1, f2 FuncType) bool {
+	if f1.ParameterCount() != f2.ParameterCount() {
+		return false
+	}
+
+	for i := 0; i < f1.ParameterCount(); i++ {
+		if !f1.ParameterIndex(i).Type.Equals(f2.ParameterIndex(i).Type) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (f *Func) Resolved() Type {
@@ -180,10 +215,12 @@ func (t *typePrinter) VisitResolvable(type_ *Resolvable) {
 	}
 }
 
-func (t *typePrinter) VisitStruct(type_ *Struct) {
-	if type_.Name != nil {
-		t.str += type_.Name.String()
-	}
+func (t *typePrinter) VisitGeneric(type_ *Generic) {
+	t.str += type_.String()
+}
+
+func (t *typePrinter) VisitStruct(_ *Struct) {
+	panic("ast.typePrinter.VisitStruct() - Not implemented")
 }
 
 func (t *typePrinter) VisitEnum(type_ *Enum) {
@@ -198,16 +235,51 @@ func (t *typePrinter) VisitInterface(type_ *Interface) {
 	}
 }
 
-func (t *typePrinter) VisitFunc(type_ *Func) {
-	if t.options.FuncNames && type_.Name != nil {
-		t.str += type_.Name.String()
-	}
-
-	t.str += type_.Signature(t.options.ParamNames)
+func (t *typePrinter) VisitFunc(_ *Func) {
+	panic("ast.typePrinter.VisitFunc() - Not implemented")
 }
 
 func (t *typePrinter) VisitNode(node Node) {
-	if type_, ok := node.(Type); ok {
+	switch type_ := node.(type) {
+	case StructType:
+		if type_.Underlying().Name != nil {
+			t.str += type_.Underlying().Name.String()
+		}
+
+		if spec, ok := type_.(*SpecializedStruct); ok {
+			t.str += "!["
+
+			for i, type_ := range spec.Types {
+				if i > 0 {
+					t.str += ", "
+				}
+
+				t.VisitNode(Resolved(type_))
+			}
+
+			t.str += "]"
+		} else if s, ok := type_.(*Struct); ok && len(s.GenericParams) != 0 {
+			t.str += "!["
+
+			for i, param := range s.GenericParams {
+				if i > 0 {
+					t.str += ", "
+				}
+
+				t.str += param.Name.String()
+			}
+
+			t.str += "]"
+		}
+
+	case FuncType:
+		if t.options.FuncNames && type_.Underlying().Name != nil {
+			t.str += type_.Underlying().Name.String()
+		}
+
+		t.str += Signature(type_, t.options.ParamNames)
+
+	case Type:
 		type_.AcceptType(t)
 	}
 }

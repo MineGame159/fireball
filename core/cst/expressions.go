@@ -77,6 +77,7 @@ func parsePrefixExprPratt(p *parser) Node {
 			type_ := parseType(p)
 
 			if p.peek() == scanner.LeftBrace {
+				// New struct
 				p.begin(StructExprNode)
 
 				p.childAdd(new_)
@@ -96,6 +97,7 @@ func parsePrefixExprPratt(p *parser) Node {
 				return p.end()
 			}
 
+			// New array
 			p.begin(AllocateArrayExprNode)
 
 			p.childAdd(new_)
@@ -115,7 +117,24 @@ func parsePrefixExprPratt(p *parser) Node {
 			return p.end()
 		}
 
-		return p.advanceGetLeaf()
+		// Identifier
+		p.begin(IdentifierExprNode)
+
+		p.advanceAddChild()
+
+		if p.peek() == scanner.Bang && p.peek2() == scanner.LeftBracket {
+			p.advanceAddChild()
+			p.advanceAddChild()
+
+			if p.repeatSeparated(parseType, canStartType, scanner.Comma) {
+				return p.end()
+			}
+			if p.consume(scanner.RightBracket) {
+				return p.end()
+			}
+		}
+
+		return p.end()
 
 	case scanner.LeftParen:
 		p.begin(ParenExprNode)
@@ -186,6 +205,27 @@ func parseInfixExprPratt(p *parser, op scanner.TokenKind, lhs Node, rightPower i
 
 		return p.end()
 
+	case scanner.Dot:
+		p.begin(BinaryExprNode)
+
+		p.childAdd(lhs)
+		p.advanceAddChild()
+		p.consume(scanner.Identifier)
+
+		if p.peek() == scanner.Bang && p.peek2() == scanner.LeftBracket {
+			p.advanceAddChild()
+			p.advanceAddChild()
+
+			if p.repeatSeparated(parseType, canStartType, scanner.Comma) {
+				return p.end()
+			}
+			if p.consume(scanner.RightBracket) {
+				return p.end()
+			}
+		}
+
+		return p.end()
+
 	default:
 		p.begin(BinaryExprNode)
 
@@ -214,8 +254,10 @@ func parsePostfixExprPratt(p *parser, op scanner.TokenKind, lhs Node) Node {
 		return p.end()
 
 	case scanner.LeftParen:
+		lhsLexeme := identifierExprOrTokenLexeme(lhs)
+
 		// Type call
-		if lhs.Token.Lexeme == "sizeof" || lhs.Token.Lexeme == "alignof" {
+		if lhsLexeme == "sizeof" || lhsLexeme == "alignof" {
 			p.begin(TypeCallExprNode)
 
 			p.childAdd(lhs)
@@ -231,7 +273,7 @@ func parsePostfixExprPratt(p *parser, op scanner.TokenKind, lhs Node) Node {
 		}
 
 		// Typeof
-		if lhs.Token.Lexeme == "typeof" {
+		if lhsLexeme == "typeof" {
 			p.begin(TypeofExprNode)
 
 			p.childAdd(lhs)
@@ -293,14 +335,24 @@ func convertExprToIdentifierType(p *parser, node Node) Node {
 
 	convertExprToIdentifierTypePart(p, node)
 
+	for _, child := range node.Children {
+		if child.Token.Kind == scanner.LeftBracket || child.Token.Kind == scanner.RightBracket || child.Kind.IsType() {
+			p.childAdd(child)
+		}
+	}
+
 	return p.end()
 }
 
 func convertExprToIdentifierTypePart(p *parser, node Node) {
 	//goland:noinspection GoSwitchMissingCasesForIotaConsts
 	switch node.Kind {
-	case IdentifierNode:
+	case TokenNode:
 		p.childAdd(node)
+		return
+
+	case IdentifierExprNode:
+		p.childAdd(node.Children[0])
 		return
 
 	case BinaryExprNode:

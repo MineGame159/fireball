@@ -18,9 +18,6 @@ func getHover(node ast.Node, pos core.Pos) *protocol.Hover {
 
 	// Switch based on the leaf node
 	switch node := node.(type) {
-	case *ast.Identifier:
-		return getHoverExprResult(node.Result(), node)
-
 	case *ast.Literal:
 		if strings.HasPrefix(node.String(), "0x") || strings.HasPrefix(node.String(), "0X") {
 			v, err := strconv.ParseUint(node.String()[2:], 16, 64)
@@ -45,7 +42,7 @@ func getHoverToken(token *ast.Token) *protocol.Hover {
 	// Switch based on the token's parent node
 	switch parent := token.Parent().(type) {
 	case *ast.Field:
-		return newHover(token, printType(parent.Type))
+		return newHover(token, printType(parent.Type()))
 
 	case *ast.EnumCase:
 		return newHover(token, strconv.FormatInt(parent.ActualValue, 10))
@@ -55,6 +52,9 @@ func getHoverToken(token *ast.Token) *protocol.Hover {
 
 	case *ast.Var:
 		return newHover(token, printType(parent.ActualType))
+
+	case *ast.Identifier:
+		return getHoverExprResult(parent.Result(), token)
 
 	case *ast.Member:
 		return getHoverExprResult(parent.Result(), token)
@@ -75,9 +75,9 @@ func getHoverToken(token *ast.Token) *protocol.Hover {
 		return newHover(token, strconv.FormatUint(uint64(value), 10))
 
 	case *ast.InitField:
-		if s, ok := ast.As[*ast.Struct](parent.Parent().(*ast.StructInitializer).Type); ok {
-			if _, field := s.GetField(token.String()); field != nil {
-				return newHover(token, ast.PrintType(field.Type))
+		if s, ok := ast.As[ast.StructType](parent.Parent().(*ast.StructInitializer).Type); ok {
+			if field := s.FieldName(token.String()); field != nil {
+				return newHover(token, ast.PrintType(field.Type()))
 			}
 		}
 	}

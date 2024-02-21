@@ -6,12 +6,13 @@ import (
 	"fireball/core/common"
 	"fireball/core/ir"
 	"fmt"
+	"strings"
 )
 
 type codegen struct {
 	ctx      *Context
 	path     string
-	resolver *ast.CombinedResolver
+	resolver ast.Resolver
 
 	types   types
 	vtables vtables
@@ -19,9 +20,9 @@ type codegen struct {
 	allocas allocas
 
 	staticVariables map[ast.Node]exprValue
-	functions       map[*ast.Func]*ir.Func
+	functions       map[ast.FuncType]*ir.Func
 
-	astFunction *ast.Func
+	astFunction ast.FuncType
 	function    *ir.Func
 	block       *ir.Block
 
@@ -41,13 +42,15 @@ type exprValue struct {
 
 func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.Module {
 	// Init codegen
+	resolver := ast.NewCombinedResolver(root)
+
 	c := &codegen{
 		ctx:      ctx,
 		path:     path,
-		resolver: ast.NewCombinedResolver(root),
+		resolver: resolver,
 
 		staticVariables: make(map[ast.Node]exprValue),
-		functions:       make(map[*ast.Func]*ir.Func),
+		functions:       make(map[ast.FuncType]*ir.Func),
 
 		module: &ir.Module{},
 	}
@@ -56,6 +59,7 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 	c.module.Path = path
 
 	c.types.c = c
+	c.types.structs = make(map[string]ir.Type)
 	c.vtables.c = c
 	c.scopes.c = c
 	c.allocas.c = c
@@ -66,8 +70,8 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 	for _, decl := range file.Decls {
 		switch decl := decl.(type) {
 		case *ast.Using:
-			if resolver := root.GetResolver(decl.Name); resolver != nil {
-				c.resolver.Add(resolver)
+			if resolver2 := root.GetResolver(decl.Name); resolver2 != nil {
+				resolver.Add(resolver2)
 			}
 
 		case *ast.Struct:
@@ -76,8 +80,24 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 			}
 
 		case *ast.Impl:
-			for _, function := range decl.Methods {
-				c.defineOrDeclare(function)
+			s := decl.Type.(*ast.Struct)
+
+			if len(s.GenericParams) > 0 {
+				for _, spec := range s.Specializations {
+					for _, method := range spec.Methods {
+						c.defineOrDeclare(method)
+					}
+				}
+
+				for _, method := range decl.Methods {
+					if method.IsStatic() {
+						c.defineOrDeclare(method)
+					}
+				}
+			} else {
+				for _, function := range decl.Methods {
+					c.defineOrDeclare(function)
+				}
 			}
 
 		case *ast.Func:
@@ -97,14 +117,32 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 	return c.module
 }
 
-func (c *codegen) defineOrDeclare(function *ast.Func) {
+func (c *codegen) defineOrDeclare(f ast.FuncType) {
+	decl := f.Underlying()
+
+	if len(decl.Generics()) == 0 {
+		c.defineOrDeclareFunc(f)
+	} else {
+		var s specializer
+		s.prepare(decl, decl.Generics())
+
+		for _, spec := range decl.Specializations {
+			s.specialize(spec.Types)
+			c.defineOrDeclareFunc(spec)
+		}
+
+		s.finish()
+	}
+}
+
+func (c *codegen) defineOrDeclareFunc(function ast.FuncType) {
 	t := c.types.get(function).(*ir.FuncType)
 	name := c.getMangledName(function)
 
-	if function.HasBody() {
+	if function.Underlying().HasBody() {
 		// Meta
 		meta := &ir.SubprogamMeta{
-			Name:        function.Name.String(),
+			Name:        function.Underlying().Name.String(),
 			LinkageName: name,
 			Scope:       c.scopes.getMeta(),
 			File:        c.scopes.file,
@@ -119,7 +157,7 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 		// Define
 		var flags ir.FuncFlags
 
-		for _, attribute := range function.Attributes {
+		for _, attribute := range function.Underlying().Attributes {
 			if attribute.Name.String() == "Inline" {
 				flags |= ir.InlineFlag
 				break
@@ -136,24 +174,25 @@ func (c *codegen) defineOrDeclare(function *ast.Func) {
 	}
 }
 
-func (c *codegen) getMangledName(function *ast.Func) string {
-	intrinsicName := function.IntrinsicName()
+func (c *codegen) getMangledName(function ast.FuncType) string {
+	// Intrinsic
+	intrinsic := function.Underlying().IntrinsicName()
 
-	if intrinsicName != "" {
+	if intrinsic != "" {
 		name := ""
 
-		switch intrinsicName {
+		switch intrinsic {
 		case "abs":
-			name = ternary(isFloating(function.Returns), "llvm.fabs", "llvm.abs")
+			name = ternary(isFloating(function.Returns()), "llvm.fabs", "llvm.abs")
 
 		case "min":
-			name = ternary(isFloating(function.Returns), "llvm.minnum", ternary(isSigned(function.Returns), "llvm.smin", "llvm.umin"))
+			name = ternary(isFloating(function.Returns()), "llvm.minnum", ternary(isSigned(function.Returns()), "llvm.smin", "llvm.umin"))
 
 		case "max":
-			name = ternary(isFloating(function.Returns), "llvm.maxnum", ternary(isSigned(function.Returns), "llvm.smax", "llvm.umax"))
+			name = ternary(isFloating(function.Returns()), "llvm.maxnum", ternary(isSigned(function.Returns()), "llvm.smax", "llvm.umax"))
 
 		case "sqrt", "pow", "sin", "cos", "exp", "exp2", "exp10", "log", "log2", "log10", "fma", "copysign", "floor", "ceil", "round":
-			name = "llvm." + intrinsicName
+			name = "llvm." + intrinsic
 
 		case "memcpy", "memmove":
 			return "llvm.memcpy.p0.p0.i32"
@@ -166,10 +205,14 @@ func (c *codegen) getMangledName(function *ast.Func) string {
 			panic("codegen getMangledName() - Invalid intrinsic")
 		}
 
-		return name + "." + function.Returns.String()
+		return name + "." + function.Returns().String()
 	}
 
-	return function.MangledName()
+	// Normal
+	var name strings.Builder
+	function.MangledName(&name)
+
+	return name.String()
 }
 
 // IR
@@ -311,7 +354,7 @@ func (c *codegen) convertCast(value exprValue, kind common.CastKind, from, to as
 
 // Static / Global variables
 
-func (c *codegen) getStaticVariable(field *ast.Field) exprValue {
+func (c *codegen) getStaticVariable(field ast.FieldLike) exprValue {
 	// Get static variable already in this module
 	if value, ok := c.staticVariables[field]; ok {
 		return value
@@ -331,23 +374,23 @@ func (c *codegen) getGlobalVariable(variable *ast.GlobalVar) exprValue {
 	return c.createGlobalVariable(variable, true)
 }
 
-func (c *codegen) createStaticVariable(field *ast.Field, external bool) exprValue {
-	type_ := c.types.get(field.Type)
+func (c *codegen) createStaticVariable(field ast.FieldLike, external bool) exprValue {
+	type_ := c.types.get(field.Type())
 	var initializer ir.Value
 
 	if !external {
 		initializer = &ir.ZeroInitConst{Typ: type_}
 	}
 
-	global := c.module.Global(field.MangledName(), type_, initializer)
+	global := c.module.Global(field.Underlying().MangledName(), type_, initializer)
 
 	if !external {
 		meta := &ir.GlobalVarMeta{
-			Name:        fmt.Sprintf("%s.%s", field.Parent().(*ast.Struct).Name, field.Name),
-			LinkageName: field.MangledName(),
+			Name:        fmt.Sprintf("%s.%s", field.Parent().(*ast.Struct).Name, field.Name()),
+			LinkageName: field.Underlying().MangledName(),
 			Scope:       c.scopes.getMeta(),
 			File:        c.scopes.file,
-			Type:        c.types.getMeta(field.Type),
+			Type:        c.types.getMeta(field.Type()),
 			Local:       false,
 			Definition:  true,
 		}
@@ -413,7 +456,7 @@ func (c *codegen) createGlobalVariable(variable *ast.GlobalVar, external bool) e
 
 // Functions
 
-func (c *codegen) getFunction(function *ast.Func) exprValue {
+func (c *codegen) getFunction(function ast.FuncType) exprValue {
 	// Get function already in this module
 	for f, value := range c.functions {
 		if f.Equals(function) {
@@ -422,7 +465,7 @@ func (c *codegen) getFunction(function *ast.Func) exprValue {
 	}
 
 	// Resolve function from project
-	if f := c.resolver.GetFunction(function.Name.String()); f != nil {
+	if f := c.resolver.GetFunction(function.Underlying().Name.String()); f != nil {
 		filePath := ast.GetParent[*ast.File](f).Path
 
 		if filePath == c.path {
@@ -441,14 +484,14 @@ func (c *codegen) beginBlock(block *ir.Block) {
 }
 
 func callNeedsTempVariable(expr *ast.Call) bool {
-	function := expr.Callee.Result().Type.(*ast.Func)
+	function := expr.Callee.Result().Type.(ast.FuncType)
 
-	if f, ok := ast.As[*ast.Func](expr.Callee.Result().Type); ok && function == nil {
+	if f, ok := ast.As[ast.FuncType](expr.Callee.Result().Type); ok && function == nil {
 		function = f
 	}
 
-	if _, ok := expr.Parent().(*ast.Expression); !ok && !ast.IsPrimitive(function.Returns, ast.Void) {
-		if _, ok := ast.As[*ast.Array](function.Returns); ok {
+	if _, ok := expr.Parent().(*ast.Expression); !ok && !ast.IsPrimitive(function.Returns(), ast.Void) {
+		if _, ok := ast.As[*ast.Array](function.Returns()); ok {
 			if _, ok := expr.Parent().(*ast.Index); ok {
 				return true
 			}
@@ -461,7 +504,7 @@ func callNeedsTempVariable(expr *ast.Call) bool {
 func (c *codegen) modifyIntrinsicArgs(function *ast.Func, intrinsicName string, args []ir.Value) []ir.Value {
 	switch intrinsicName {
 	case "abs":
-		if !isFloating(function.Returns) {
+		if !isFloating(function.Returns()) {
 			args = append(args, ir.False)
 		}
 

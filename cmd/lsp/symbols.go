@@ -59,32 +59,32 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 				}, len(struct_.StaticFields)+len(struct_.Fields)+methodCount[struct_])
 
 				for _, field := range struct_.StaticFields {
-					if nodeCst(field.Name) == nil {
+					if nodeCst(field.Name()) == nil {
 						continue
 					}
 
 					symbols.addChild(id, symbol{
 						file:           file,
 						kind:           protocol.SymbolKindField,
-						name:           field.Name.String(),
-						detail:         ast.PrintType(field.Type),
-						range_:         nodeCst(field.Name).Range,
-						selectionRange: nodeCst(field.Name).Range,
+						name:           field.Name().String(),
+						detail:         ast.PrintType(field.Type()),
+						range_:         nodeCst(field.Name()).Range,
+						selectionRange: nodeCst(field.Name()).Range,
 					})
 				}
 
 				for _, field := range struct_.Fields {
-					if nodeCst(field.Name) == nil {
+					if nodeCst(field.Name()) == nil {
 						continue
 					}
 
 					symbols.addChild(id, symbol{
 						file:           file,
 						kind:           protocol.SymbolKindField,
-						name:           field.Name.String(),
-						detail:         ast.PrintType(field.Type),
-						range_:         nodeCst(field.Name).Range,
-						selectionRange: nodeCst(field.Name).Range,
+						name:           field.Name().String(),
+						detail:         ast.PrintType(field.Type()),
+						range_:         nodeCst(field.Name()).Range,
+						selectionRange: nodeCst(field.Name()).Range,
 					})
 				}
 
@@ -114,7 +114,7 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 						detail := ""
 
 						if symbols.supportsDetail() {
-							detail = function.Signature(true)
+							detail = ast.Signature(function, true)
 						}
 
 						symbols.addChild(id, symbol{
@@ -164,7 +164,7 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 						detail := ""
 
 						if symbols.supportsDetail() {
-							detail = method.Signature(true)
+							detail = ast.Signature(method, true)
 						}
 
 						symbols.addChild(id, symbol{
@@ -182,7 +182,7 @@ func getSymbols(symbols symbolConsumer, files []*workspace.File) {
 				detail := ""
 
 				if symbols.supportsDetail() {
-					detail = function.Signature(true)
+					detail = ast.Signature(function, true)
 				}
 
 				symbols.add(symbol{

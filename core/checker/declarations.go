@@ -22,18 +22,23 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 		c.visitStructAttribute(attribute)
 	}
 
+	prevResolver := c.resolver
+	if len(decl.GenericParams) != 0 {
+		c.resolver = ast.NewGenericResolver(c.resolver, decl.GenericParams)
+	}
+
 	// Check static fields
 	fields := utils.NewSet[string]()
 
 	for _, field := range decl.StaticFields {
 		// Check name collision
-		if field.Name != nil && !fields.Add(field.Name.String()) {
-			c.error(field.Name, "Static field with the name '%s' already exists", field.Name)
+		if field.Name() != nil && !fields.Add(field.Name().String()) {
+			c.error(field.Name(), "Static field with the name '%s' already exists", field.Name())
 		}
 
 		// Check void type
-		if ast.IsPrimitive(field.Type, ast.Void) {
-			c.error(field.Name, "Static field cannot be of type 'void'")
+		if ast.IsPrimitive(field.Type(), ast.Void) {
+			c.error(field.Name(), "Static field cannot be of type 'void'")
 		}
 	}
 
@@ -42,15 +47,17 @@ func (c *checker) VisitStruct(decl *ast.Struct) {
 
 	for _, field := range decl.Fields {
 		// Check name collision
-		if field.Name != nil && !fields.Add(field.Name.String()) {
-			c.error(field.Name, "Field with the name '%s' already exists", field.Name)
+		if field.Name() != nil && !fields.Add(field.Name().String()) {
+			c.error(field.Name(), "Field with the name '%s' already exists", field.Name)
 		}
 
 		// Check void type
-		if ast.IsPrimitive(field.Type, ast.Void) {
-			c.error(field.Name, "Field cannot be of type 'void'")
+		if ast.IsPrimitive(field.Type(), ast.Void) {
+			c.error(field.Name(), "Field cannot be of type 'void'")
 		}
 	}
+
+	c.resolver = prevResolver
 }
 
 func (c *checker) VisitImpl(decl *ast.Impl) {
@@ -84,9 +91,16 @@ func (c *checker) VisitImpl(decl *ast.Impl) {
 	}
 
 	// Children
+	prevResolver := c.resolver
+
 	if decl.Type != nil {
 		c.pushScope()
 		c.addVariable(&ast.Token{Token_: scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}}, decl.Type, nil)
+
+		s, _ := ast.As[*ast.Struct](decl.Type)
+		if len(s.GenericParams) > 0 {
+			c.resolver = ast.NewGenericResolver(c.resolver, s.GenericParams)
+		}
 	}
 
 	decl.AcceptChildren(c)
@@ -94,6 +108,8 @@ func (c *checker) VisitImpl(decl *ast.Impl) {
 	if decl.Type != nil {
 		c.popScope()
 	}
+
+	c.resolver = prevResolver
 }
 
 func (c *checker) VisitEnum(decl *ast.Enum) {
@@ -210,7 +226,7 @@ func (c *checker) VisitInterface(decl *ast.Interface) {
 func (c *checker) VisitFunc(decl *ast.Func) {
 	// Check name collision
 	if decl.Name != nil {
-		if s := decl.Receiver(); s != nil {
+		if s := decl.Struct(); s != nil {
 			if method := c.resolver.GetMethod(s, decl.Name.String(), decl.IsStatic()); method != nil && method != decl {
 				c.error(decl.Name, "Method with this name already exists")
 			}
@@ -264,6 +280,15 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		c.error(decl.Name, "Invalid combination of attributes")
 	}
 
+	// Check generics
+	if len(decl.GenericParams) != 0 && isExtern {
+		c.error(decl.Name, "Extern functions can't be generic")
+	}
+
+	if len(decl.GenericParams) != 0 && isIntrinsic {
+		c.error(decl.Name, "Intrinsic functions can't be generic")
+	}
+
 	// Check body
 	if decl.HasBody() {
 		if !decl.Cst().Contains(scanner.LeftBrace) {
@@ -278,6 +303,11 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	// Push scope
 	c.function = decl
 	c.pushScope()
+
+	prevResolver := c.resolver
+	if len(decl.GenericParams) != 0 {
+		c.resolver = ast.NewGenericResolver(c.resolver, decl.GenericParams)
+	}
 
 	// Params
 	for _, param := range decl.Params {
@@ -296,11 +326,13 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 	}
 
 	// Pop scope
+	c.resolver = prevResolver
+
 	c.popScope()
 	c.function = nil
 
 	// Check last return
-	if decl.HasBody() && !ast.IsPrimitive(decl.Returns, ast.Void) {
+	if decl.HasBody() && !ast.IsPrimitive(decl.Returns(), ast.Void) {
 		valid := len(decl.Body) > 0
 
 		if valid {
@@ -310,7 +342,7 @@ func (c *checker) VisitFunc(decl *ast.Func) {
 		}
 
 		if !valid {
-			c.error(decl.Name, "Function needs to return a '%s' value", ast.PrintType(decl.Returns))
+			c.error(decl.Name, "Function needs to return a '%s' value", ast.PrintType(decl.Returns()))
 		}
 	}
 }

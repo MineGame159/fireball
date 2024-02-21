@@ -172,23 +172,23 @@ type Field struct {
 	cst    cst.Node
 	parent Node
 
-	Name *Token
-	Type Type
+	Name_ *Token
+	Type_ Type
 }
 
-func NewField(node cst.Node, name *Token, type_ Type) *Field {
-	if name == nil && type_ == nil {
+func NewField(node cst.Node, name_ *Token, type_ Type) *Field {
+	if name_ == nil && type_ == nil {
 		return nil
 	}
 
 	f := &Field{
-		cst:  node,
-		Name: name,
-		Type: type_,
+		cst:   node,
+		Name_: name_,
+		Type_: type_,
 	}
 
-	if name != nil {
-		name.SetParent(f)
+	if name_ != nil {
+		name_.SetParent(f)
 	}
 	if type_ != nil {
 		type_.SetParent(f)
@@ -222,11 +222,11 @@ func (f *Field) SetParent(parent Node) {
 }
 
 func (f *Field) AcceptChildren(visitor Visitor) {
-	if f.Name != nil {
-		visitor.VisitNode(f.Name)
+	if f.Name_ != nil {
+		visitor.VisitNode(f.Name_)
 	}
-	if f.Type != nil {
-		visitor.VisitNode(f.Type)
+	if f.Type_ != nil {
+		visitor.VisitNode(f.Type_)
 	}
 }
 
@@ -235,13 +235,13 @@ func (f *Field) Clone() Node {
 		cst: f.cst,
 	}
 
-	if f.Name != nil {
-		f2.Name = f.Name.Clone().(*Token)
-		f2.Name.SetParent(f2)
+	if f.Name_ != nil {
+		f2.Name_ = f.Name_.Clone().(*Token)
+		f2.Name_.SetParent(f2)
 	}
-	if f.Type != nil {
-		f2.Type = f.Type.Clone().(Type)
-		f2.Type.SetParent(f2)
+	if f.Type_ != nil {
+		f2.Type_ = f.Type_.Clone().(Type)
+		f2.Type_.SetParent(f2)
 	}
 
 	return f2
@@ -670,6 +670,8 @@ func IsNil(node Node) bool {
 		return node == nil
 	case *Resolvable:
 		return node == nil
+	case *Generic:
+		return node == nil
 	case *Namespace:
 		return node == nil
 	case *Using:
@@ -751,6 +753,14 @@ func IsNil(node Node) bool {
 	case *Attribute:
 		return node == nil
 	case *Token:
+		return node == nil
+	case *SpecializedField:
+		return node == nil
+	case *SpecializedStruct:
+		return node == nil
+	case *SpecializedFunc:
+		return node == nil
+	case *PartiallySpecializedFunc:
 		return node == nil
 
 	default:
