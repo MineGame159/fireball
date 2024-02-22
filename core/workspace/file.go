@@ -65,6 +65,11 @@ func (f *File) SetText(text string, parse bool) {
 			}
 		}
 
+		// Specialize types
+		for _, file := range f.Project.Files {
+			typeresolver.Specialize(file, file.Ast)
+		}
+
 		// Check
 		for _, file := range f.Project.Files {
 			if resolver := f.Project.getNamespace(file.Ast); resolver != nil {

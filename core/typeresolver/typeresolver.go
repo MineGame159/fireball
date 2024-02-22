@@ -109,30 +109,8 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 		}
 
 		if resolved != nil {
-			// Visit children
-			type_.AcceptChildren(t)
-
-			// Specialize struct if needed
-			if s, ok := ast.As[*ast.Struct](resolved); ok {
-				if len(resolvable.GenericArgs) != len(s.GenericParams) {
-					if resolvable.GenericArgs != nil {
-						errorSlice(t, resolvable.GenericArgs, "Got '%d' generic arguments but struct takes '%d'", len(resolvable.GenericArgs), len(s.GenericParams))
-					} else {
-						t.error(resolvable.Parts[len(resolvable.Parts)-1], "Got '%d' generic arguments but struct takes '%d'", len(resolvable.GenericArgs), len(s.GenericParams))
-					}
-				}
-
-				if len(resolvable.GenericArgs) != 0 {
-					resolved = s.Specialize(resolvable.GenericArgs)
-				}
-			} else if len(resolvable.GenericArgs) != 0 {
-				errorSlice(t, resolvable.GenericArgs, "This type doesn't have any generic parameters")
-			}
-
 			// Store resolved type
 			resolvable.Type = resolved
-
-			return
 		} else {
 			// Report an error
 			str := strings.Builder{}
@@ -145,7 +123,7 @@ func (t *typeResolver) visitType(type_ ast.Type) {
 				str.WriteString(part.String())
 			}
 
-			t.error(resolvable, "Unknown type '%s'", str.String())
+			errorNode(t.reporter, resolvable, "Unknown type '%s'", str.String())
 			resolvable.Type = &ast.Primitive{Kind: ast.Void}
 
 			if t.expr != nil {
@@ -189,23 +167,23 @@ func (t *typeResolver) VisitNode(node ast.Node) {
 
 // Utils
 
-func (t *typeResolver) error(node ast.Node, format string, args ...any) {
+func errorNode(reporter utils.Reporter, node ast.Node, format string, args ...any) {
 	if ast.IsNil(node) {
 		return
 	}
 
-	t.reporter.Report(utils.Diagnostic{
+	reporter.Report(utils.Diagnostic{
 		Kind:    utils.ErrorKind,
 		Range:   node.Cst().Range,
 		Message: fmt.Sprintf(format, args...),
 	})
 }
 
-func errorSlice[T ast.Node](t *typeResolver, nodes []T, format string, args ...any) {
+func errorSlice[T ast.Node](reporter utils.Reporter, nodes []T, format string, args ...any) {
 	start := nodes[0].Cst().Range.Start
 	end := nodes[len(nodes)-1].Cst().Range.End
 
-	t.reporter.Report(utils.Diagnostic{
+	reporter.Report(utils.Diagnostic{
 		Kind: utils.ErrorKind,
 		Range: core.Range{
 			Start: start,

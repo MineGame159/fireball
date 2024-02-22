@@ -65,6 +65,10 @@ func (r *Resolvable) Equals(other Type) bool {
 		panic("ast.Resolvable.Equals() - Not resolved")
 	}
 
+	if IsNil(other) {
+		return false
+	}
+
 	return r.Resolved().Equals(other.Resolved())
 }
 

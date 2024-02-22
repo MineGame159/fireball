@@ -32,24 +32,36 @@ func (s *Struct) Specialize(types []Type) StructType {
 		fields:       fields,
 	}
 
+	for i := 0; i < len(staticFields); i++ {
+		staticFields[i].struct_ = spec
+	}
+
+	for i := 0; i < len(fields); i++ {
+		fields[i].struct_ = spec
+	}
+
 	s.Specializations = append(s.Specializations, spec)
 	return spec
 }
 
 func specializeFields(s *Struct, types []Type, fields []*Field) []SpecializedField {
-	specFields := make([]SpecializedField, len(fields))
+	specFields := make([]SpecializedField, 0, len(fields))
 
-	for i, field := range fields {
-		type_ := specialize(s.GenericParams, types, field.Type_)
+	for _, field := range fields {
+		if IsNil(field.Type()) {
+			continue
+		}
+
+		type_ := specialize(s.GenericParams, types, field.Type())
 
 		if type_ == nil {
-			type_ = field.Type_
+			type_ = field.Type()
 		}
 
-		specFields[i] = SpecializedField{
+		specFields = append(specFields, SpecializedField{
 			wrapper: wrapper[*Field]{wrapped: field},
 			type_:   type_,
-		}
+		})
 	}
 
 	return specFields
@@ -70,7 +82,7 @@ func (f *Func) Specialize(types []Type) FuncType {
 	return spec
 }
 
-func specializeFunc(receiver StructType, specializations *[]*SpecializedFunc, f SpecializableFunc, types []Type) (FuncType, bool) {
+func specializeFunc(receiver Type, specializations *[]*SpecializedFunc, f SpecializableFunc, types []Type) (FuncType, bool) {
 	// Check cache
 	for _, spec := range *specializations {
 		if slices.EqualFunc(spec.Types, types, typesEquals) {
@@ -241,6 +253,14 @@ func shallowCopyStruct(s StructType, types []Type) *SpecializedStruct {
 		fields:       fields,
 	}
 
+	for i := 0; i < len(staticFields); i++ {
+		staticFields[i].struct_ = spec
+	}
+
+	for i := 0; i < len(fields); i++ {
+		fields[i].struct_ = spec
+	}
+
 	s.Underlying().Specializations = append(s.Underlying().Specializations, spec)
 	return spec
 }
@@ -281,17 +301,24 @@ func shallowCopyFuncType(f *Func, types []Type) *SpecializedFunc {
 type SpecializedField struct {
 	wrapper[*Field]
 
-	type_ Type
+	struct_ StructType
+	type_   Type
 }
 
 func (s *SpecializedField) Clone() Node {
 	return &SpecializedField{
 		wrapper: s.wrapper,
+		struct_: s.struct_,
+		type_:   s.type_,
 	}
 }
 
 func (s *SpecializedField) Underlying() *Field {
 	return s.wrapped
+}
+
+func (s *SpecializedField) Struct() StructType {
+	return s.struct_
 }
 
 func (s *SpecializedField) Name() *Token {
@@ -493,7 +520,7 @@ func (p *PartiallySpecializedFunc) Underlying() *Func {
 	return p.wrapped
 }
 
-func (p *PartiallySpecializedFunc) Receiver() StructType {
+func (p *PartiallySpecializedFunc) Receiver() Type {
 	return p.receiver
 }
 
@@ -536,7 +563,7 @@ func (p *PartiallySpecializedFunc) Specialize(types []Type) FuncType {
 type SpecializedFunc struct {
 	wrapper[*Func]
 
-	receiver StructType
+	receiver Type
 	Types    []Type
 
 	params  []SpecializedParam
@@ -577,7 +604,7 @@ func (s *SpecializedFunc) Underlying() *Func {
 	return s.wrapped
 }
 
-func (s *SpecializedFunc) Receiver() StructType {
+func (s *SpecializedFunc) Receiver() Type {
 	return s.receiver
 }
 
@@ -595,7 +622,15 @@ func (s *SpecializedFunc) Returns() Type {
 
 func (s *SpecializedFunc) MangledName(name *strings.Builder) {
 	// Base
-	receiver := s.Receiver()
+	var receiver StructType
+
+	if s.Receiver() != nil {
+		if s, ok := s.Receiver().(StructType); ok {
+			receiver = s
+		} else {
+			panic("ast.SpecializedFunc.MangledName() - Receiver is not a StructType, this shouldn't happen")
+		}
+	}
 
 	if receiver == nil {
 		receiver = s.Underlying().Struct()

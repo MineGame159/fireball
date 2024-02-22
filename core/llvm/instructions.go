@@ -386,6 +386,9 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 				w.writeString(", ")
 			}
 
+			var argTP *ir.PointerType
+			var prevArgTByVal ir.Type
+
 			if i < len(type_.Params) {
 				param := type_.Params[i]
 
@@ -394,9 +397,22 @@ func (w *textWriter) writeInstruction(inst ir.Inst) {
 						w.writeString("metadata ")
 					}
 				}
+
+				if paramT, ok := param.Type().(*ir.PointerType); ok {
+					if argT, ok := arg.Type().(*ir.PointerType); ok {
+						argTP = argT
+						prevArgTByVal = argT.ByVal
+
+						argT.ByVal = paramT.ByVal
+					}
+				}
 			}
 
 			w.writeValue(arg)
+
+			if argTP != nil {
+				argTP.ByVal = prevArgTByVal
+			}
 		}
 
 		w.isArgument = false

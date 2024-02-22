@@ -96,26 +96,26 @@ func (c *codegen) genFunc(f ast.FuncType) {
 		c.resolver = ast.NewGenericResolver(c.resolver, f.Underlying().GenericParams)
 	}
 
+	// Classify
+	funcAbi := abi.GetFuncAbi(decl)
+	returnArgs := funcAbi.Classify(f.Returns(), nil)
+
+	index := 0
+
+	if len(returnArgs) == 1 && returnArgs[0].Class == abi.Memory {
+		index++
+	}
+
 	// Add this variable
 	if receiver := f.Receiver(); receiver != nil {
 		name := scanner.Token{Kind: scanner.Identifier, Lexeme: "this"}
 		node := cst.Node{Kind: cst.TokenNode, Token: name, Range: decl.Name.Cst().Range}
 
-		c.scopes.addVariable(ast.NewToken(node, name), receiver, function.Typ.Params[0], 1)
+		c.scopes.addVariable(ast.NewToken(node, name), receiver, function.Typ.Params[index], 1)
+		index++
 	}
 
 	// Copy parameters
-	funcAbi := abi.GetFuncAbi(decl)
-	returnArgs := funcAbi.Classify(f.Returns(), nil)
-
-	index := 0
-	if len(returnArgs) == 1 && returnArgs[0].Class == abi.Memory {
-		index++
-	}
-	if decl.Receiver() != nil {
-		index++
-	}
-
 	paramI := index
 
 	for i := 0; i < f.ParameterCount(); i++ {

@@ -7,6 +7,8 @@ type FieldLike interface {
 
 	Underlying() *Field
 
+	Struct() StructType
+
 	Name() *Token
 	Type() Type
 }
@@ -44,7 +46,7 @@ type FuncType interface {
 	Type
 
 	Underlying() *Func
-	Receiver() StructType
+	Receiver() Type
 
 	ParameterCount() int
 	ParameterIndex(index int) SpecializedParam

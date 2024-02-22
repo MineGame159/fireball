@@ -761,7 +761,7 @@ func (c *codegen) VisitMember(expr *ast.Member) {
 			if node.Underlying().IsStatic() {
 				c.exprResult = c.getStaticVariable(node)
 			} else {
-				struct_ := expr.Value.Result().Type.(ast.StructType)
+				struct_ := node.Struct()
 				fields, _ := abi.GetStructLayout(struct_.Underlying()).Fields(abi.GetTargetAbi(), struct_)
 				_, i := getField(fields, node.Name())
 

@@ -72,7 +72,7 @@ func testCmd(_ *cobra.Command, _ []string) {
 			_, _ = namespaceStyle.Printf("%s.", part)
 		}
 
-		if receiver := test.Receiver(); receiver != nil {
+		if receiver, ok := test.Receiver().(ast.StructType); ok {
 			_, _ = namespaceStyle.Printf("%s.", receiver.Underlying().Name)
 		}
 

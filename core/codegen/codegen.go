@@ -85,7 +85,13 @@ func Emit(ctx *Context, path string, root ast.RootResolver, file *ast.File) *ir.
 			if len(s.GenericParams) > 0 {
 				for _, spec := range s.Specializations {
 					for _, method := range spec.Methods {
+						var sp specializer
+						sp.prepare(method.Underlying(), s.GenericParams)
+
+						sp.specialize(spec.Types)
 						c.defineOrDeclare(method)
+
+						sp.finish()
 					}
 				}
 

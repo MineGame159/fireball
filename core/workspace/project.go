@@ -213,6 +213,11 @@ func (p *Project) LoadFiles() error {
 		}
 	}
 
+	// Specialize types
+	for _, file := range p.Files {
+		typeresolver.Specialize(file, file.Ast)
+	}
+
 	// Check
 	for _, file := range p.Files {
 		if resolver := p.getNamespace(file.Ast); resolver != nil {
@@ -266,6 +271,10 @@ func (p *Project) RemoveFile(path string) bool {
 				file.diagnostics = file.diagnostics[:file.parseDiagnosticCount]
 				typeresolver.Resolve(file, resolver, file.Ast)
 			}
+		}
+
+		for _, file := range p.Files {
+			typeresolver.Specialize(file, file.Ast)
 		}
 
 		for _, file := range p.Files {

@@ -9,6 +9,9 @@ import (
 
 func getImplementations(node ast.Node, pos core.Pos, resolver ast.Resolver) []protocol.Location {
 	leaf := ast.GetLeaf(node, pos)
+	if ast.IsNil(leaf) {
+		return nil
+	}
 
 	builder := implementationBuilder{}
 

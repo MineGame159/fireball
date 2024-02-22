@@ -8,6 +8,10 @@ func (f *Field) Underlying() *Field {
 	return f
 }
 
+func (f *Field) Struct() StructType {
+	return f.Parent().(StructType)
+}
+
 func (f *Field) Name() *Token {
 	return f.Name_
 }
@@ -72,9 +76,13 @@ func (f *Func) Underlying() *Func {
 	return f
 }
 
-func (f *Func) Receiver() StructType {
+func (f *Func) Receiver() Type {
 	if impl, ok := f.Parent().(*Impl); ok && !f.IsStatic() {
 		return impl.Type.(*Struct)
+	}
+
+	if inter, ok := f.Parent().(*Interface); ok {
+		return inter
 	}
 
 	return nil
