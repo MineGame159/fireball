@@ -4,8 +4,6 @@ import (
 	"fireball/core/ast"
 	"fireball/core/scanner"
 	"fireball/core/utils"
-	"math"
-	"strconv"
 )
 
 func (c *checker) VisitNamespace(_ *ast.Namespace) {}
@@ -116,82 +114,6 @@ func (c *checker) VisitEnum(decl *ast.Enum) {
 	decl.AcceptChildren(c)
 
 	c.checkNameCollision(decl, decl.Name)
-
-	// Set case values
-	lastValue := int64(-1)
-
-	for _, case_ := range decl.Cases {
-		if case_.Value == nil {
-			lastValue++
-			case_.ActualValue = lastValue
-		} else {
-			var value int64
-			var err error
-
-			switch case_.Value.Token().Kind {
-			case scanner.Number:
-				value, err = strconv.ParseInt(case_.Value.String(), 10, 64)
-			case scanner.Hex:
-				value, err = strconv.ParseInt(case_.Value.String()[2:], 16, 64)
-			case scanner.Binary:
-				value, err = strconv.ParseInt(case_.Value.String()[2:], 2, 64)
-
-			default:
-				panic("checker.VisitEnum() - Not implemented")
-			}
-
-			if err == nil {
-				lastValue = value
-				case_.ActualValue = value
-			} else {
-				c.error(case_.Value, "Failed to parse number")
-
-				lastValue++
-				case_.ActualValue = lastValue
-			}
-		}
-	}
-
-	// Find type
-	if decl.Type == nil {
-		minValue := int64(math.MaxInt64)
-		maxValue := int64(math.MinInt64)
-
-		for _, case_ := range decl.Cases {
-			minValue = min(minValue, case_.ActualValue)
-			maxValue = max(maxValue, case_.ActualValue)
-		}
-
-		var kind ast.PrimitiveKind
-
-		if minValue >= 0 {
-			// Unsigned
-			if maxValue <= math.MaxUint8 {
-				kind = ast.U8
-			} else if maxValue <= math.MaxUint16 {
-				kind = ast.U16
-			} else if maxValue <= math.MaxUint32 {
-				kind = ast.U32
-			} else {
-				kind = ast.U64
-			}
-		} else {
-			// Signed
-			if minValue >= math.MinInt8 && maxValue <= math.MaxInt8 {
-				kind = ast.I8
-			} else if minValue >= math.MinInt16 && maxValue <= math.MaxInt16 {
-				kind = ast.I16
-			} else if minValue >= math.MinInt32 && maxValue <= math.MaxInt32 {
-				kind = ast.I32
-			} else {
-				kind = ast.I64
-			}
-		}
-
-		decl.ActualType = &ast.Primitive{Kind: kind}
-	} else {
-		decl.ActualType = decl.Type
-	}
 
 	// Check type
 	if decl.Type != nil {
