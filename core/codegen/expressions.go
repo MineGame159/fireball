@@ -34,6 +34,10 @@ func (c *codegen) VisitLiteral(expr *ast.Literal) {
 		raw := expr.String()
 		last := raw[len(raw)-1]
 
+		if last == 'u' || last == 'U' {
+			v, _ := strconv.ParseUint(raw, 10, 32)
+			value = &ir.IntConst{Typ: type_, Value: ir.Unsigned(v)}
+		}
 		if last == 'f' || last == 'F' {
 			v, _ := strconv.ParseFloat(raw[:len(raw)-1], 32)
 			value = &ir.FloatConst{Typ: type_, Value: v}

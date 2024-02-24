@@ -276,7 +276,9 @@ func (s *Scanner) integerOrFloat() PositionedToken {
 		}
 	}
 
-	if s.peek() == 'f' || s.peek() == 'F' {
+	if s.peek() == 'u' || s.peek() == 'U' {
+		s.advance()
+	} else if s.peek() == 'f' || s.peek() == 'F' {
 		s.advance()
 	}
 

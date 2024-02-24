@@ -36,7 +36,15 @@ func (c *checker) VisitLiteral(expr *ast.Literal) {
 		raw := expr.String()
 		last := raw[len(raw)-1]
 
-		if last == 'f' || last == 'F' {
+		if last == 'u' || last == 'U' {
+			_, err := strconv.ParseUint(raw[:len(raw)-1], 10, 32)
+			if err != nil {
+				c.error(expr, "Invalid unsigned integer")
+				expr.Result().SetInvalid()
+			}
+
+			kind = ast.U32
+		} else if last == 'f' || last == 'F' {
 			_, err := strconv.ParseFloat(raw[:len(raw)-1], 32)
 			if err != nil {
 				c.error(expr, "Invalid float")
