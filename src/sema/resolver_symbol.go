@@ -182,6 +182,8 @@ func (r *resolver) ResolveSymbol(symbol *symbols.Symbol) {
 
 			if f.Receiver != nil {
 				selfRef := &types.Reference{Mutable: f.Receiver.Mutable, Pointee: inType.SelfParam}
+
+				m.Type.HasReceiver = true
 				m.Type.Params = append([]types.Type{selfRef}, m.Type.Params...)
 
 				inType.InstanceMethods = append(inType.InstanceMethods, m)

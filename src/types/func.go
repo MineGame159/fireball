@@ -5,8 +5,9 @@ import "strings"
 type Func struct {
 	TypeParams []*Param
 
-	Params  []Type
-	VarArgs bool
+	HasReceiver bool
+	Params      []Type
+	VarArgs     bool
 
 	Returns Type
 

@@ -37,6 +37,10 @@ impl[T] Wrapper[T] {
 	func set(mut self, v: T) {
 		self.value = v;
 	}
+
+	func map(self, fn: func(T) T) T {
+		return fn(self.value);
+	}
 }
 
 // Higher-order helper: takes a function reference as an argument.
@@ -79,6 +83,16 @@ func funcRefTypeAnnotation() bool {
 func funcRefAsArgument() bool {
 	var pred: func(i32) bool = is_positive;
 	return apply(pred, 5) && apply(is_positive, -3) == false;
+}
+
+func map_increase(value: i32) i32 {
+	return value + 1;
+}
+
+#[test("function reference passed as an argument to a method")]
+func funcRefAsMethodArgument() bool {
+	var wrapper = Wrapper:[i32] { value: 6 };
+	return wrapper.map(map_increase) == 7;
 }
 
 #[test("mutable method assigned to function reference")]

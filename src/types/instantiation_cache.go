@@ -228,6 +228,7 @@ func (c *InstantiationCache) resolve(typ Type, substitutions []Substitution) Typ
 
 		return &Func{
 			TypeParams:    nil,
+			HasReceiver:   typ.HasReceiver,
 			Params:        params,
 			VarArgs:       typ.VarArgs,
 			Returns:       returns,
@@ -282,6 +283,7 @@ func (c *InstantiationCache) substitute(generic Type, substitutions []Substituti
 
 	case *Func:
 		f := &Func{
+			HasReceiver:   generic.HasReceiver,
 			Params:        nil,
 			VarArgs:       generic.VarArgs,
 			Returns:       nil,

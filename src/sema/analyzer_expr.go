@@ -512,6 +512,10 @@ func (a *analyzer) AnalyzeBaseBinaryOp(b *ast.Binary, left, right ExprInfo, op a
 }
 
 func (a *analyzer) VisitIdentifier(i *ast.Identifier) ExprInfo {
+	if i.Path[0].Name.Token.Text == "map_increase" {
+		print()
+	}
+
 	domain := symbols.Variable | symbols.Function
 	if !a.WantsFunction(i) {
 		domain = symbols.Variable
@@ -1067,6 +1071,10 @@ func (a *analyzer) WantsFunction(node ast.Node) bool {
 		for i, arg := range parent.Args {
 			if arg == node {
 				if f, ok := a.AnalyzeExpr(parent.Callee).Type.(*types.Func); ok && i < len(f.Params) {
+					if f.HasReceiver {
+						i++
+					}
+
 					return a.TypeWantsFunction(f.Params[i])
 				}
 			}

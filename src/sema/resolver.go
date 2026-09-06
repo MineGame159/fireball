@@ -181,6 +181,7 @@ func (r *resolver) ResolveMethod(f *ast.Func, okType bool, typ, methodTyp types.
 	t.VarArgs = f.VarArgs
 
 	if f.Receiver != nil {
+		t.HasReceiver = true
 		t.Params = append(t.Params, &types.Reference{Mutable: f.Receiver.Mutable, Pointee: methodTyp})
 	}
 
