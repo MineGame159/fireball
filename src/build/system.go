@@ -117,10 +117,14 @@ func (s *System) CompileProjectHierarchy(projMap map[string]*project.Project) ([
 		}
 
 		name := getBuildFileName(file)
-		module := codegen.Generate(file.Ast, s.target.Arch, s.target.CallConv, file.Instantiations, file.TypeEnv, fileDataMap, builtins, file.Path, false, s.profile.Lto)
+		module := codegen.Generate(file.Ast, s.target.Arch, s.target.CallConv, file.Instantiations, file.TypeEnv, fileDataMap, builtins, file.Path, false)
 
 		if module.IsEmpty() {
 			return nil
+		}
+
+		if s.profile.Lto {
+			ir.GenerateSummary(module)
 		}
 
 		objFilePath, err := s.compileModule(objPath, irPath, name, module)
@@ -172,6 +176,10 @@ func (s *System) CompileEntrypoint(fn EntrypointFn) (string, error) {
 	}
 
 	// Compile
+	if s.profile.Lto {
+		ir.GenerateSummary(module)
+	}
+
 	objFilePath, err := s.compileModule(mainObjPath, mainIrPath, "__entrypoint", module)
 	if err != nil {
 		return "", err

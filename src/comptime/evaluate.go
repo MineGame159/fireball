@@ -48,7 +48,7 @@ func Evaluate(file *ast.File, instantiations *types.InstantiationCache, typeEnv 
 				module := ir.NewModule()
 				module.Path = "__comptime__"
 
-				c := codegen.New(module, file, abi.AMD64, abi.SystemV, instantiations, typeEnv, fileDataMap, builtins, true, false)
+				c := codegen.New(module, file, abi.AMD64, abi.SystemV, instantiations, typeEnv, fileDataMap, builtins, true)
 				fun := generateModule(c, decl)
 
 				// Evaluate IR module

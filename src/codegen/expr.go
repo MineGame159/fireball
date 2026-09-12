@@ -583,23 +583,15 @@ func (c *Codegen) VisitIdentifier(i *ast.Identifier) ir.Value {
 			return ptr
 		}
 
-		c.AddSummaryConst(node)
 		return c.GetConst(node)
 
 	case *ast.GlobalVar:
 		typ := c.ExprType(i)
-		c.AddSummaryGlobalVar(node)
 		return c.GetGlobalVar(node, typ)
 
 	case *ast.Func:
 		typ := c.ExprType(i).(*types.Func)
 		in := c.GetFuncInterface(node)
-
-		call := false
-		if c, ok := i.Parent().(*ast.Call); ok && c.Callee == i {
-			call = true
-		}
-		c.AddSummaryCallee(node, typ, in, call)
 
 		return c.GetFunction(node, typ, in)
 
@@ -709,12 +701,6 @@ func (c *Codegen) VisitMember(m *ast.Member) ir.Value {
 		typ := c.ExprType(m).(*types.Func)
 		in := c.GetFuncInterface(f)
 
-		call := false
-		if c, ok := m.Parent().(*ast.Call); ok && c.Callee == m {
-			call = true
-		}
-		c.AddSummaryCallee(f, typ, in, call)
-
 		return c.GetFunction(f, typ, in)
 	}
 
@@ -798,7 +784,6 @@ func (c *Codegen) VisitCall(e *ast.Call) ir.Value {
 		in := c.GetFuncInterface(f)
 		callee = c.GetFunction(f, typ, in)
 		sig = callee.(*ir.Function).Signature
-		c.AddSummaryCallee(f, typ, in, true)
 		receiver = c.ResolveReceiver(m.Expr)
 	} else if isInterfaceStatic(f, e.Callee) {
 		// Static method from interface, resolved to concrete impl
@@ -811,7 +796,6 @@ func (c *Codegen) VisitCall(e *ast.Call) ir.Value {
 		in := c.GetFuncInterface(f)
 		callee = c.GetFunction(f, typ, in)
 		sig = callee.(*ir.Function).Signature
-		c.AddSummaryCallee(f, typ, in, true)
 	}
 
 	return c.EmitCallExpr(callee, sig, typ, receiver, e.Args, c.UnderlyingExprType(e))
@@ -854,13 +838,6 @@ func (c *Codegen) StringView(runes []rune) ir.Value {
 	sb.Set("size", &ir.Integer{Typ: ir.I32, Value: core.Unsigned(false, uint64(init.Size))})
 
 	value := sb.Build()
-
-	// Summary
-
-	if c.ModuleSummaryRef.Valid() && c.fun != nil {
-		ref := c.GetSummaryRef(gVar.Name, true)
-		c.AddSummaryRef(ref)
-	}
 
 	return value
 }
@@ -1224,7 +1201,6 @@ func (c *Codegen) Cast(value ir.Value, kind sema.CastKind, from sema.ExprInfo, t
 
 			callee := c.GetFunction(f, typ, nil)
 			sig := callee.Signature
-			c.AddSummaryCallee(f, typ, nil, true)
 			receiver := srcTypeInfoPtr
 
 			vtableOpt := c.EmitCall(callee, sig, typ, receiver, []ir.Value{targetTypeInfoPtr}, []types.Type{&types.Pointer{Pointee: c.Builtins.TypeInfo}}, typ.Returns)

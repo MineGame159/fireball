@@ -1,10 +1,17 @@
 package ir
 
+import (
+	"fireball/core"
+	"iter"
+)
+
 type Instruction interface {
 	RuntimeValue
 
 	Name() string
 	SetName(name string)
+
+	Values() iter.Seq[Value]
 
 	Block() *Block
 	setBlock(b *Block)
@@ -63,10 +70,20 @@ type Ret struct {
 	Value Value
 }
 
+func (r *Ret) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(r.Value)
+	}
+}
+
 type Br struct {
 	baseVoidInstruction
 
 	Label *Block
+}
+
+func (b *Br) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {}
 }
 
 type BrCond struct {
@@ -75,6 +92,12 @@ type BrCond struct {
 	Condition Value
 	IfTrue    *Block
 	IfFalse   *Block
+}
+
+func (b *BrCond) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(b.Condition)
+	}
 }
 
 // Unary instructions
@@ -87,6 +110,12 @@ type FNeg struct {
 
 func (f *FNeg) Type() Type {
 	return f.Value.Type()
+}
+
+func (f *FNeg) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(f.Value)
+	}
 }
 
 // Binary instructions
@@ -110,6 +139,15 @@ func (a *Add) Type() Type {
 	return a.Left.Type()
 }
 
+func (a *Add) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(a.Left) {
+			return
+		}
+		yield(a.Right)
+	}
+}
+
 type Sub struct {
 	baseInstruction
 
@@ -121,6 +159,15 @@ func (s *Sub) Type() Type {
 	return s.Left.Type()
 }
 
+func (s *Sub) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(s.Left) {
+			return
+		}
+		yield(s.Right)
+	}
+}
+
 type Mul struct {
 	baseInstruction
 
@@ -130,6 +177,15 @@ type Mul struct {
 
 func (m *Mul) Type() Type {
 	return m.Left.Type()
+}
+
+func (m *Mul) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(m.Left) {
+			return
+		}
+		yield(m.Right)
+	}
 }
 
 type Div struct {
@@ -144,6 +200,15 @@ func (d *Div) Type() Type {
 	return d.Left.Type()
 }
 
+func (d *Div) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(d.Left) {
+			return
+		}
+		yield(d.Right)
+	}
+}
+
 type Rem struct {
 	baseInstruction
 
@@ -154,6 +219,15 @@ type Rem struct {
 
 func (r *Rem) Type() Type {
 	return r.Left.Type()
+}
+
+func (r *Rem) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(r.Left) {
+			return
+		}
+		yield(r.Right)
+	}
 }
 
 // Bitwise binary instructions
@@ -169,6 +243,15 @@ func (s *Shl) Type() Type {
 	return s.Left.Type()
 }
 
+func (s *Shl) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(s.Left) {
+			return
+		}
+		yield(s.Right)
+	}
+}
+
 type Shr struct {
 	baseInstruction
 
@@ -179,6 +262,15 @@ type Shr struct {
 
 func (s *Shr) Type() Type {
 	return s.Left.Type()
+}
+
+func (s *Shr) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(s.Left) {
+			return
+		}
+		yield(s.Right)
+	}
 }
 
 type And struct {
@@ -192,6 +284,15 @@ func (a *And) Type() Type {
 	return a.Left.Type()
 }
 
+func (a *And) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(a.Left) {
+			return
+		}
+		yield(a.Right)
+	}
+}
+
 type Or struct {
 	baseInstruction
 
@@ -203,6 +304,15 @@ func (o *Or) Type() Type {
 	return o.Left.Type()
 }
 
+func (o *Or) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(o.Left) {
+			return
+		}
+		yield(o.Right)
+	}
+}
+
 type Xor struct {
 	baseInstruction
 
@@ -212,6 +322,15 @@ type Xor struct {
 
 func (x *Xor) Type() Type {
 	return x.Left.Type()
+}
+
+func (x *Xor) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(x.Left) {
+			return
+		}
+		yield(x.Right)
+	}
 }
 
 // Vector instructions
@@ -227,6 +346,15 @@ func (e *ExtractElement) Type() Type {
 	return e.Value.Type().(*VectorType).Element
 }
 
+func (e *ExtractElement) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(e.Value) {
+			return
+		}
+		yield(e.Index)
+	}
+}
+
 type InsertElement struct {
 	baseInstruction
 
@@ -237,6 +365,18 @@ type InsertElement struct {
 
 func (i *InsertElement) Type() Type {
 	return i.Value.Type()
+}
+
+func (i *InsertElement) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(i.Value) {
+			return
+		}
+		if !yield(i.Element) {
+			return
+		}
+		yield(i.Index)
+	}
 }
 
 type ShuffleVector struct {
@@ -251,6 +391,18 @@ func (s *ShuffleVector) Type() Type {
 	return &VectorType{
 		Length:  s.Mask.Type().(*VectorType).Length,
 		Element: s.Value1.Type().(*VectorType).Element,
+	}
+}
+
+func (s *ShuffleVector) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(s.Value1) {
+			return
+		}
+		if !yield(s.Value2) {
+			return
+		}
+		yield(s.Mask)
 	}
 }
 
@@ -283,6 +435,12 @@ func (e *ExtractValue) Type() Type {
 	return typ
 }
 
+func (e *ExtractValue) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(e.Value)
+	}
+}
+
 type InsertValue struct {
 	baseInstruction
 
@@ -293,6 +451,15 @@ type InsertValue struct {
 
 func (i *InsertValue) Type() Type {
 	return i.Value.Type()
+}
+
+func (i *InsertValue) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(i.Value) {
+			return
+		}
+		yield(i.Element)
+	}
 }
 
 // Memory access and addressing instructions
@@ -308,6 +475,10 @@ func (a *Alloca) Type() Type {
 	return Pointer
 }
 
+func (a *Alloca) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {}
+}
+
 type Load struct {
 	baseInstruction
 
@@ -319,11 +490,26 @@ func (l *Load) Type() Type {
 	return l.Typ
 }
 
+func (l *Load) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(l.Pointer)
+	}
+}
+
 type Store struct {
 	baseVoidInstruction
 
 	Value   Value
 	Pointer Value
+}
+
+func (s *Store) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(s.Value) {
+			return
+		}
+		yield(s.Pointer)
+	}
 }
 
 type GetElementPtrConst struct {
@@ -339,6 +525,12 @@ func (g *GetElementPtrConst) Type() Type {
 	return Pointer
 }
 
+func (g *GetElementPtrConst) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(g.Pointer)
+	}
+}
+
 type GetElementPtrDyn struct {
 	baseInstruction
 
@@ -350,6 +542,19 @@ type GetElementPtrDyn struct {
 
 func (g *GetElementPtrDyn) Type() Type {
 	return Pointer
+}
+
+func (g *GetElementPtrDyn) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(g.Pointer) {
+			return
+		}
+		for _, index := range g.Indices {
+			if !core.IsNil(index) && !yield(index) {
+				return
+			}
+		}
+	}
 }
 
 // Conversion instructions
@@ -365,6 +570,12 @@ func (t *Trunc) Type() Type {
 	return t.Typ
 }
 
+func (t *Trunc) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(t.Value)
+	}
+}
+
 type Ext struct {
 	baseInstruction
 
@@ -375,6 +586,12 @@ type Ext struct {
 
 func (e *Ext) Type() Type {
 	return e.Typ
+}
+
+func (e *Ext) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(e.Value)
+	}
 }
 
 type FpToInt struct {
@@ -389,6 +606,12 @@ func (f *FpToInt) Type() Type {
 	return f.Typ
 }
 
+func (f *FpToInt) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(f.Value)
+	}
+}
+
 type IntToFp struct {
 	baseInstruction
 
@@ -399,6 +622,12 @@ type IntToFp struct {
 
 func (i *IntToFp) Type() Type {
 	return i.Typ
+}
+
+func (i *IntToFp) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(i.Value)
+	}
 }
 
 type PtrToInt struct {
@@ -412,6 +641,12 @@ func (p *PtrToInt) Type() Type {
 	return p.Typ
 }
 
+func (p *PtrToInt) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(p.Value)
+	}
+}
+
 type IntToPtr struct {
 	baseInstruction
 
@@ -420,6 +655,12 @@ type IntToPtr struct {
 
 func (i *IntToPtr) Type() Type {
 	return Pointer
+}
+
+func (i *IntToPtr) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(i.Value)
+	}
 }
 
 type BitCast struct {
@@ -431,6 +672,12 @@ type BitCast struct {
 
 func (b *BitCast) Type() Type {
 	return b.Typ
+}
+
+func (b *BitCast) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(b.Value)
+	}
 }
 
 // Other instructions
@@ -459,6 +706,15 @@ func (i *ICmp) Type() Type {
 	return I1
 }
 
+func (i *ICmp) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(i.Left) {
+			return
+		}
+		yield(i.Right)
+	}
+}
+
 type FCmp struct {
 	baseInstruction
 
@@ -470,6 +726,15 @@ type FCmp struct {
 
 func (f *FCmp) Type() Type {
 	return I1
+}
+
+func (f *FCmp) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(f.Left) {
+			return
+		}
+		yield(f.Right)
+	}
 }
 
 type PhiPair struct {
@@ -487,6 +752,16 @@ func (p *Phi) Type() Type {
 	return p.Pairs[0].Value.Type()
 }
 
+func (p *Phi) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		for _, pair := range p.Pairs {
+			if !yield(pair.Value) {
+				return
+			}
+		}
+	}
+}
+
 type Select struct {
 	baseInstruction
 
@@ -497,6 +772,18 @@ type Select struct {
 
 func (s *Select) Type() Type {
 	return s.IfTrue.Type()
+}
+
+func (s *Select) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(s.Condition) {
+			return
+		}
+		if !yield(s.IfTrue) {
+			return
+		}
+		yield(s.IfFalse)
+	}
 }
 
 type Call struct {
@@ -511,6 +798,19 @@ func (c *Call) Type() Type {
 	return c.Signature.Returns
 }
 
+func (c *Call) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		if !yield(c.Callee) {
+			return
+		}
+		for _, arg := range c.Args {
+			if !yield(arg) {
+				return
+			}
+		}
+	}
+}
+
 // Debug instructions
 
 type DbgDeclare struct {
@@ -519,4 +819,10 @@ type DbgDeclare struct {
 	Pointer     Value
 	VariableRef MetaRef
 	LocationRef MetaRef
+}
+
+func (d *DbgDeclare) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {
+		yield(d.Pointer)
+	}
 }

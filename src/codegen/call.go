@@ -212,10 +212,6 @@ func (c *Codegen) EmitCall(callee ir.Value, sig *ir.Signature, funcType *types.F
 	}
 
 	// Call
-	if !ir.IsConstant(callee) {
-		c.funDoesIndirectDispatch = true
-	}
-
 	value := c.Emitter.Call(sig, callee, finalArgs)
 
 	// Return
@@ -258,8 +254,6 @@ func (c *Codegen) ResolveInterfaceMethod(receiverType types.Type, methodName str
 
 	callee := c.GetFunction(concreteFunc, concreteTyp, in)
 	sig := callee.Signature
-
-	c.AddSummaryCallee(concreteFunc, concreteTyp, in, true)
 
 	return callee, sig, concreteTyp
 }

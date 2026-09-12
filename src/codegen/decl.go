@@ -101,12 +101,9 @@ func (c *Codegen) BeginFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
 
 	c.fun = fun
 	c.funcTyp = typ
-	c.funDoesIndirectDispatch = false
 }
 
 func (c *Codegen) EndFunc() {
-	fun := c.fun
-
 	c.Emitter.Begin(c.bVariables)
 	c.Emitter.Br(c.bEntry)
 
@@ -119,25 +116,6 @@ func (c *Codegen) EndFunc() {
 
 	c.scope.Pop()
 	c.Emitter.PopScope()
-
-	// Summary
-	if ref, ok := c.functionSummaries[fun.Name]; ok {
-		funSum := c.Module.GetSummary(ref).(*ir.FunctionSummary)
-
-		for _, block := range fun.Blocks {
-			funSum.InstructionCount += block.InstructionCount
-		}
-
-		if c.funDoesIndirectDispatch {
-			funSum.Flags |= ir.FuncHasUnknownCall
-		}
-
-		funSum.Calls = c.summaryCalls
-		c.summaryCalls = nil
-
-		funSum.Refs = c.summaryRefs
-		c.summaryRefs = nil
-	}
 }
 
 func (c *Codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
@@ -189,26 +167,6 @@ func (c *Codegen) CreateGlobalVar(g *ast.GlobalVar, typ types.Type, declare bool
 
 		gVar.SetMeta(ref)
 		globals.Values = append(globals.Values, ir.RawMetaValue{Ref: ref})
-	}
-
-	// Summary
-
-	if !declare && !g.IsExtern() && c.ModuleSummaryRef.Valid() {
-		c.Module.AddSummary(&ir.VariableSummary{
-			Module: c.ModuleSummaryRef,
-			Name:   name,
-			LinkFlags: ir.LinkSummaryFlags{
-				Linkage:             ir.LinkageExternal,
-				Visibility:          ir.VisibilityDefault,
-				NotEligibleToImport: false,
-				Live:                false,
-				DsoLocal:            true,
-				CanAutoHide:         false,
-				ImportType:          ir.ImportDefinition,
-			},
-			Flags: 0,
-			Refs:  nil,
-		})
 	}
 
 	return gVar
@@ -293,32 +251,6 @@ func (c *Codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in 
 		fun.Flags = ir.Declare
 	} else {
 		fun.Flags = ir.DsoLocal
-	}
-
-	// Summary
-
-	if !declare && !f.IsExtern() && c.ModuleSummaryRef.Valid() {
-		linkage := ir.LinkageExternal
-		if typ.Generic != nil {
-			linkage = ir.LinkageLinkOnceODR
-		}
-
-		ref := c.Module.AddSummary(&ir.FunctionSummary{
-			Module: c.ModuleSummaryRef,
-			Name:   fun.Name,
-			LinkFlags: ir.LinkSummaryFlags{
-				Linkage:             linkage,
-				Visibility:          ir.VisibilityDefault,
-				NotEligibleToImport: false,
-				Live:                false,
-				DsoLocal:            true,
-				CanAutoHide:         false,
-				ImportType:          ir.ImportDefinition,
-			},
-			Flags: ir.FuncNoUnwind,
-		})
-
-		c.functionSummaries[fun.Name] = ref
 	}
 
 	return fun

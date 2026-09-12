@@ -6,23 +6,11 @@ import (
 	"fireball/ir"
 	"fireball/types"
 	"fmt"
-	"slices"
 	"strings"
 )
 
 func (c *Codegen) GetTypeInfo(typ types.Type) ir.Value {
 	name := TypeInfoLinkName(typ, "type_info")
-
-	// Summary ref
-	if c.ModuleSummaryRef.Valid() {
-		defer func() {
-			ref := c.GetSummaryRef(name, true)
-
-			if !slices.Contains(c.summaryRefs, ref) {
-				c.summaryRefs = append(c.summaryRefs, ref)
-			}
-		}()
-	}
 
 	// Check already existing type infos
 	for gVar := range c.Module.GlobalVars() {
@@ -64,17 +52,6 @@ func (c *Codegen) GetVTable(in *types.Interface, typ types.Type) ir.Value {
 	// Vtables are keyed on the canonical (non-mutable) interface.
 	in = in.AsImmutable()
 	name := VTableLinkName(in, typ)
-
-	// Summary ref
-	if c.ModuleSummaryRef.Valid() {
-		defer func() {
-			ref := c.GetSummaryRef(name, true)
-
-			if !slices.Contains(c.summaryRefs, ref) {
-				c.summaryRefs = append(c.summaryRefs, ref)
-			}
-		}()
-	}
 
 	// Check already existing vtables
 	for gVar := range c.Module.GlobalVars() {
@@ -120,8 +97,6 @@ func (c *Codegen) CreateVTable(typ types.Type, in *types.Interface, linkOnce boo
 	}
 
 	gVar.Initializer = value
-
-	c.GlobalVarSummary(name, gVar.Flags, value)
 
 	return gVar
 }
@@ -193,8 +168,6 @@ func (c *Codegen) CreateTypeInfo(typ types.Type, linkOnce bool) *ir.GlobalVar {
 	}
 
 	gVar.Initializer = value
-
-	c.GlobalVarSummary(name, gVar.Flags, value)
 
 	return gVar
 }

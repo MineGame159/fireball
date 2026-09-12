@@ -296,51 +296,6 @@ outer:
 
 		emitter.Ret(value)
 
-		// Summary
-
-		moduleRef := module.AddSummary(&ir.ModuleSummary{
-			Path: module.Path,
-			Hash: [5]uint32{},
-		})
-
-		summaryCalls := make([]ir.FunctionSummaryCall, 0, 1+len(inits))
-
-		fbMainRef := module.AddSummary(&ir.SymbolSummary{Name: mainFun.Name})
-		summaryCalls = append(summaryCalls, ir.FunctionSummaryCall{Callee: fbMainRef})
-
-		for _, init := range inits {
-			initRef := module.AddSummary(&ir.SymbolSummary{Name: codegen.FuncLinkName(init.node, init.typ, nil)})
-			summaryCalls = append(summaryCalls, ir.FunctionSummaryCall{Callee: initRef})
-		}
-
-		module.AddSummary(&ir.FunctionSummary{
-			Module: moduleRef,
-			Name:   fun.Name,
-			LinkFlags: ir.LinkSummaryFlags{
-				Linkage:             ir.LinkageExternal,
-				Visibility:          ir.VisibilityDefault,
-				NotEligibleToImport: false,
-				Live:                false,
-				DsoLocal:            true,
-				CanAutoHide:         false,
-				ImportType:          ir.ImportDefinition,
-			},
-			InstructionCount: emitter.Block().InstructionCount,
-			Flags:            ir.FuncNoInline | ir.FuncNoUnwind,
-			Calls:            summaryCalls,
-			Refs:             nil,
-		})
-
-		module.AddSummary(&ir.SimpleSummary{
-			Name:  "flags",
-			Value: 520,
-		})
-
-		module.AddSummary(&ir.SimpleSummary{
-			Name:  "blockcount",
-			Value: 0,
-		})
-
 		return proj
 	}, nil
 }

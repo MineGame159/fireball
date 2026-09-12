@@ -50,14 +50,10 @@ type Codegen struct {
 	FileRef ir.MetaRef
 	UnitRef ir.MetaRef
 
-	ModuleSummaryRef  ir.SummaryRef
-	functionSummaries map[string]ir.SummaryRef
-
-	fun                     *ir.Function
-	funcTyp                 *types.Func // type of the function currently being generated
-	funDoesIndirectDispatch bool
-	substitutions           []types.Substitution
-	returnPtr               ir.Value
+	fun           *ir.Function
+	funcTyp       *types.Func // type of the function currently being generated
+	substitutions []types.Substitution
+	returnPtr     ir.Value
 
 	bVariables *ir.Block
 	bEntry     *ir.Block
@@ -65,16 +61,13 @@ type Codegen struct {
 	bLoopBreak    *ir.Block
 	bLoopContinue *ir.Block
 
-	summaryCalls []ir.FunctionSummaryCall
-	summaryRefs  []ir.SummaryRef
-
 	instantiations        *types.InstantiationCache
 	pendingInstantiations []pendingInstantiation
 
 	fileDataMap map[*ast.File]FileData
 }
 
-func New(module *ir.Module, file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, compTime, summary bool) *Codegen {
+func New(module *ir.Module, file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, compTime bool) *Codegen {
 	c := &Codegen{
 		Module: module,
 		Uid:    fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(module.Path))),
@@ -118,27 +111,16 @@ func New(module *ir.Module, file *ast.File, arch abi.Arch, callConv abi.CallConv
 		c.UnitRef,
 	)
 
-	// Setup summary
-
-	if summary {
-		c.ModuleSummaryRef = c.Module.AddSummary(&ir.ModuleSummary{
-			Path: module.Path,
-			Hash: [5]uint32{},
-		})
-
-		c.functionSummaries = make(map[string]ir.SummaryRef)
-	}
-
 	return c
 }
 
-func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, path string, compTime, summary bool) *ir.Module {
+func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, path string, compTime bool) *ir.Module {
 	defer core.Scope()()
 
 	module := ir.NewModule()
 	module.Path = path
 
-	c := New(module, file, arch, callConv, instantiations, typeEnv, fileDataMap, builtins, compTime, summary)
+	c := New(module, file, arch, callConv, instantiations, typeEnv, fileDataMap, builtins, compTime)
 
 	// Setup meta
 
@@ -307,20 +289,6 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 		c.substitutions = nil
 	}
 
-	// End summary
-
-	if summary {
-		c.Module.AddSummary(&ir.SimpleSummary{
-			Name:  "flags",
-			Value: 520,
-		})
-
-		c.Module.AddSummary(&ir.SimpleSummary{
-			Name:  "blockcount",
-			Value: 0,
-		})
-	}
-
 	return c.Module
 }
 
@@ -334,7 +302,6 @@ func (c *Codegen) EmitPanic(_ ast.Node, format string, args ...any) {
 	typ := c.Builtins.PanicType
 
 	callee := c.GetFunction(f, typ, nil)
-	c.AddSummaryCallee(f, typ, nil, true)
 
 	c.EmitCall(callee, callee.Signature, typ, nil, []ir.Value{msg}, typ.Params, typ.Returns)
 }

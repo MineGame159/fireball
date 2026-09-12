@@ -247,7 +247,7 @@ func (e *Evaluator) evalInst(inst ir.Instruction) (Register, bool) {
 		ptr := e.getRegister(inst.Pointer)
 
 		if ptr.Scalar == 0 {
-			e.panic("tried to dereference null pointer")
+			e.panic("tried to read a null pointer")
 		}
 
 		return e.readRegister(ptr.Scalar, inst.Typ), true
@@ -255,6 +255,10 @@ func (e *Evaluator) evalInst(inst ir.Instruction) (Register, bool) {
 	case *ir.Store:
 		ptr := e.getRegister(inst.Pointer)
 		val := e.getRegister(inst.Value)
+
+		if ptr.Scalar == 0 {
+			e.panic("tried to write to a null pointer")
+		}
 
 		e.writeRegister(ptr.Scalar, inst.Value.Type(), val)
 		return Register{}, false

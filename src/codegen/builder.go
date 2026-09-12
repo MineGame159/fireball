@@ -206,45 +206,5 @@ func (c *Codegen) GlobalVar(name string, flags ir.GlobalVarFlags, value ir.Value
 	gVar.Flags = flags
 	gVar.Initializer = value
 
-	// Summary
-	c.GlobalVarSummary(name, flags, value)
-
 	return gVar
-}
-
-func (c *Codegen) GlobalVarSummary(name string, flags ir.GlobalVarFlags, value ir.Value) {
-	if c.ModuleSummaryRef.Valid() {
-		linkage := ir.LinkageExternal
-		if flags&ir.LinkOnce != 0 {
-			linkage = ir.LinkageLinkOnceODR
-		}
-
-		visibility := ir.VisibilityDefault
-		if flags&ir.Constant != 0 {
-			visibility = ir.VisibilityHidden
-		}
-
-		sumFlags := ir.VariableSummaryFlags(0)
-		if flags&ir.Constant != 0 {
-			sumFlags = ir.VarReadOnly | ir.VarConstant
-		}
-
-		refs := c.CollectSummaryRefs(nil, value)
-
-		c.Module.AddSummary(&ir.VariableSummary{
-			Module: c.ModuleSummaryRef,
-			Name:   name,
-			LinkFlags: ir.LinkSummaryFlags{
-				Linkage:             linkage,
-				Visibility:          visibility,
-				NotEligibleToImport: flags&ir.Constant != 0,
-				Live:                false,
-				DsoLocal:            true,
-				CanAutoHide:         true,
-				ImportType:          ir.ImportDefinition,
-			},
-			Flags: sumFlags,
-			Refs:  refs,
-		})
-	}
 }

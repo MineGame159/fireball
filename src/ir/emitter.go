@@ -3,6 +3,7 @@ package ir
 import (
 	"fireball/core"
 	"fmt"
+	"iter"
 	"math"
 	"reflect"
 	"slices"
@@ -82,6 +83,10 @@ func emit[T Instruction](e *Emitter, in T) T {
 
 type dummyInstruction struct {
 	baseVoidInstruction
+}
+
+func (d *dummyInstruction) Values() iter.Seq[Value] {
+	return func(yield func(Value) bool) {}
 }
 
 var dummy = &dummyInstruction{}
