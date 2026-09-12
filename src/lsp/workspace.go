@@ -3,6 +3,8 @@ package lsp
 import (
 	"cmp"
 	"context"
+	"fireball/ast"
+	"fireball/codegen"
 	"fireball/core"
 	"fireball/project"
 	"fireball/sema"
@@ -126,6 +128,23 @@ func (w *Workspace) parseFiles(files []*project.File) {
 	// Analyze
 	for _, proj := range ordered {
 		proj.Analyze(w.depMap, instantiations, typeEnv, builtins)
+	}
+
+	// Evaluate comp-time
+	fileDataMap := make(map[*ast.File]codegen.FileData)
+
+	for _, proj := range ordered {
+		for _, file := range proj.Files {
+			fileDataMap[file.Ast] = codegen.FileData{
+				ExprInfos:   file.ExprInfos,
+				NodeTypes:   file.NodeTypes,
+				Evaluations: file.Evaluations,
+			}
+		}
+	}
+
+	for _, proj := range ordered {
+		proj.EvalCompTime(instantiations, typeEnv, fileDataMap, builtins)
 	}
 }
 

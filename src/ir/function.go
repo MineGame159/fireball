@@ -57,6 +57,8 @@ type Function struct {
 
 	ParamValues []Value
 	Blocks      []*Block
+
+	Data any
 }
 
 func (f *Function) Type() Type {
@@ -65,6 +67,7 @@ func (f *Function) Type() Type {
 
 func (f *Function) NewBlock(name string) *Block {
 	block := &Block{
+		Func: f,
 		Name: name,
 	}
 
@@ -91,6 +94,8 @@ func (f *Function) AddLast(in Instruction) Instruction {
 // Block
 
 type Block struct {
+	Func *Function
+
 	Name             string
 	InstructionCount uint32
 
@@ -98,7 +103,13 @@ type Block struct {
 	tailInstruction Instruction
 }
 
+func (b *Block) First() Instruction {
+	return b.headInstruction
+}
+
 func (b *Block) AddFirst(in Instruction) Instruction {
+	in.setBlock(b)
+
 	in.setNext(b.headInstruction)
 	b.headInstruction = in
 
@@ -112,6 +123,8 @@ func (b *Block) AddFirst(in Instruction) Instruction {
 }
 
 func (b *Block) AddLast(in Instruction) Instruction {
+	in.setBlock(b)
+
 	if core.IsNil(b.headInstruction) {
 		b.headInstruction = in
 	} else {

@@ -2,6 +2,36 @@ mod example;
 
 import example::c::{printf};
 
+
+
+
+struct Item {
+    name: StringView,
+    value: i32,
+}
+
+const NUM: i32 = 5 * (6 - 3);
+
+const ITEMS: [2]Item = [2]Item {
+    Item {
+        name: "First",
+        value: NUM + 1,
+    },
+    Item {
+        name: "Second",
+        value: sizeof(Item) as i32 * 2,
+    },
+};
+
+func main() {
+    for (var i = 0; i < 2; i++) {
+        var item = ITEMS[i];
+        printf("%s: %d\n".ptr, item.name.ptr, item.value);
+    }
+}
+
+
+
 // '?...' is just syntax sugar for using the full type: 'Option[...]'
 func retrieve() ?i32 {
     return Option:[i32]::none();
@@ -10,17 +40,17 @@ func retrieve() ?i32 {
 func example() ?i32 {
     // returns 'none' from the function if 'retrieve()' returns 'none',
     // otherwise the expression results in the unwrapped value
-    var value1 = retrieve()?;
+    //var value1 = retrieve()?;
 
     // unwraps the value returned by 'retrieve()' and skips expression on the right if it returned 'some(...)',
     // otherwise results in the value of the expression on the right
-    var value2 = retrieve() or 1;
+    //var value2 = retrieve() or 1;
 
     // values can be implicitly converted to their Option counterpart
     return 5;
 }
 
-func main() {
+func main2() {
     var os = get_os();
     printf("Hello from %s!\n".ptr, os.ptr);
 }

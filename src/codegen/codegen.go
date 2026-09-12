@@ -6,6 +6,7 @@ import (
 	"fireball/core"
 	"fireball/fb-core"
 	"fireball/ir"
+	"fireball/ir/eval"
 	"fireball/sema"
 	"fireball/types"
 	"fmt"
@@ -15,8 +16,9 @@ import (
 )
 
 type FileData struct {
-	ExprInfos map[ast.Node]sema.ExprInfo
-	NodeTypes map[ast.Node]types.Type
+	ExprInfos   map[ast.Node]sema.ExprInfo
+	NodeTypes   map[ast.Node]types.Type
+	Evaluations map[ast.Expr]eval.Value
 }
 
 type pendingInstantiation struct {
@@ -25,28 +27,30 @@ type pendingInstantiation struct {
 	fun *ir.Function
 }
 
-type codegen struct {
-	module *ir.Module
-	uid    string
+type Codegen struct {
+	Module *ir.Module
+	Uid    string
 
-	arch      abi.Arch
-	callConv  abi.CallConv
-	exprInfos map[ast.Node]sema.ExprInfo
-	nodeTypes map[ast.Node]types.Type
-	typeEnv   *sema.TypeEnvironment
+	Arch      abi.Arch
+	CallConv  abi.CallConv
+	ExprInfos map[ast.Node]sema.ExprInfo
+	NodeTypes map[ast.Node]types.Type
+	TypeEnv   *sema.TypeEnvironment
 
-	builtins fb_core.Builtins
+	Builtins fb_core.Builtins
+
+	CompTime bool
 
 	scope       symbolScope
 	stringCount uint32
 
-	types   *TypeCache
-	emitter ir.Emitter
+	Types   *TypeCache
+	Emitter ir.Emitter
 
-	fileRef ir.MetaRef
-	unitRef ir.MetaRef
+	FileRef ir.MetaRef
+	UnitRef ir.MetaRef
 
-	moduleSummaryRef  ir.SummaryRef
+	ModuleSummaryRef  ir.SummaryRef
 	functionSummaries map[string]ir.SummaryRef
 
 	fun                     *ir.Function
@@ -54,7 +58,9 @@ type codegen struct {
 	funDoesIndirectDispatch bool
 	substitutions           []types.Substitution
 	returnPtr               ir.Value
-	bVariables              *ir.Block
+
+	bVariables *ir.Block
+	bEntry     *ir.Block
 
 	bLoopBreak    *ir.Block
 	bLoopContinue *ir.Block
@@ -68,78 +74,86 @@ type codegen struct {
 	fileDataMap map[*ast.File]FileData
 }
 
-func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, path string, summary bool) *ir.Module {
-	defer core.Scope()()
+func New(module *ir.Module, file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, compTime, summary bool) *Codegen {
+	c := &Codegen{
+		Module: module,
+		Uid:    fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(module.Path))),
 
-	module := ir.NewModule()
-	module.Path = path
+		Arch:      arch,
+		CallConv:  callConv,
+		ExprInfos: fileDataMap[file].ExprInfos,
+		NodeTypes: fileDataMap[file].NodeTypes,
+		TypeEnv:   typeEnv,
 
-	c := codegen{
-		module: module,
-		uid:    fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(path))),
-
-		arch:      arch,
-		callConv:  callConv,
-		exprInfos: fileDataMap[file].ExprInfos,
-		nodeTypes: fileDataMap[file].NodeTypes,
-		typeEnv:   typeEnv,
-
-		builtins: builtins,
+		Builtins: builtins,
+		CompTime: compTime,
 
 		instantiations: instantiations,
 		fileDataMap:    fileDataMap,
 
-		types:   &TypeCache{Arch: arch, Module: module},
-		emitter: ir.Emitter{Module: module},
+		Types:   &TypeCache{Arch: arch, Module: module},
+		Emitter: ir.Emitter{Module: module},
 	}
 
 	// Setup meta
 
-	c.fileRef = module.AddMeta(&ir.FileMeta{
-		Path: path,
+	c.FileRef = c.Module.AddMeta(&ir.FileMeta{
+		Path: module.Path,
 	})
-	c.emitter.PushScope(c.fileRef)
+	c.Emitter.PushScope(c.FileRef)
 
-	c.types.FileRef = c.fileRef
+	c.Types.FileRef = c.FileRef
 
-	var retainedTypes ir.MetaRef
-	var retainedTypeRefs []ir.RawMetaValue
-
-	for _, decl := range file.Decls {
-		if s, ok := decl.(*ast.Struct); ok && len(s.TypeParams) == 0 {
-			ref := c.types.GetMeta(c.nodeTypes[s])
-			retainedTypeRefs = append(retainedTypeRefs, ir.RawMetaValue{Ref: ref})
-		}
-	}
-
-	if len(retainedTypeRefs) > 0 {
-		retainedTypes = c.module.AddMeta(&ir.RawMeta{Values: retainedTypeRefs})
-	}
-
-	c.unitRef = module.AddMeta(&ir.CompileUnitMeta{
-		File:          c.fileRef,
-		Producer:      "fireball",
-		IsOptimized:   false,
-		Enums:         0,
-		RetainedTypes: retainedTypes,
-		Globals:       0,
-		Imports:       0,
+	c.UnitRef = module.AddMeta(&ir.CompileUnitMeta{
+		File:        c.FileRef,
+		Producer:    "fireball",
+		IsOptimized: false,
+		Enums:       0,
+		Globals:     0,
+		Imports:     0,
 	})
 
-	c.module.AddNamedMetaRefs(
+	c.Module.AddNamedMetaRefs(
 		"llvm.dbg.cu",
-		c.unitRef,
+		c.UnitRef,
 	)
 
 	// Setup summary
 
 	if summary {
-		c.moduleSummaryRef = c.module.AddSummary(&ir.ModuleSummary{
-			Path: path,
+		c.ModuleSummaryRef = c.Module.AddSummary(&ir.ModuleSummary{
+			Path: module.Path,
 			Hash: [5]uint32{},
 		})
 
 		c.functionSummaries = make(map[string]ir.SummaryRef)
+	}
+
+	return c
+}
+
+func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]FileData, builtins fb_core.Builtins, path string, compTime, summary bool) *ir.Module {
+	defer core.Scope()()
+
+	module := ir.NewModule()
+	module.Path = path
+
+	c := New(module, file, arch, callConv, instantiations, typeEnv, fileDataMap, builtins, compTime, summary)
+
+	// Setup meta
+
+	var retainedTypeRefs []ir.RawMetaValue
+
+	for _, decl := range file.Decls {
+		if s, ok := decl.(*ast.Struct); ok && len(s.TypeParams) == 0 {
+			ref := c.Types.GetMeta(c.NodeTypes[s])
+			retainedTypeRefs = append(retainedTypeRefs, ir.RawMetaValue{Ref: ref})
+		}
+	}
+
+	if len(retainedTypeRefs) > 0 {
+		ref := c.Module.AddMeta(&ir.RawMeta{Values: retainedTypeRefs})
+		module.GetMeta(c.UnitRef).(*ir.CompileUnitMeta).RetainedTypes = ref
 	}
 
 	// Function / Global Var declarations
@@ -149,25 +163,25 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 	for _, decl := range file.Decls {
 		switch decl := decl.(type) {
 		case *ast.GlobalVar:
-			typ := c.nodeTypes[decl]
+			typ := c.NodeTypes[decl]
 			c.scope.Add(decl.Name().Token.Text, c.CreateGlobalVar(decl, typ, false))
 
 		case *ast.Impl:
 			var in *types.Interface
 			if decl.Interface != nil {
-				in, _ = c.nodeTypes[decl.Interface].(*types.Interface)
+				in, _ = c.NodeTypes[decl.Interface].(*types.Interface)
 			}
 
 			for _, f := range decl.Methods {
 				if !c.HasTypeParams(f) {
-					typ := c.nodeTypes[f].(*types.Func)
+					typ := c.NodeTypes[f].(*types.Func)
 					c.CreateFunction(f, typ, false, in)
 				}
 			}
 
 		case *ast.Func:
 			if !c.HasTypeParams(decl) && ast.GetAttribute[*ast.Intrinsic](decl) == nil {
-				typ := c.nodeTypes[decl].(*types.Func)
+				typ := c.NodeTypes[decl].(*types.Func)
 				c.scope.Add(decl.Name().Token.Text, c.CreateFunction(decl, typ, false, nil))
 			}
 		}
@@ -179,14 +193,14 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 		switch decl := decl.(type) {
 		case *ast.Impl:
 			if decl.Interface != nil && len(decl.TypeParams) == 0 {
-				in := c.nodeTypes[decl.Interface].(*types.Interface)
+				in := c.NodeTypes[decl.Interface].(*types.Interface)
 
 				var typ types.Type
 
 				if p, ok := decl.Type.(*ast.PrimitiveType); ok {
 					typ = types.GetPrimitive(p.Kind)
 				} else {
-					typ = c.nodeTypes[decl.Type]
+					typ = c.NodeTypes[decl.Type]
 				}
 
 				c.CreateVTable(typ, in, false)
@@ -216,18 +230,18 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 
 	for _, decl := range file.Decls {
 		if decl, ok := decl.(*ast.Interface); ok && !c.HasTypeParams(decl) {
-			c.CreateTypeInfo(c.nodeTypes[decl], false)
+			c.CreateTypeInfo(c.NodeTypes[decl], false)
 		}
 	}
 
 	for _, decl := range file.Decls {
 		switch decl := decl.(type) {
 		case *ast.Enum:
-			c.CreateTypeInfo(c.nodeTypes[decl], false)
+			c.CreateTypeInfo(c.NodeTypes[decl], false)
 
 		case *ast.Struct:
 			if !c.HasTypeParams(decl) {
-				c.CreateTypeInfo(c.nodeTypes[decl], false)
+				c.CreateTypeInfo(c.NodeTypes[decl], false)
 			}
 		}
 	}
@@ -239,12 +253,12 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 		case *ast.Impl:
 			var in *types.Interface
 			if decl.Interface != nil {
-				in, _ = c.nodeTypes[decl.Interface].(*types.Interface)
+				in, _ = c.NodeTypes[decl.Interface].(*types.Interface)
 			}
 
 			for _, f := range decl.Methods {
 				if !c.HasTypeParams(f) {
-					typ := c.nodeTypes[f].(*types.Func)
+					typ := c.NodeTypes[f].(*types.Func)
 					fun := c.GetFunction(f, typ, in)
 
 					c.VisitFunc(f, typ, fun)
@@ -253,7 +267,7 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 
 		case *ast.Func:
 			if !c.HasTypeParams(decl) && ast.GetAttribute[*ast.Intrinsic](decl) == nil {
-				typ := c.nodeTypes[decl].(*types.Func)
+				typ := c.NodeTypes[decl].(*types.Func)
 				fun := c.scope.Get(decl.Name().Token.Text).(*ir.Function)
 
 				c.VisitFunc(decl, typ, fun)
@@ -270,8 +284,8 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 		c.pendingInstantiations = c.pendingInstantiations[:len(c.pendingInstantiations)-1]
 
 		if fd, ok := c.fileDataMap[ast.GetFile(pending.f)]; ok {
-			c.exprInfos = fd.ExprInfos
-			c.nodeTypes = fd.NodeTypes
+			c.ExprInfos = fd.ExprInfos
+			c.NodeTypes = fd.NodeTypes
 		}
 
 		c.substitutions = pending.typ.Substitutions
@@ -296,28 +310,28 @@ func Generate(file *ast.File, arch abi.Arch, callConv abi.CallConv, instantiatio
 	// End summary
 
 	if summary {
-		c.module.AddSummary(&ir.SimpleSummary{
+		c.Module.AddSummary(&ir.SimpleSummary{
 			Name:  "flags",
 			Value: 520,
 		})
 
-		c.module.AddSummary(&ir.SimpleSummary{
+		c.Module.AddSummary(&ir.SimpleSummary{
 			Name:  "blockcount",
 			Value: 0,
 		})
 	}
 
-	return c.module
+	return c.Module
 }
 
 // Utils
 
-func (c *codegen) EmitPanic(_ ast.Node, format string, args ...any) {
+func (c *Codegen) EmitPanic(_ ast.Node, format string, args ...any) {
 	str := fmt.Sprintf(format, args...)
 	msg := c.StringView([]rune(str))
 
-	f := c.builtins.PanicNode
-	typ := c.builtins.PanicType
+	f := c.Builtins.PanicNode
+	typ := c.Builtins.PanicType
 
 	callee := c.GetFunction(f, typ, nil)
 	c.AddSummaryCallee(f, typ, nil, true)
@@ -356,24 +370,24 @@ func typeSubsString(subs []types.Substitution) string {
 	return sb.String()
 }
 
-func (c *codegen) HasTypeParams(decl ast.Decl) bool {
+func (c *Codegen) HasTypeParams(decl ast.Decl) bool {
 	switch decl := decl.(type) {
 	case *ast.Struct:
-		typ := c.nodeTypes[decl].(*types.Struct)
+		typ := c.NodeTypes[decl].(*types.Struct)
 
 		if len(typ.TypeParams) > 0 || typ.Generic != nil {
 			return true
 		}
 
 	case *ast.Interface:
-		typ := c.nodeTypes[decl].(*types.Interface)
+		typ := c.NodeTypes[decl].(*types.Interface)
 
 		if len(typ.TypeParams) > 0 || typ.Generic != nil {
 			return true
 		}
 
 	case *ast.Func:
-		typ := c.nodeTypes[decl].(*types.Func)
+		typ := c.NodeTypes[decl].(*types.Func)
 
 		if len(typ.TypeParams) > 0 || typ.Generic != nil {
 			return true
@@ -385,6 +399,23 @@ func (c *codegen) HasTypeParams(decl ast.Decl) bool {
 	}
 
 	return false
+}
+
+func ConstLinkName(c *ast.Const) string {
+	// Normal
+	file := ast.GetFile(c)
+
+	sb := strings.Builder{}
+	sb.WriteString("fb$")
+
+	for _, entry := range file.Mod.Path {
+		sb.WriteString(entry.Token.Text)
+		sb.WriteString("::")
+	}
+
+	sb.WriteString(c.Name().Token.Text)
+
+	return sb.String()
 }
 
 func GlobalVarLinkName(g *ast.GlobalVar) string {
@@ -500,7 +531,122 @@ func FuncLinkName(f *ast.Func, typ *types.Func, in *types.Interface) string {
 	return sb.String()
 }
 
-func (c *codegen) GetFuncInterface(f *ast.Func) *types.Interface {
+func (c *Codegen) GetConst(decl *ast.Const) *ir.GlobalVar {
+	// Check already existing constants
+	name := ConstLinkName(decl)
+
+	for gVar := range c.Module.GlobalVars() {
+		if gVar.Name == name {
+			return gVar
+		}
+	}
+
+	// Create constant
+	typ := c.ResolveType(c.fileDataMap[ast.GetFile(decl)].NodeTypes[decl.Type])
+	val := c.fileDataMap[ast.GetFile(decl)].Evaluations[decl.Value]
+
+	gVar := c.GlobalVar(name, ir.Constant|ir.UnnamedAddr|ir.LinkOnce, c.GetIrValue(val, typ))
+
+	return gVar
+}
+
+func (c *Codegen) GetIrValue(val eval.Value, typ types.Type) ir.Value {
+	if comp, ok := typ.(types.Composed); ok {
+		typ = comp.Underlying()
+	}
+
+	switch val := val.(type) {
+	case *eval.IntValue:
+		switch typ.(*types.Primitive).Kind {
+		case types.Bool:
+			if val.Value == 1 {
+				return ir.True
+			}
+
+			return ir.False
+
+		case types.U8:
+			return &ir.Integer{Value: core.Unsigned(false, val.Value&0xFF), Typ: ir.I8}
+		case types.U16:
+			return &ir.Integer{Value: core.Unsigned(false, val.Value&0xFFFF), Typ: ir.I16}
+		case types.U32:
+			return &ir.Integer{Value: core.Unsigned(false, val.Value&0xFFFFFFFF), Typ: ir.I32}
+		case types.U64:
+			return &ir.Integer{Value: core.Unsigned(false, val.Value&0xFFFFFFFFFFFFFFFF), Typ: ir.I64}
+
+		case types.I8:
+			return &ir.Integer{Value: core.TwosComplementWidth(val.Value, 8), Typ: ir.I8}
+		case types.I16:
+			return &ir.Integer{Value: core.TwosComplementWidth(val.Value, 16), Typ: ir.I16}
+		case types.I32:
+			return &ir.Integer{Value: core.TwosComplementWidth(val.Value, 32), Typ: ir.I32}
+		case types.I64:
+			return &ir.Integer{Value: core.TwosComplementWidth(val.Value, 64), Typ: ir.I64}
+
+		default:
+			panic("codegen.Codegen.GetIrValue() - Invalid integer primitive kind")
+		}
+
+	case *eval.FloatValue:
+		if typ.(*types.Primitive).Kind == types.F64 {
+			return &ir.DoubleV{Value: val.Value}
+		}
+
+		return &ir.FloatV{Value: float32(val.Value)}
+
+	case *eval.StringValue:
+		return c.StringPtr(val.Value)
+
+	case *eval.NullValue:
+		return &ir.Null{}
+
+	case *eval.AggregateValue:
+		if typ, ok := typ.(*types.Array); ok {
+			elements := make([]ir.Value, len(val.Values))
+
+			for i, value := range val.Values {
+				elements[i] = c.GetIrValue(value, typ.Element)
+			}
+
+			return &ir.Array{Elements: elements}
+		}
+
+		fields := make([]ir.Value, len(val.Values))
+		info := c.Arch.Info(typ)
+
+		for i, value := range val.Values {
+			fields[i] = c.GetIrValue(value, typ.(*types.Struct).Fields[info.Fields[i].Index].Type)
+		}
+
+		return &ir.Struct{Typ: c.Types.Get(typ), Fields: fields}
+
+	case *eval.GlobalValue:
+		if strings.HasPrefix(val.Name, "fb$link_name$") {
+			return c.GetTypeInfo(val.Data.(types.Type))
+		}
+
+		gVar := c.Module.GetGlobalVar(val.Name)
+
+		if gVar == nil {
+			gVar = c.Module.NewGlobalVar(val.Name, val.Typ)
+			gVar.Flags = ir.External | val.Flags
+		}
+
+		return gVar
+
+	case *eval.FuncValue:
+		f := val.Data.(*ast.Func)
+		typ := c.fileDataMap[ast.GetFile(f)].NodeTypes[f].(*types.Func)
+		in := c.GetFuncInterface(f)
+
+		return c.GetFunction(f, typ, in)
+
+	default:
+		panic("codegen.Codegen.GetIrValue() - Invalid eval.Value")
+	}
+}
+
+func (c *Codegen) GetFuncInterface(f *ast.Func) *types.Interface {
 	impl, ok := f.Parent().(*ast.Impl)
 	if !ok || impl.Interface == nil {
 		return nil
@@ -520,11 +666,11 @@ func (c *codegen) GetFuncInterface(f *ast.Func) *types.Interface {
 	return in
 }
 
-func (c *codegen) GetGlobalVar(g *ast.GlobalVar, typ types.Type) *ir.GlobalVar {
+func (c *Codegen) GetGlobalVar(g *ast.GlobalVar, typ types.Type) *ir.GlobalVar {
 	// Check already existing global variables
 	name := GlobalVarLinkName(g)
 
-	for gVar := range c.module.GlobalVars() {
+	for gVar := range c.Module.GlobalVars() {
 		if gVar.Name == name {
 			return gVar
 		}
@@ -534,11 +680,11 @@ func (c *codegen) GetGlobalVar(g *ast.GlobalVar, typ types.Type) *ir.GlobalVar {
 	return c.CreateGlobalVar(g, typ, true)
 }
 
-func (c *codegen) GetFunction(f *ast.Func, typ *types.Func, iface *types.Interface) *ir.Function {
+func (c *Codegen) GetFunction(f *ast.Func, typ *types.Func, iface *types.Interface) *ir.Function {
 	// Check already existing functions
 	name := FuncLinkName(f, typ, iface)
 
-	for fun := range c.module.Functions() {
+	for fun := range c.Module.Functions() {
 		if fun.Name == name {
 			return fun
 		}
@@ -562,7 +708,7 @@ func (c *codegen) GetFunction(f *ast.Func, typ *types.Func, iface *types.Interfa
 	return c.CreateFunction(f, typ, true, iface)
 }
 
-func (c *codegen) BitCast(value ir.Value, typ ir.Type) ir.Value {
+func (c *Codegen) BitCast(value ir.Value, typ ir.Type) ir.Value {
 	if value.Type() == typ {
 		return value
 	}
@@ -570,50 +716,50 @@ func (c *codegen) BitCast(value ir.Value, typ ir.Type) ir.Value {
 	// Bool (I1) -> I8
 	if value.Type() == ir.I1 {
 		if t, ok := typ.(*ir.IntegerType); ok && t.Bits == 8 {
-			return c.emitter.Ext(ir.Unsigned, value, t)
+			return c.Emitter.Ext(ir.Unsigned, value, t)
 		}
 	}
 
 	// I8 -> Bool (I1)
 	if value.Type() == ir.I8 {
 		if t, ok := typ.(*ir.IntegerType); ok && t.Bits == 1 {
-			return c.emitter.Trunc(value, t)
+			return c.Emitter.Trunc(value, t)
 		}
 	}
 
 	// Ptr -> Int
 	if value.Type() == ir.Pointer {
 		if _, ok := typ.(*ir.IntegerType); ok {
-			return c.emitter.PtrToInt(value, typ)
+			return c.Emitter.PtrToInt(value, typ)
 		}
 	}
 
 	// Int -> Ptr
 	if _, ok := value.Type().(*ir.IntegerType); ok {
 		if typ == ir.Pointer {
-			return c.emitter.IntToPtr(value)
+			return c.Emitter.IntToPtr(value)
 		}
 	}
 
 	// BitCast
 	if !ir.IsAggregate(value.Type()) && !ir.IsAggregate(typ) && value.Type().Info().Size == typ.Info().Size {
-		return c.emitter.BitCast(value, typ)
+		return c.Emitter.BitCast(value, typ)
 	}
 
 	// Store + Load
 	ptr := c.Alloca(value.Type(), "bitcast")
-	c.emitter.Store(value, ptr)
+	c.Emitter.Store(value, ptr)
 
-	return c.emitter.Load(typ, ptr)
+	return c.Emitter.Load(typ, ptr)
 }
 
-func (c *codegen) Alloca(typ ir.Type, name string) ir.Value {
-	prevBlock := c.emitter.Block()
-	c.emitter.Begin(c.bVariables)
+func (c *Codegen) Alloca(typ ir.Type, name string) ir.Value {
+	prevBlock := c.Emitter.Block()
+	c.Emitter.Begin(c.bVariables)
 
-	ptr := c.emitter.Alloca(typ, 1)
+	ptr := c.Emitter.Alloca(typ, 1)
 	ptr.SetName(name)
 
-	c.emitter.Begin(prevBlock)
+	c.Emitter.Begin(prevBlock)
 	return ptr
 }

@@ -30,7 +30,7 @@ func (hi *highlighter) VisitStructInitializer(s *ast.StructInitializer) int {
 	hi.VisitType(s.Type)
 
 	for _, field := range s.Fields {
-		hi.AddFull(field.Name, propertyKind)
+		hi.AddFull(field.Name, propertyKind, 0)
 		hi.VisitExpr(field.Value)
 	}
 
@@ -41,7 +41,7 @@ func (hi *highlighter) VisitWith(w *ast.With) int {
 	hi.VisitExpr(w.Expr)
 
 	for _, field := range w.Fields {
-		hi.AddFull(field.Name, propertyKind)
+		hi.AddFull(field.Name, propertyKind, 0)
 		hi.VisitExpr(field.Value)
 	}
 
@@ -72,7 +72,7 @@ func (hi *highlighter) VisitAlignOf(a *ast.AlignOf) int {
 
 func (hi *highlighter) VisitOffsetOf(o *ast.OffsetOf) int {
 	hi.VisitType(o.Type)
-	hi.AddFull(o.Field, propertyKind)
+	hi.AddFull(o.Field, propertyKind, 0)
 
 	return 0
 }
@@ -126,22 +126,22 @@ func (hi *highlighter) VisitIdentifier(i *ast.Identifier) int {
 		case symbols.Invalid:
 
 		case symbols.Struct:
-			hi.Add(entry, classKind)
+			hi.Add(entry, classKind, 0)
 
 		case symbols.Enum:
-			hi.Add(entry, enumKind)
+			hi.Add(entry, enumKind, 0)
 
 		case symbols.Interface:
-			hi.Add(entry, interfaceKind)
+			hi.Add(entry, interfaceKind, 0)
 
 		case symbols.Func:
-			hi.Add(entry, functionKind)
+			hi.Add(entry, functionKind, 0)
 
 		case symbols.TypeParam:
-			hi.Add(entry, genericKind)
+			hi.Add(entry, genericKind, 0)
 
 		case symbols.Case:
-			hi.Add(entry, enumMemberKind)
+			hi.Add(entry, enumMemberKind, 0)
 
 		case symbols.Param:
 			kind := parameterKind
@@ -152,10 +152,13 @@ func (hi *highlighter) VisitIdentifier(i *ast.Identifier) int {
 				}
 			}
 
-			hi.Add(entry, kind)
+			hi.Add(entry, kind, 0)
+
+		case symbols.Const:
+			hi.Add(entry, variableKind, readonlyKind)
 
 		case symbols.Var:
-			hi.Add(entry, variableKind)
+			hi.Add(entry, variableKind, 0)
 		}
 
 		for _, arg := range i.Path[len(i.Path)-1].TypeArgs {
@@ -179,9 +182,9 @@ func (hi *highlighter) VisitMember(m *ast.Member) int {
 	if info, ok := hi.file.ExprInfos[m]; ok {
 		switch info.Node.(type) {
 		case *ast.Func:
-			hi.Add(m.Name, functionKind)
+			hi.Add(m.Name, functionKind, 0)
 		case *ast.Field:
-			hi.Add(m.Name, propertyKind)
+			hi.Add(m.Name, propertyKind, 0)
 		}
 	}
 

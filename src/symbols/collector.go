@@ -125,6 +125,15 @@ func Collect(file *ast.File) []Symbol {
 				Type:   &types.Interface{Name: sb.String(), ModulePath: modulePath, TypeParams: typeParams, SelfParam: selfParam, AssociatedTypes: associatedTypes}, // filled in type resolver
 			})
 
+		case *ast.Const:
+			symbols = append(symbols, Symbol{
+				Kind:   Const,
+				Public: decl.Public,
+				Name:   decl.Name().Token.Text,
+				Node:   decl,
+				Type:   nil, // filled in type resolver
+			})
+
 		case *ast.GlobalVar:
 			symbols = append(symbols, Symbol{
 				Kind:   Var,

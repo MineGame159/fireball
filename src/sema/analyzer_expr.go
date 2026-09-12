@@ -14,7 +14,10 @@ import (
 // Visitor
 
 func (a *analyzer) VisitBool(_ *ast.Bool) ExprInfo {
-	return ExprInfo{Type: types.PrimitiveBool}
+	return ExprInfo{
+		Type:     types.PrimitiveBool,
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitNumber(n *ast.Number) ExprInfo {
@@ -22,26 +25,38 @@ func (a *analyzer) VisitNumber(n *ast.Number) ExprInfo {
 	case lexer.BinaryInteger, lexer.HexInteger, lexer.UnsignedInteger:
 		value := lexer.ParseInteger(n.Token).Raw()
 
-		return ExprInfo{Type: &types.Integer{
-			Negative: false,
-			Unsigned: true,
-			RawBits:  uint32(bits.Len64(value)),
-		}}
+		return ExprInfo{
+			Type: &types.Integer{
+				Negative: false,
+				Unsigned: true,
+				RawBits:  uint32(bits.Len64(value)),
+			},
+			CompTime: true,
+		}
 
 	case lexer.SignedInteger:
 		value := lexer.ParseInteger(n.Token).Raw()
 
-		return ExprInfo{Type: &types.Integer{
-			Negative: false,
-			Unsigned: false,
-			RawBits:  uint32(bits.Len64(value)),
-		}}
+		return ExprInfo{
+			Type: &types.Integer{
+				Negative: false,
+				Unsigned: false,
+				RawBits:  uint32(bits.Len64(value)),
+			},
+			CompTime: true,
+		}
 
 	case lexer.Decimal:
-		return ExprInfo{Type: types.PrimitiveF64}
+		return ExprInfo{
+			Type:     types.PrimitiveF64,
+			CompTime: true,
+		}
 
 	case lexer.Decimal32bit:
-		return ExprInfo{Type: types.PrimitiveF32}
+		return ExprInfo{
+			Type:     types.PrimitiveF32,
+			CompTime: true,
+		}
 
 	default:
 		panic("sema.analyzer.VisitNumber() - Invalid token kind")
@@ -49,21 +64,30 @@ func (a *analyzer) VisitNumber(n *ast.Number) ExprInfo {
 }
 
 func (a *analyzer) VisitCharacter(c *ast.Character) ExprInfo {
-	return ExprInfo{Type: &types.Integer{
-		Negative: false,
-		Unsigned: true,
-		RawBits:  uint32(bits.Len64(uint64(c.Rune))),
-	}}
+	return ExprInfo{
+		Type: &types.Integer{
+			Negative: false,
+			Unsigned: true,
+			RawBits:  uint32(bits.Len64(uint64(c.Rune))),
+		},
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitString(_ *ast.String) ExprInfo {
-	return ExprInfo{Type: a.stringViewType}
+	return ExprInfo{
+		Type:     a.stringViewType,
+		CompTime: true,
+	}
 }
 
 var nullType = &types.Null{}
 
 func (a *analyzer) VisitNull(_ *ast.Null) ExprInfo {
-	return ExprInfo{Type: nullType}
+	return ExprInfo{
+		Type:     nullType,
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitStructInitializer(s *ast.StructInitializer) ExprInfo {
@@ -77,8 +101,11 @@ func (a *analyzer) VisitStructInitializer(s *ast.StructInitializer) ExprInfo {
 		return a.Error(s.Type, "type '%s' is not a struct", typ)
 	}
 
+	compTime := true
+
 	for _, field := range s.Fields {
-		a.VisitFieldInitializer(t, field)
+		value := a.VisitFieldInitializer(t, field)
+		compTime = compTime && value.CompTime
 	}
 
 	if t.Layout == types.Union && len(s.Fields) > 1 {
@@ -115,7 +142,10 @@ func (a *analyzer) VisitStructInitializer(s *ast.StructInitializer) ExprInfo {
 		}
 	}
 
-	return ExprInfo{Type: typ}
+	return ExprInfo{
+		Type:     typ,
+		CompTime: compTime,
+	}
 }
 
 func (a *analyzer) VisitWith(w *ast.With) ExprInfo {
@@ -129,23 +159,29 @@ func (a *analyzer) VisitWith(w *ast.With) ExprInfo {
 		return a.Error(w.Expr, "type '%s' is not a struct", expr.Type)
 	}
 
+	compTime := expr.CompTime
+
 	for _, field := range w.Fields {
-		a.VisitFieldInitializer(t, field)
+		value := a.VisitFieldInitializer(t, field)
+		compTime = compTime && value.CompTime
 	}
 
 	if t.Layout == types.Union && len(w.Fields) > 1 {
 		a.Error(w, "when modifying an union struct, only one field can be set at most")
 	}
 
-	return ExprInfo{Type: t}
+	return ExprInfo{
+		Type:     t,
+		CompTime: compTime,
+	}
 }
 
-func (a *analyzer) VisitFieldInitializer(t *types.Struct, field *ast.FieldInitializer) {
+func (a *analyzer) VisitFieldInitializer(t *types.Struct, field *ast.FieldInitializer) ExprInfo {
 	f := t.Field(field.Name.Token.Text)
 
 	if f == nil {
 		a.Error(field.Name, "field '%s' doesn't exist on struct '%s'", field.Name.Token.Text, t)
-		return
+		return ExprInfo{Type: types.Invalid}
 	}
 
 	a.exprInfos[field] = ExprInfo{
@@ -155,6 +191,8 @@ func (a *analyzer) VisitFieldInitializer(t *types.Struct, field *ast.FieldInitia
 
 	value := a.AnalyzeExpr(field.Value)
 	a.ExpectType(f.Type, value, field.Value)
+
+	return value
 }
 
 func (a *analyzer) VisitArrayInitializer(ai *ast.ArrayInitializer) ExprInfo {
@@ -169,12 +207,19 @@ func (a *analyzer) VisitArrayInitializer(ai *ast.ArrayInitializer) ExprInfo {
 		a.Error(ai.Type, "mismatched array size, type has size of %d but got %d elements", t.Size, len(ai.Elements))
 	}
 
+	compTime := true
+
 	for _, element := range ai.Elements {
 		expr := a.AnalyzeExpr(element)
+		compTime = compTime && expr.CompTime
+
 		a.ExpectType(t.Element, expr, element)
 	}
 
-	return ExprInfo{Type: t}
+	return ExprInfo{
+		Type:     t,
+		CompTime: compTime,
+	}
 }
 
 func (a *analyzer) VisitSizeOf(s *ast.SizeOf) ExprInfo {
@@ -183,7 +228,10 @@ func (a *analyzer) VisitSizeOf(s *ast.SizeOf) ExprInfo {
 		return ExprInfo{Type: types.Invalid}
 	}
 
-	return ExprInfo{Type: types.PrimitiveU32}
+	return ExprInfo{
+		Type:     types.PrimitiveU32,
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitAlignOf(e *ast.AlignOf) ExprInfo {
@@ -192,7 +240,10 @@ func (a *analyzer) VisitAlignOf(e *ast.AlignOf) ExprInfo {
 		return ExprInfo{Type: types.Invalid}
 	}
 
-	return ExprInfo{Type: types.PrimitiveU32}
+	return ExprInfo{
+		Type:     types.PrimitiveU32,
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitOffsetOf(o *ast.OffsetOf) ExprInfo {
@@ -214,13 +265,19 @@ func (a *analyzer) VisitOffsetOf(o *ast.OffsetOf) ExprInfo {
 		a.Error(o.Type, "expected a struct type, not '%s'", typ)
 	}
 
-	return ExprInfo{Type: types.PrimitiveU32}
+	return ExprInfo{
+		Type:     types.PrimitiveU32,
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitTypeOf(t *ast.TypeOf) ExprInfo {
 	a.ResolveAndAnalyzeType(t.Type)
 
-	return ExprInfo{Type: &types.Reference{Pointee: a.typeInfoType}}
+	return ExprInfo{
+		Type:     &types.Reference{Pointee: a.typeInfoType},
+		CompTime: true,
+	}
 }
 
 func (a *analyzer) VisitPrefix(p *ast.Prefix) ExprInfo {
@@ -248,21 +305,34 @@ func (a *analyzer) VisitPrefix(p *ast.Prefix) ExprInfo {
 				return a.Error(p.Expr, "expected signed numeric type, got '%s'", i)
 			}
 
-			return ExprInfo{Type: &types.Integer{
-				Negative: !i.Negative,
-				Unsigned: false,
-				RawBits:  i.RawBits,
-			}}
+			return ExprInfo{
+				Type: &types.Integer{
+					Negative: !i.Negative,
+					Unsigned: false,
+					RawBits:  i.RawBits,
+				},
+				CompTime: true,
+			}
 		}
 
-		return ExprInfo{Type: a.ExpectPrimitiveClass(types.IsSigned, "signed numeric", expr, p.Expr)}
+		return ExprInfo{
+			Type:     a.ExpectPrimitiveClass(types.IsSigned, "signed numeric", expr, p.Expr),
+			CompTime: expr.CompTime,
+		}
 
 	case ast.Not:
 		a.ExpectType(types.PrimitiveBool, expr, p.Expr)
-		return ExprInfo{Type: types.PrimitiveBool}
+
+		return ExprInfo{
+			Type:     types.PrimitiveBool,
+			CompTime: expr.CompTime,
+		}
 
 	case ast.BitNot:
-		return ExprInfo{Type: a.ExpectPrimitiveClass(types.IsInteger, "integer", expr, p.Expr)}
+		return ExprInfo{
+			Type:     a.ExpectPrimitiveClass(types.IsInteger, "integer", expr, p.Expr),
+			CompTime: expr.CompTime,
+		}
 
 	case ast.IncrementE:
 		if !expr.Address {
@@ -290,25 +360,33 @@ func (a *analyzer) VisitPrefix(p *ast.Prefix) ExprInfo {
 		}
 
 		if a.AddressDerivedFromRawPointer(p.Expr) {
-			return ExprInfo{Type: &types.Pointer{Mutable: expr.Mutable, Pointee: expr.Type}}
+			return ExprInfo{
+				Type:     &types.Pointer{Mutable: expr.Mutable, Pointee: expr.Type},
+				CompTime: expr.CompTime,
+			}
 		}
 
-		return ExprInfo{Type: &types.Reference{Mutable: expr.Mutable, Pointee: expr.Type}}
+		return ExprInfo{
+			Type:     &types.Reference{Mutable: expr.Mutable, Pointee: expr.Type},
+			CompTime: expr.CompTime,
+		}
 
 	case ast.Dereference:
 		switch typ := expr.Type.(type) {
 		case *types.Reference:
 			return ExprInfo{
-				Type:    typ.Pointee,
-				Mutable: typ.Mutable,
-				Address: true,
+				Type:     typ.Pointee,
+				Mutable:  typ.Mutable,
+				Address:  true,
+				CompTime: expr.CompTime,
 			}
 
 		case *types.Pointer:
 			return ExprInfo{
-				Type:    typ.Pointee,
-				Mutable: typ.Mutable,
-				Address: true,
+				Type:     typ.Pointee,
+				Mutable:  typ.Mutable,
+				Address:  true,
+				CompTime: expr.CompTime,
 			}
 
 		default:
@@ -386,7 +464,10 @@ func (a *analyzer) VisitBinary(b *ast.Binary) ExprInfo {
 
 		a.ExpectType(left.Type, right, b.Right)
 
-		return ExprInfo{Type: left.Type}
+		return ExprInfo{
+			Type:     left.Type,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Assignment
@@ -400,7 +481,10 @@ func (a *analyzer) VisitBinary(b *ast.Binary) ExprInfo {
 
 		a.ExpectType(left.Type, right, b.Right)
 
-		return ExprInfo{Type: left.Type}
+		return ExprInfo{
+			Type:     left.Type,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Base
@@ -425,36 +509,42 @@ func (a *analyzer) AnalyzeBaseBinaryOp(b *ast.Binary, left, right ExprInfo, op a
 
 	// Math
 	if op.IsMath() {
-		left := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", left, b.Left)
-		right := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", right, b.Right)
+		leftT := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", left, b.Left)
+		rightT := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", right, b.Right)
 
-		if left == types.Invalid || right == types.Invalid {
+		if leftT == types.Invalid || rightT == types.Invalid {
 			return ExprInfo{Type: types.Invalid}
 		}
 
-		typ := CommonType(a.typeEnv, left, right)
+		typ := CommonType(a.typeEnv, leftT, rightT)
 		if typ == nil {
-			return a.Error(b, "binary operator needs compatible types, got '%s' and '%s'", left, right)
+			return a.Error(b, "binary operator needs compatible types, got '%s' and '%s'", leftT, rightT)
 		}
 
-		return ExprInfo{Type: typ}
+		return ExprInfo{
+			Type:     typ,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Bitwise
 	if op.IsBitwise() {
-		left := a.ExpectPrimitiveClass(types.IsInteger, "integer", left, b.Left)
-		right := a.ExpectPrimitiveClass(types.IsInteger, "integer", right, b.Right)
+		leftT := a.ExpectPrimitiveClass(types.IsInteger, "integer", left, b.Left)
+		rightT := a.ExpectPrimitiveClass(types.IsInteger, "integer", right, b.Right)
 
-		if left == types.Invalid || right == types.Invalid {
+		if leftT == types.Invalid || rightT == types.Invalid {
 			return ExprInfo{Type: types.Invalid}
 		}
 
-		typ := CommonType(a.typeEnv, left, right)
+		typ := CommonType(a.typeEnv, leftT, rightT)
 		if typ == nil {
-			return a.Error(b, "binary operator needs compatible types, got '%s' and '%s'", left, right)
+			return a.Error(b, "binary operator needs compatible types, got '%s' and '%s'", leftT, rightT)
 		}
 
-		return ExprInfo{Type: typ}
+		return ExprInfo{
+			Type:     typ,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Boolean
@@ -462,7 +552,10 @@ func (a *analyzer) AnalyzeBaseBinaryOp(b *ast.Binary, left, right ExprInfo, op a
 		a.ExpectType(types.PrimitiveBool, left, b.Left)
 		a.ExpectType(types.PrimitiveBool, right, b.Right)
 
-		return ExprInfo{Type: types.PrimitiveBool}
+		return ExprInfo{
+			Type:     types.PrimitiveBool,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Equality
@@ -477,23 +570,29 @@ func (a *analyzer) AnalyzeBaseBinaryOp(b *ast.Binary, left, right ExprInfo, op a
 			return a.Error(b, "equality operators only work on primitive types, references, pointers, function references or enums, not %s", left.Type)
 		}
 
-		return ExprInfo{Type: types.PrimitiveBool}
+		return ExprInfo{
+			Type:     types.PrimitiveBool,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Relational
 	if op.IsRelational() {
-		left := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", left, b.Left)
-		right := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", right, b.Right)
+		leftT := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", left, b.Left)
+		rightT := a.ExpectPrimitiveClass(types.IsNumeric, "numeric", right, b.Right)
 
-		if left == types.Invalid || right == types.Invalid {
+		if leftT == types.Invalid || rightT == types.Invalid {
 			return ExprInfo{Type: types.Invalid}
 		}
 
-		if common := CommonType(a.typeEnv, left, right); common == nil {
-			return a.Error(b, "binary operator needs compatible types, got '%s' and '%s'", left, right)
+		if common := CommonType(a.typeEnv, leftT, rightT); common == nil {
+			return a.Error(b, "binary operator needs compatible types, got '%s' and '%s'", leftT, rightT)
 		}
 
-		return ExprInfo{Type: types.PrimitiveBool}
+		return ExprInfo{
+			Type:     types.PrimitiveBool,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	// Or
@@ -505,17 +604,16 @@ func (a *analyzer) AnalyzeBaseBinaryOp(b *ast.Binary, left, right ExprInfo, op a
 
 		a.ExpectType(leftInner, right, b.Right)
 
-		return ExprInfo{Type: leftInner}
+		return ExprInfo{
+			Type:     leftInner,
+			CompTime: left.CompTime && right.CompTime,
+		}
 	}
 
 	panic("sema.analyzer.AnalyzeBaseBinaryOp() - Invalid base operator")
 }
 
 func (a *analyzer) VisitIdentifier(i *ast.Identifier) ExprInfo {
-	if i.Path[0].Name.Token.Text == "map_increase" {
-		print()
-	}
-
 	domain := symbols.Variable | symbols.Function
 	if !a.WantsFunction(i) {
 		domain = symbols.Variable
@@ -531,11 +629,22 @@ func (a *analyzer) VisitIdentifier(i *ast.Identifier) ExprInfo {
 	switch symbol.Kind {
 	case symbols.Case:
 		return ExprInfo{
-			Type:    symbol.Type,
-			Node:    symbol.Node,
-			Symbol:  symbol.Kind,
-			Mutable: false,
-			Address: false,
+			Type:     symbol.Type,
+			Node:     symbol.Node,
+			Symbol:   symbol.Kind,
+			Mutable:  false,
+			Address:  false,
+			CompTime: true,
+		}
+
+	case symbols.Const:
+		return ExprInfo{
+			Type:     symbol.Type,
+			Node:     symbol.Node,
+			Symbol:   symbol.Kind,
+			Mutable:  false,
+			Address:  true,
+			CompTime: true,
 		}
 
 	case symbols.Param, symbols.Var:
@@ -564,9 +673,10 @@ func (a *analyzer) VisitIdentifier(i *ast.Identifier) ExprInfo {
 		}
 
 		return ExprInfo{
-			Type:   symbol.Type,
-			Node:   symbol.Node,
-			Symbol: symbol.Kind,
+			Type:     symbol.Type,
+			Node:     symbol.Node,
+			Symbol:   symbol.Kind,
+			CompTime: true,
 		}
 
 	case symbols.Struct, symbols.Enum, symbols.Interface, symbols.TypeParam:
@@ -604,9 +714,10 @@ func (a *analyzer) VisitIndex(i *ast.Index) ExprInfo {
 		a.ExpectPrimitiveClass(types.IsInteger, "integer", index, i.Index)
 
 		return ExprInfo{
-			Type:    p.Pointee,
-			Mutable: p.Mutable,
-			Address: true,
+			Type:     p.Pointee,
+			Mutable:  p.Mutable,
+			Address:  true,
+			CompTime: expr.CompTime && index.CompTime,
 		}
 	}
 
@@ -615,9 +726,10 @@ func (a *analyzer) VisitIndex(i *ast.Index) ExprInfo {
 		a.ExpectPrimitiveClass(types.IsInteger, "integer", index, i.Index)
 
 		return ExprInfo{
-			Type:    t.Element,
-			Mutable: true,
-			Address: expr.Address,
+			Type:     t.Element,
+			Mutable:  true,
+			Address:  expr.Address,
+			CompTime: expr.CompTime && index.CompTime,
 		}
 	}
 
@@ -739,10 +851,11 @@ func (a *analyzer) VisitMember(m *ast.Member) ExprInfo {
 				}
 
 				return ExprInfo{
-					Type:    field.Type,
-					Node:    a.resolveFieldNode(t, m.Name.Token.Text),
-					Mutable: mutable,
-					Address: address,
+					Type:     field.Type,
+					Node:     a.resolveFieldNode(t, m.Name.Token.Text),
+					Mutable:  mutable,
+					Address:  address,
+					CompTime: expr.CompTime,
 				}
 			}
 		}
@@ -937,10 +1050,16 @@ func (a *analyzer) VisitCast(c *ast.Cast) ExprInfo {
 				Type:  to,
 			}})
 
-			return ExprInfo{Type: opt}
+			return ExprInfo{
+				Type:     opt,
+				CompTime: expr.CompTime && kind.CompTime(),
+			}
 
 		default:
-			return ExprInfo{Type: to}
+			return ExprInfo{
+				Type:     to,
+				CompTime: expr.CompTime && kind.CompTime(),
+			}
 		}
 	}
 
@@ -1054,6 +1173,11 @@ func (a *analyzer) AddressDerivedFromRawPointer(node ast.Expr) bool {
 
 func (a *analyzer) WantsFunction(node ast.Node) bool {
 	switch parent := node.Parent().(type) {
+	case *ast.Const:
+		if parent.Value == node && !core.IsNil(parent.Type) {
+			return a.TypeWantsFunction(a.ResolveAndAnalyzeType(parent.Type))
+		}
+
 	case *ast.Var:
 		if parent.Initializer == node && !core.IsNil(parent.Type) {
 			return a.TypeWantsFunction(a.ResolveAndAnalyzeType(parent.Type))

@@ -13,6 +13,8 @@
 "type" @keyword
 "func" @keyword.function
 
+"const" @keyword
+
 "var" @keyword
 "if" @keyword.control.conditional
 "else" @keyword.control.conditional
@@ -63,6 +65,8 @@
 (impl type_param: (type_param name: (identifier) @type.parameter))
 
 (associated_type name: (identifier) @type)
+
+(const name: (identifier) @constant)
 
 (global_var name: (identifier) @variable.global)
 

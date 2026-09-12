@@ -18,6 +18,8 @@ type GlobalVar struct {
 	Typ         Type
 	Flags       GlobalVarFlags
 	Initializer Value
+
+	Data any
 }
 
 func (g *GlobalVar) Type() Type {

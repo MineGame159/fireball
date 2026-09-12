@@ -44,7 +44,7 @@ func (m *Module) CheckCollisions() {
 					typeDomain[symbol.Name] = true
 				}
 
-			case symbols.Var:
+			case symbols.Const, symbols.Var:
 				if _, ok := varDomain[symbol.Name]; ok {
 					file.collisionDiagnostics = append(file.collisionDiagnostics, m.getCollisionDiagnostic(file, symbol, "variable"))
 				} else {

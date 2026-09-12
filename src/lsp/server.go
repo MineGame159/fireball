@@ -134,7 +134,9 @@ func (s *Server) Initialize(ctx context.Context, params *protocol.InitializePara
 						protocol.SemanticTokenKeyword,
 						protocol.SemanticTokenComment,
 					},
-					TokenModifiers: []protocol.SemanticTokenModifiers{},
+					TokenModifiers: []protocol.SemanticTokenModifiers{
+						protocol.SemanticTokenModifierReadonly,
+					},
 				},
 				Full: &protocol.SemanticTokensFull{},
 			},

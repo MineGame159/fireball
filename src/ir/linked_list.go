@@ -6,7 +6,7 @@ import (
 )
 
 type linkedListNode[T any] interface {
-	next() T
+	Next() T
 }
 
 func iterLinkedList[T linkedListNode[T]](node T) iter.Seq[T] {
@@ -15,7 +15,7 @@ func iterLinkedList[T linkedListNode[T]](node T) iter.Seq[T] {
 			if !yield(node) {
 				return
 			}
-			node = node.next()
+			node = node.Next()
 		}
 	}
 }

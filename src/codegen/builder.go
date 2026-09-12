@@ -7,26 +7,26 @@ import (
 
 // Array Builder
 
-type arrayBuilder struct {
-	c   *codegen
+type ArrayBuilder struct {
+	c   *Codegen
 	typ *types.Array
 
 	values []ir.Value
 }
 
-func (c *codegen) Array(a *types.Array) arrayBuilder {
-	return arrayBuilder{
+func (c *Codegen) Array(a *types.Array) ArrayBuilder {
+	return ArrayBuilder{
 		c:   c,
 		typ: a,
 	}
 }
 
-func (a *arrayBuilder) Add(value ir.Value) {
+func (a *ArrayBuilder) Add(value ir.Value) {
 	a.values = append(a.values, value)
 }
 
-func (a *arrayBuilder) Build() ir.Value {
-	typ := a.c.types.Get(a.typ).(*ir.ArrayType)
+func (a *ArrayBuilder) Build() ir.Value {
+	typ := a.c.Types.Get(a.typ).(*ir.ArrayType)
 
 	if len(a.values) == 0 {
 		return &ir.ZeroInitializer{Typ: typ}
@@ -78,7 +78,7 @@ func (a *arrayBuilder) Build() ir.Value {
 
 	for i, value := range a.values {
 		if !ir.IsConstant(value) {
-			arrayValue = a.c.emitter.InsertValue(arrayValue, value, uint32(i))
+			arrayValue = a.c.Emitter.InsertValue(arrayValue, value, uint32(i))
 		}
 	}
 
@@ -87,27 +87,27 @@ func (a *arrayBuilder) Build() ir.Value {
 
 // Struct Builder
 
-type structBuilder struct {
-	c   *codegen
+type StructBuilder struct {
+	c   *Codegen
 	typ *types.Struct
 
 	fields map[string]ir.Value
 }
 
-func (c *codegen) Struct(s *types.Struct) structBuilder {
-	return structBuilder{
+func (c *Codegen) Struct(s *types.Struct) StructBuilder {
+	return StructBuilder{
 		c:      c,
 		typ:    s,
 		fields: make(map[string]ir.Value),
 	}
 }
 
-func (s *structBuilder) Set(name string, value ir.Value) {
+func (s *StructBuilder) Set(name string, value ir.Value) {
 	s.fields[name] = value
 }
 
-func (s *structBuilder) Build() ir.Value {
-	typ := s.c.types.Get(s.typ).(ir.StructLikeType)
+func (s *StructBuilder) Build() ir.Value {
+	typ := s.c.Types.Get(s.typ).(ir.StructLikeType)
 
 	if len(s.fields) == 0 {
 		return &ir.ZeroInitializer{Typ: typ}
@@ -192,7 +192,7 @@ func (s *structBuilder) Build() ir.Value {
 				}
 			}
 
-			structValue = s.c.emitter.InsertValue(structValue, value, uint32(i))
+			structValue = s.c.Emitter.InsertValue(structValue, value, uint32(i))
 		}
 	}
 
@@ -201,50 +201,49 @@ func (s *structBuilder) Build() ir.Value {
 
 // Global Var
 
-func (c *codegen) GlobalVar(name string, constant bool, linkOnce bool, value ir.Value) *ir.GlobalVar {
-	gVar := c.module.NewGlobalVar(name, value.Type())
+func (c *Codegen) GlobalVar(name string, flags ir.GlobalVarFlags, value ir.Value) *ir.GlobalVar {
+	gVar := c.Module.NewGlobalVar(name, value.Type())
+	gVar.Flags = flags
 	gVar.Initializer = value
 
-	if constant {
-		gVar.Flags = ir.Constant
-	}
-	if linkOnce {
-		gVar.Flags |= ir.LinkOnce
-	}
-
 	// Summary
-	c.GlobalVarSummary(name, constant, linkOnce, value)
+	c.GlobalVarSummary(name, flags, value)
 
 	return gVar
 }
 
-func (c *codegen) GlobalVarSummary(name string, constant bool, linkOnce bool, value ir.Value) {
-	if c.moduleSummaryRef.Valid() {
+func (c *Codegen) GlobalVarSummary(name string, flags ir.GlobalVarFlags, value ir.Value) {
+	if c.ModuleSummaryRef.Valid() {
 		linkage := ir.LinkageExternal
-		if linkOnce {
+		if flags&ir.LinkOnce != 0 {
 			linkage = ir.LinkageLinkOnceODR
 		}
 
-		flags := ir.VariableSummaryFlags(0)
-		if constant {
-			flags = ir.VarReadOnly | ir.VarConstant
+		visibility := ir.VisibilityDefault
+		if flags&ir.Constant != 0 {
+			visibility = ir.VisibilityHidden
+		}
+
+		sumFlags := ir.VariableSummaryFlags(0)
+		if flags&ir.Constant != 0 {
+			sumFlags = ir.VarReadOnly | ir.VarConstant
 		}
 
 		refs := c.CollectSummaryRefs(nil, value)
 
-		c.module.AddSummary(&ir.VariableSummary{
-			Module: c.moduleSummaryRef,
+		c.Module.AddSummary(&ir.VariableSummary{
+			Module: c.ModuleSummaryRef,
 			Name:   name,
 			LinkFlags: ir.LinkSummaryFlags{
 				Linkage:             linkage,
-				Visibility:          ir.VisibilityDefault,
-				NotEligibleToImport: false,
+				Visibility:          visibility,
+				NotEligibleToImport: flags&ir.Constant != 0,
 				Live:                false,
 				DsoLocal:            true,
 				CanAutoHide:         true,
 				ImportType:          ir.ImportDefinition,
 			},
-			Flags: flags,
+			Flags: sumFlags,
 			Refs:  refs,
 		})
 	}

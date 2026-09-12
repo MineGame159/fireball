@@ -14,6 +14,7 @@ type Type interface {
 	isIrType()
 
 	Info() TypeInfo
+	Equals(other Type) bool
 }
 
 type StructLikeType interface {
@@ -72,6 +73,14 @@ func (s SimpleType) Info() TypeInfo {
 	}
 }
 
+func (s SimpleType) Equals(other Type) bool {
+	if other, ok := other.(*SimpleType); ok {
+		return s.Kind == other.Kind
+	}
+
+	return false
+}
+
 var Void = &SimpleType{Kind: VoidKind}
 var Float = &SimpleType{Kind: FloatKind}
 var Double = &SimpleType{Kind: DoubleKind}
@@ -86,8 +95,16 @@ type IntegerType struct {
 func (i IntegerType) isIrType() {}
 
 func (i IntegerType) Info() TypeInfo {
-	bytes := uint32(i.Bits / 8)
+	bytes := 1 + (uint32(i.Bits)-1)/8
 	return TypeInfo{Size: bytes, Align: max(bytes, 1)}
+}
+
+func (i IntegerType) Equals(other Type) bool {
+	if other, ok := other.(*IntegerType); ok {
+		return i.Bits == other.Bits
+	}
+
+	return false
 }
 
 var I1 = &IntegerType{Bits: 1}
@@ -110,6 +127,14 @@ func (v VectorType) Info() TypeInfo {
 	return TypeInfo{Size: info.Size * v.Length, Align: info.Align}
 }
 
+func (v VectorType) Equals(other Type) bool {
+	if other, ok := other.(*VectorType); ok {
+		return v.Length == other.Length && v.Element.Equals(other.Element)
+	}
+
+	return false
+}
+
 // Array
 
 type ArrayType struct {
@@ -122,6 +147,14 @@ func (a ArrayType) isIrType() {}
 func (a ArrayType) Info() TypeInfo {
 	info := a.Element.Info()
 	return TypeInfo{Size: info.Size * a.Length, Align: info.Align}
+}
+
+func (a ArrayType) Equals(other Type) bool {
+	if other, ok := other.(*ArrayType); ok {
+		return a.Length == other.Length && a.Element.Equals(other.Element)
+	}
+
+	return false
 }
 
 // Struct
@@ -162,6 +195,18 @@ func (s StructType) Info() TypeInfo {
 	return info
 }
 
+func (s StructType) Equals(other Type) bool {
+	switch other := other.(type) {
+	case *StructType:
+		return structsEquals(&s, other)
+	case *RefStructType:
+		return structsEquals(&s, &other.Struct)
+
+	default:
+		return false
+	}
+}
+
 func (s StructType) AllFields() iter.Seq2[int, Field] {
 	return slices.All(s.Fields)
 }
@@ -189,6 +234,18 @@ func (r RefStructType) Info() TypeInfo {
 	return r.Struct.Info()
 }
 
+func (r RefStructType) Equals(other Type) bool {
+	switch other := other.(type) {
+	case *StructType:
+		return structsEquals(&r.Struct, other)
+	case *RefStructType:
+		return structsEquals(&r.Struct, &other.Struct)
+
+	default:
+		return false
+	}
+}
+
 func (r RefStructType) AllFields() iter.Seq2[int, Field] {
 	return r.Struct.AllFields()
 }
@@ -198,6 +255,20 @@ func (r RefStructType) Field(name string) (Type, int) {
 }
 
 // Utils
+
+func structsEquals(s1, s2 *StructType) bool {
+	if s1.Packed != s2.Packed || len(s1.Fields) != len(s2.Fields) {
+		return false
+	}
+
+	for i, field := range s1.Fields {
+		if !field.Type.Equals(s2.Fields[i].Type) {
+			return false
+		}
+	}
+
+	return true
+}
 
 func alignTo(num, align uint32) uint32 {
 	if num%align != 0 {

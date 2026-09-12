@@ -16,8 +16,9 @@ type ExprInfo struct {
 
 	Symbol symbols.Kind
 
-	Mutable bool
-	Address bool
+	Mutable  bool
+	Address  bool
+	CompTime bool
 }
 
 func (e ExprInfo) Invalid() bool {

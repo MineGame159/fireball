@@ -437,6 +437,58 @@ func (a *AssociatedType) Attributes() []Attribute {
 	return a.Attributes_
 }
 
+// Const
+
+type Const struct {
+	baseNode
+
+	Documentation_ []*Leaf
+	Attributes_    []Attribute
+	Public         bool
+
+	Name_ *Leaf
+	Type  Type
+	Value Expr
+}
+
+func (c *Const) Children() iter.Seq[Node] {
+	return func(yield func(Node) bool) {
+		for _, doc := range c.Documentation_ {
+			if !yield(doc) {
+				return
+			}
+		}
+		for _, attribute := range c.Attributes_ {
+			if !yield(attribute) {
+				return
+			}
+		}
+		if !yield(c.Name_) {
+			return
+		}
+		if !yield(c.Type) {
+			return
+		}
+		if !yield(c.Value) {
+			return
+		}
+	}
+}
+
+func (c *Const) Attributes() []Attribute {
+	return c.Attributes_
+}
+
+func (c *Const) Documentation() []*Leaf {
+	return c.Documentation_
+}
+
+func (c *Const) Name() *Leaf {
+	return c.Name_
+}
+
+func (c *Const) _isDecl() {}
+
 // GlobalVar
 
 type GlobalVar struct {

@@ -3,8 +3,11 @@ package project
 import (
 	"fireball/ast"
 	"fireball/cfg"
+	"fireball/codegen"
+	"fireball/comptime"
 	"fireball/core"
 	"fireball/fb-core"
+	"fireball/ir/eval"
 	"fireball/parser"
 	"fireball/sema"
 	"fireball/symbols"
@@ -35,7 +38,10 @@ type File struct {
 	NodeTypes       map[ast.Node]types.Type
 	Instantiations  *types.InstantiationCache
 	TypeEnv         *sema.TypeEnvironment
+	Evaluations     map[ast.Expr]eval.Value
 	semaDiagnostics []core.Diagnostic
+
+	compTimeDiagnostics []core.Diagnostic
 }
 
 type Source interface {
@@ -77,6 +83,10 @@ func (f *File) analyze(root symbols.Scope, instantiations *types.InstantiationCa
 	f.ExprInfos, f.semaDiagnostics = sema.Analyze(f.Ast, f.Symbols, root, instantiations, typeEnv, builtins, f.NodeTypes, f.Proj.Config.Name, f.Path)
 }
 
+func (f *File) evalCompTime(instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]codegen.FileData, builtins fb_core.Builtins) {
+	f.Evaluations, f.compTimeDiagnostics = comptime.Evaluate(f.Ast, instantiations, typeEnv, fileDataMap, builtins)
+}
+
 func (f *File) Diagnostics() iter.Seq[core.Diagnostic] {
 	return func(yield func(core.Diagnostic) bool) {
 		seen := make(map[core.Range]any)
@@ -108,6 +118,11 @@ func (f *File) Diagnostics() iter.Seq[core.Diagnostic] {
 			}
 		}
 		for _, diagnostic := range f.semaDiagnostics {
+			if !process(diagnostic) {
+				return
+			}
+		}
+		for _, diagnostic := range f.compTimeDiagnostics {
 			if !process(diagnostic) {
 				return
 			}

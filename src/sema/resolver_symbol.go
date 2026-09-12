@@ -194,12 +194,26 @@ func (r *resolver) ResolveSymbol(symbol *symbols.Symbol) {
 
 		inType.CopyMethodsToOppositeMutabilityVariant()
 
+	case symbols.Const:
+		c := symbol.Node.(*ast.Const)
+
+		typ := r.ResolveAndAnalyzeType(c.Type)
+
+		if typ == types.PrimitiveVoid {
+			r.Error(c.Name(), "constant cannot have a void type")
+			typ = types.Invalid
+		}
+
+		r.nodeTypes[c] = typ
+		symbol.Type = typ
+
 	case symbols.Var:
 		g := symbol.Node.(*ast.GlobalVar)
 
 		typ := r.ResolveAndAnalyzeType(g.Type)
 
 		if typ == types.PrimitiveVoid {
+			r.Error(g.Name(), "global variable cannot have a void type")
 			typ = types.Invalid
 		}
 

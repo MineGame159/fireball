@@ -356,6 +356,9 @@ func (l *Lexer) keywordIdentifier() Token {
 	case "func":
 		token.Kind = Func
 
+	case "const":
+		token.Kind = Const
+
 	case "var":
 		token.Kind = Var
 	case "if":

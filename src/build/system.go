@@ -92,8 +92,9 @@ func (s *System) CompileProjectHierarchy(projMap map[string]*project.Project) ([
 
 	for _, file := range files {
 		fileDataMap[file.Ast] = codegen.FileData{
-			ExprInfos: file.ExprInfos,
-			NodeTypes: file.NodeTypes,
+			ExprInfos:   file.ExprInfos,
+			NodeTypes:   file.NodeTypes,
+			Evaluations: file.Evaluations,
 		}
 	}
 
@@ -116,7 +117,7 @@ func (s *System) CompileProjectHierarchy(projMap map[string]*project.Project) ([
 		}
 
 		name := getBuildFileName(file)
-		module := codegen.Generate(file.Ast, s.target.Arch, s.target.CallConv, file.Instantiations, file.TypeEnv, fileDataMap, builtins, file.Path, s.profile.Lto)
+		module := codegen.Generate(file.Ast, s.target.Arch, s.target.CallConv, file.Instantiations, file.TypeEnv, fileDataMap, builtins, file.Path, false, s.profile.Lto)
 
 		if module.IsEmpty() {
 			return nil

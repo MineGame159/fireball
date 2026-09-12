@@ -23,6 +23,10 @@
   "impl" @context
   type: (type) @name) @item
 
+(const
+  "const" @context
+  name: (identifier) @name) @item
+
 (global_var
   "var" @context
   name: (identifier) @name) @item

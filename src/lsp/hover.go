@@ -181,6 +181,9 @@ func (s *Server) buildHover(file *project.File, node ast.Node, rng core.Range) *
 
 		label = sb.String()
 
+	case *ast.Const:
+		label = typeString(file, n, n.Type)
+
 	case *ast.GlobalVar:
 		label = typeString(file, n, n.Type)
 

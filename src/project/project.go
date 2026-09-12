@@ -3,6 +3,7 @@ package project
 import (
 	"fireball/ast"
 	"fireball/cfg"
+	"fireball/codegen"
 	"fireball/core"
 	"fireball/fb-core"
 	"fireball/sema"
@@ -116,6 +117,14 @@ func (p *Project) Analyze(depMap map[Dependency]*Project, instantiations *types.
 
 	for _, file := range p.Files {
 		file.analyze(&root, instantiations, typeEnv, builtins)
+	}
+}
+
+func (p *Project) EvalCompTime(instantiations *types.InstantiationCache, typeEnv *sema.TypeEnvironment, fileDataMap map[*ast.File]codegen.FileData, builtins fb_core.Builtins) {
+	defer core.Scope()()
+
+	for _, file := range p.Files {
+		file.evalCompTime(instantiations, typeEnv, fileDataMap, builtins)
 	}
 }
 

@@ -34,6 +34,8 @@ func (p *parser) parseDecl(documentation []*ast.Leaf, attributes []ast.Attribute
 		}
 		return p.parseImpl(documentation, attributes)
 
+	case lexer.Const:
+		return p.parseConst(documentation, attributes, public, start)
 	case lexer.Var:
 		return p.parseGlobalVar(documentation, attributes, public, start)
 	case lexer.Func:
@@ -572,6 +574,64 @@ func (p *parser) parseAssociatedType(documentation []*ast.Leaf, attributes []ast
 	return
 }
 
+func (p *parser) parseConst(documentation []*ast.Leaf, attributes []ast.Attribute, public bool, start lexer.Token) (c *ast.Const, recoverId int) {
+	c = &ast.Const{}
+	c.Range_.Start = start.Range.Start
+	c.Documentation_ = documentation
+	c.Attributes_ = attributes
+	c.Public = public
+	c.Name_ = emptyLeaf
+	defer func() {
+		c.Range_.End = p.previous.Range.End
+
+		if core.IsNil(c.Type) {
+			c.Type = p.badType()
+		}
+		if core.IsNil(c.Value) {
+			c.Value = p.badExpr()
+		}
+	}()
+
+	recoverId = -1
+
+	// 'const'
+	if recoverId = p.expect(lexer.Const, "expected 'const'"); recoverId >= 0 {
+		return
+	}
+
+	// Name
+	if c.Name_, recoverId = p.parseLeaf(); recoverId >= 0 {
+		return
+	}
+
+	// ':'
+	if recoverId = p.expect(lexer.Colon, "expected ':' before type"); recoverId >= 0 {
+		return
+	}
+
+	// Type
+	if c.Type, recoverId = p.parseType(); recoverId >= 0 {
+		return
+	}
+
+	// '='
+	if recoverId = p.expect(lexer.Equal, "expected '=' before value"); recoverId >= 0 {
+		return
+	}
+
+	// Value
+	if c.Value, recoverId = p.parseExpr(); recoverId >= 0 {
+		return
+	}
+
+	// ';'
+	if recoverId = p.expect(lexer.Semicolon, "expected ';' after a constant"); recoverId >= 0 {
+		return
+	}
+
+	return
+}
+
 func (p *parser) parseGlobalVar(documentation []*ast.Leaf, attributes []ast.Attribute, public bool, start lexer.Token) (g *ast.GlobalVar, recoverId int) {
 	g = &ast.GlobalVar{}
 	g.Range_.Start = start.Range.Start
@@ -610,7 +670,7 @@ func (p *parser) parseGlobalVar(documentation []*ast.Leaf, attributes []ast.Attr
 	}
 
 	// ';'
-	if recoverId = p.expect(lexer.Semicolon, "expected ';' after global variable"); recoverId >= 0 {
+	if recoverId = p.expect(lexer.Semicolon, "expected ';' after a global variable"); recoverId >= 0 {
 		return
 	}
 

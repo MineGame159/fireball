@@ -17,7 +17,7 @@ func (m MetaRef) Value() uint32 {
 }
 
 type MetaNode interface {
-	next() MetaNode
+	Next() MetaNode
 	setNext(node MetaNode)
 }
 
@@ -25,7 +25,7 @@ type baseMetaNode struct {
 	nextNode MetaNode
 }
 
-func (b *baseMetaNode) next() MetaNode {
+func (b *baseMetaNode) Next() MetaNode {
 	return b.nextNode
 }
 

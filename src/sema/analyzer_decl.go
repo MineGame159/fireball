@@ -80,7 +80,11 @@ func (a *analyzer) VisitEnum(e *ast.Enum) {
 	// Type
 	symbol, _ := a.scopes.GetSymbol(symbols.Type, e.Name().Token.Text)
 
-	typ := symbol.Type.(*types.Enum)
+	typ, ok := symbol.Type.(*types.Enum)
+	if !ok {
+		return
+	}
+
 	a.nodeTypes[e] = typ
 
 	// Duplicate names and values
@@ -394,6 +398,30 @@ func instanceSignatureMatches(in *types.Func, concrete *types.Func) bool {
 	return in.Returns.Equals(concrete.Returns)
 }
 
+var constAllowedAttributes = []reflect.Type{
+	reflect.TypeFor[ast.Cfg](),
+}
+
+func (a *analyzer) VisitConst(c *ast.Const) {
+	// Attributes
+	a.CheckAttributes(c.Attributes(), constAllowedAttributes)
+
+	// Type
+	typ := a.nodeTypes[c.Type]
+	a.nodeTypes[c] = typ
+
+	// Value
+	value := a.AnalyzeExpr(c.Value)
+	a.ExpectType(typ, value, c.Value)
+
+	if !value.CompTime {
+		expr, _ := a.FindDeepestNonCompTimeExpr(c.Value)
+		a.Error(expr, "expression cannot be evaluated at compile time")
+
+		return
+	}
+}
+
 var globalVarAllowedAttributes = []reflect.Type{
 	reflect.TypeFor[ast.Extern](),
 	reflect.TypeFor[ast.LinkName](),
@@ -644,6 +672,33 @@ func (a *analyzer) CheckAttributes(attributes []ast.Attribute, allowed []reflect
 			a.Error(attribute, "attribute '%s' is not allowed here", snakeCase(typ.Name()))
 		}
 	}
+}
+
+func (a *analyzer) FindDeepestNonCompTimeExpr(expr ast.Expr) (ast.Expr, int) {
+	var deepest ast.Expr
+	maxDepth := -1
+
+	if !a.exprInfos[expr].CompTime {
+		deepest = expr
+		maxDepth = 0
+	}
+
+	for child := range expr.Children() {
+		if child, ok := child.(ast.Expr); ok {
+			childDeepest, childDepth := a.FindDeepestNonCompTimeExpr(child)
+
+			if childDeepest != nil {
+				currentDepth := childDepth + 1
+
+				if currentDepth > maxDepth {
+					maxDepth = currentDepth
+					deepest = childDeepest
+				}
+			}
+		}
+	}
+
+	return deepest, maxDepth
 }
 
 func snakeCase(str string) string {

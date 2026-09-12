@@ -30,6 +30,42 @@ func Unsigned(negative bool, v uint64) Integer {
 	}
 }
 
+func TwosComplement(v uint64) Integer {
+	negative := (v >> 63) != 0
+
+	if negative {
+		return Integer{
+			negative: true,
+			value:    ^v + 1,
+		}
+	}
+
+	return Integer{
+		negative: false,
+		value:    v,
+	}
+}
+
+func TwosComplementWidth(v uint64, bits uint32) Integer {
+	signBitMask := uint64(1) << (bits - 1)
+	negative := (v & signBitMask) != 0
+
+	if negative {
+		shift := 64 - bits
+		signExtended := uint64(int64(v<<shift) >> shift)
+
+		return Integer{
+			negative: true,
+			value:    ^signExtended + 1,
+		}
+	}
+
+	return Integer{
+		negative: false,
+		value:    v & ((uint64(1) << bits) - 1),
+	}
+}
+
 func (i Integer) Negative() bool {
 	return i.negative
 }
@@ -154,6 +190,14 @@ func (i Integer) Unsigned() uint64 {
 }
 
 func (i Integer) Raw() uint64 {
+	return i.value
+}
+
+func (i Integer) TwosComplement() uint64 {
+	if i.negative {
+		return ^i.value + 1
+	}
+
 	return i.value
 }
 

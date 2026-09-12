@@ -186,6 +186,16 @@ func getSymbols(symbols symbolConsumer, files []*project.File) {
 	for _, file := range files {
 		for _, decl := range file.Ast.Decls {
 			switch decl := decl.(type) {
+			case *ast.Const:
+				symbols.add(symbol{
+					file:           file,
+					kind:           protocol.SymbolKindConstant,
+					name:           getText(decl.Name()),
+					detail:         getTypeString(decl.Type),
+					range_:         getRange(decl),
+					selectionRange: getRange(decl.Name()),
+				})
+
 			case *ast.GlobalVar:
 				symbols.add(symbol{
 					file:           file,

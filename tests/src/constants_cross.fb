@@ -1,0 +1,8 @@
+mod tests::constants::cross;
+
+import tests::constants::{LIT_BOOL};
+
+#[test("const: cross file reference")]
+func constCrossFile() bool {
+    return true == LIT_BOOL;
+}

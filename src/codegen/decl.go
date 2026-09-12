@@ -11,42 +11,37 @@ import (
 
 // Visitor
 
-func (c *codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
-	if core.IsNil(f.Body) {
-		return
-	}
-
+func (c *Codegen) BeginFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
 	// Meta
 
-	ref := c.module.AddMeta(&ir.SubprogramMeta{
+	ref := c.Module.AddMeta(&ir.SubprogramMeta{
 		Name:     f.Name().Token.Text,
 		LinkName: fun.Name,
-		Type:     c.module.GetMeta(c.types.GetMeta(typ)).(*ir.DerivedTypeMeta).Base,
-		Scope:    c.emitter.PeekScope(),
-		Unit:     c.unitRef,
-		File:     c.fileRef,
+		Type:     c.Module.GetMeta(c.Types.GetMeta(typ)).(*ir.DerivedTypeMeta).Base,
+		Scope:    c.Emitter.PeekScope(),
+		Unit:     c.UnitRef,
+		File:     c.FileRef,
 		Line:     f.Range().Start.Line,
 	})
 
 	fun.SetMeta(ref)
 
-	c.emitter.PushScope(ref)
-	defer c.emitter.PopScope()
+	c.Emitter.PushScope(ref)
 
 	// Blocks
 	c.bVariables = fun.NewBlock("fun.variables")
-	bEntry := fun.NewBlock("fun.entry")
+	c.bEntry = fun.NewBlock("fun.entry")
 
 	// Variables
-	c.emitter.Begin(c.bVariables)
+	c.Emitter.Begin(c.bVariables)
 
 	c.scope.Push()
 
 	paramI := 0
 
 	// Return value
-	{
-		classes, _ := c.callConv.Classify(c.arch, typ.Returns)
+	if !c.CompTime {
+		classes, _ := c.CallConv.Classify(c.Arch, typ.Returns)
 
 		if len(classes) == 1 && classes[0] == abi.Memory {
 			c.returnPtr = fun.ParamValues[paramI]
@@ -61,14 +56,14 @@ func (c *codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
 		value := fun.ParamValues[paramI]
 		paramI++
 
-		c.emitter.SetDebugLocation(f.Range().Start)
+		c.Emitter.SetDebugLocation(f.Range().Start)
 
-		ptr := c.emitter.Alloca(ir.Pointer, 1)
+		ptr := c.Emitter.Alloca(ir.Pointer, 1)
 		ptr.SetName("param.self")
 
 		c.emitDbgDeclare("self", params[0], ptr, 0, f.Receiver)
 
-		c.emitter.Store(value, ptr)
+		c.Emitter.Store(value, ptr)
 
 		c.scope.Add("self", ptr)
 
@@ -79,22 +74,22 @@ func (c *codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
 	for i, param := range params {
 		name := fun.Params[paramI].Name
 		value := fun.ParamValues[paramI]
-		typ := c.types.Get(param)
+		typ := c.Types.Get(param)
 
-		c.emitter.SetDebugLocation(f.Params[i].Range().Start)
+		c.Emitter.SetDebugLocation(f.Params[i].Range().Start)
 
-		ptr := c.emitter.Alloca(typ, 1)
+		ptr := c.Emitter.Alloca(typ, 1)
 		ptr.SetName("param." + name)
 
 		c.emitDbgDeclare(name, param, ptr, uint32(i+1), f.Params[i])
 
-		classes, _ := c.callConv.Classify(c.arch, param)
+		classes, _ := c.CallConv.Classify(c.Arch, param)
 
 		if len(classes) == 1 && classes[0] == abi.Memory {
-			value = c.emitter.Load(typ, value)
+			value = c.Emitter.Load(typ, value)
 		}
 
-		c.emitter.Store(value, ptr)
+		c.Emitter.Store(value, ptr)
 
 		c.scope.Add(name, ptr)
 
@@ -102,28 +97,32 @@ func (c *codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
 	}
 
 	// Body
-	c.emitter.Begin(bEntry)
+	c.Emitter.Begin(c.bEntry)
 
 	c.fun = fun
 	c.funcTyp = typ
 	c.funDoesIndirectDispatch = false
+}
 
-	c.GenerateStmt(f.Body)
-	c.emitter.Ret(nil)
+func (c *Codegen) EndFunc() {
+	fun := c.fun
 
-	c.emitter.Begin(c.bVariables)
-	c.emitter.Br(bEntry)
+	c.Emitter.Begin(c.bVariables)
+	c.Emitter.Br(c.bEntry)
 
 	c.fun = nil
 	c.funcTyp = nil
 	c.returnPtr = nil
+
+	c.bEntry = nil
 	c.bVariables = nil
 
 	c.scope.Pop()
+	c.Emitter.PopScope()
 
 	// Summary
 	if ref, ok := c.functionSummaries[fun.Name]; ok {
-		funSum := c.module.GetSummary(ref).(*ir.FunctionSummary)
+		funSum := c.Module.GetSummary(ref).(*ir.FunctionSummary)
 
 		for _, block := range fun.Blocks {
 			funSum.InstructionCount += block.InstructionCount
@@ -141,38 +140,51 @@ func (c *codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
 	}
 }
 
+func (c *Codegen) VisitFunc(f *ast.Func, typ *types.Func, fun *ir.Function) {
+	if core.IsNil(f.Body) {
+		return
+	}
+
+	c.BeginFunc(f, typ, fun)
+
+	c.GenerateStmt(f.Body)
+	c.Emitter.Ret(nil)
+
+	c.EndFunc()
+}
+
 // Utils
 
-func (c *codegen) CreateGlobalVar(g *ast.GlobalVar, typ types.Type, declare bool) *ir.GlobalVar {
+func (c *Codegen) CreateGlobalVar(g *ast.GlobalVar, typ types.Type, declare bool) *ir.GlobalVar {
 	name := GlobalVarLinkName(g)
-	t := c.types.Get(typ)
+	t := c.Types.Get(typ)
 
-	gVar := c.module.NewGlobalVar(name, t)
+	gVar := c.Module.NewGlobalVar(name, t)
 
 	if g.IsExtern() || declare {
 		gVar.Flags = ir.External
 	} else {
 		gVar.Initializer = &ir.ZeroInitializer{Typ: t}
 
-		ref := c.module.AddMeta(&ir.GlobalVariableMeta{
+		ref := c.Module.AddMeta(&ir.GlobalVariableMeta{
 			Name:     g.Name().Token.Text,
 			LinkName: name,
-			Type:     c.types.GetMeta(typ),
-			Scope:    c.emitter.PeekScope(),
-			File:     c.fileRef,
+			Type:     c.Types.GetMeta(typ),
+			Scope:    c.Emitter.PeekScope(),
+			File:     c.FileRef,
 			Line:     g.Range().Start.Line,
 		})
 
-		ref = c.module.AddMeta(&ir.GlobalVariableExpressionMeta{Var: ref})
+		ref = c.Module.AddMeta(&ir.GlobalVariableExpressionMeta{Var: ref})
 
-		cu := c.module.GetMeta(c.unitRef).(*ir.CompileUnitMeta)
+		cu := c.Module.GetMeta(c.UnitRef).(*ir.CompileUnitMeta)
 		var globals *ir.RawMeta
 
 		if cu.Globals.Valid() {
-			globals = c.module.GetMeta(cu.Globals).(*ir.RawMeta)
+			globals = c.Module.GetMeta(cu.Globals).(*ir.RawMeta)
 		} else {
 			globals = &ir.RawMeta{}
-			cu.Globals = c.module.AddMeta(globals)
+			cu.Globals = c.Module.AddMeta(globals)
 		}
 
 		gVar.SetMeta(ref)
@@ -181,9 +193,9 @@ func (c *codegen) CreateGlobalVar(g *ast.GlobalVar, typ types.Type, declare bool
 
 	// Summary
 
-	if !declare && !g.IsExtern() && c.moduleSummaryRef.Valid() {
-		c.module.AddSummary(&ir.VariableSummary{
-			Module: c.moduleSummaryRef,
+	if !declare && !g.IsExtern() && c.ModuleSummaryRef.Valid() {
+		c.Module.AddSummary(&ir.VariableSummary{
+			Module: c.ModuleSummaryRef,
 			Name:   name,
 			LinkFlags: ir.LinkSummaryFlags{
 				Linkage:             ir.LinkageExternal,
@@ -202,12 +214,12 @@ func (c *codegen) CreateGlobalVar(g *ast.GlobalVar, typ types.Type, declare bool
 	return gVar
 }
 
-func (c *codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in *types.Interface) *ir.Function {
+func (c *Codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in *types.Interface) *ir.Function {
 	// Check already created extern functions
 	name := FuncLinkName(f, typ, in)
 
 	if f.IsExtern() {
-		for fun := range c.module.Functions() {
+		for fun := range c.Module.Functions() {
 			if fun.Name == name {
 				return fun
 			}
@@ -235,14 +247,19 @@ func (c *codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in 
 	}
 
 	for i, param := range f.Params {
-		classes, info := c.callConv.Classify(c.arch, paramTypes[i])
 		var attrs ir.ParamAttribute
 
-		if len(classes) == 1 && classes[0] == abi.Memory {
-			sig.Params = append(sig.Params, ir.Pointer)
-			attrs = ir.NonNull
+		if c.CompTime {
+			sig.Params = append(sig.Params, c.Types.Get(paramTypes[i]))
 		} else {
-			sig.Params = append(sig.Params, getTypeForClasses(classes, info.Size))
+			classes, info := c.CallConv.Classify(c.Arch, paramTypes[i])
+
+			if len(classes) == 1 && classes[0] == abi.Memory {
+				sig.Params = append(sig.Params, ir.Pointer)
+				attrs = ir.NonNull
+			} else {
+				sig.Params = append(sig.Params, getTypeForClasses(classes, info.Size))
+			}
 		}
 
 		params = append(params, ir.Param{
@@ -252,12 +269,14 @@ func (c *codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in 
 	}
 
 	// Returns
-	{
-		classes, info := c.callConv.Classify(c.arch, typ.Returns)
+	if c.CompTime {
+		sig.Returns = c.Types.Get(typ.Returns)
+	} else {
+		classes, info := c.CallConv.Classify(c.Arch, typ.Returns)
 
 		if len(classes) == 1 && classes[0] == abi.Memory {
 			sig.Returns = ir.Void
-			sig.SRet = c.types.Get(typ.Returns)
+			sig.SRet = c.Types.Get(typ.Returns)
 
 			sig.Params = slices.Insert(sig.Params, 0, ir.Type(ir.Pointer))
 			params = slices.Insert(params, 0, ir.Param{Name: "sret", Attributes: ir.NonNull | ir.WriteOnly})
@@ -267,7 +286,8 @@ func (c *codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in 
 	}
 
 	// Function
-	fun := c.module.NewFunction(name, sig, params)
+	fun := c.Module.NewFunction(name, sig, params)
+	fun.Data = f
 
 	if f.IsExtern() || declare {
 		fun.Flags = ir.Declare
@@ -277,14 +297,14 @@ func (c *codegen) CreateFunction(f *ast.Func, typ *types.Func, declare bool, in 
 
 	// Summary
 
-	if !declare && !f.IsExtern() && c.moduleSummaryRef.Valid() {
+	if !declare && !f.IsExtern() && c.ModuleSummaryRef.Valid() {
 		linkage := ir.LinkageExternal
 		if typ.Generic != nil {
 			linkage = ir.LinkageLinkOnceODR
 		}
 
-		ref := c.module.AddSummary(&ir.FunctionSummary{
-			Module: c.moduleSummaryRef,
+		ref := c.Module.AddSummary(&ir.FunctionSummary{
+			Module: c.ModuleSummaryRef,
 			Name:   fun.Name,
 			LinkFlags: ir.LinkSummaryFlags{
 				Linkage:             linkage,

@@ -1,0 +1,289 @@
+mod tests::constants;
+
+// ── Helper types ───────────────────────────────────────────────────────────────
+
+struct Vec2 {
+    x: i32,
+    y: i32,
+}
+
+struct Item {
+    name: StringView,
+    count: i32,
+}
+
+enum Direction {
+    North,
+    East,
+    South,
+    West,
+}
+
+func twice(x: i32) i32 {
+    return x * 2;
+}
+
+// ── Literal constants ─────────────────────────────────────────────────────────
+
+pub const LIT_BOOL: bool = true;
+const LIT_INT: i32 = 42;
+const LIT_NEG: i32 = -7;
+const LIT_F64: f64 = 3.5;
+const LIT_F32: f32 = 1.25f;
+const LIT_CHAR: u8 = 'A';
+const LIT_HEX: u32 = 0xFFFF;
+const LIT_BIN: u8 = 0b1010;
+
+// ── Arithmetic / bitwise / float folding ──────────────────────────────────────
+
+const ARITH: i32 = 2 + 3 * 4 - 6 / 2;    // 11
+const NEGATE: i32 = -5 * 2;              // -10
+const MOD: i32 = 17 % 5;                 // 2
+const SHIFT: u32 = 1u << 4u;             // 16
+const MASK: u32 = (1u << 8u) - 1u;       // 255
+const BITWISE: u32 = 0b1100 | 0b0011;    // 15
+const F_SUM: f64 = 1.5 + 2.25;           // 3.75
+const F_MUL: f32 = 2.0f * 3.0f;          // 6.0
+
+// ── Chained constants ─────────────────────────────────────────────────────────
+
+const CHAIN_A: i32 = 10;
+const CHAIN_B: i32 = CHAIN_A + 5;        // 15
+const CHAIN_C: i32 = CHAIN_B * 2;        // 30
+
+// Forward reference: FORWARD_USE references FORWARD_BASE declared below.
+const FORWARD_USE: i32 = FORWARD_BASE + 1;
+const FORWARD_BASE: i32 = 41;
+
+// ── Casts ─────────────────────────────────────────────────────────────────────
+
+const CAST_WIDE: i64 = 7 as i64;
+const CAST_NARROW: i8 = 200 as i8;       // -56
+
+// ── Strings ───────────────────────────────────────────────────────────────────
+
+const GREETING: StringView = "hello";
+const EMPTY: StringView = "";
+
+// ── Aggregates ────────────────────────────────────────────────────────────────
+
+const VEC: Vec2 = Vec2 { x: 3, y: 4 };
+const NESTED: Vec2 = Vec2 { x: CHAIN_C, y: ARITH };
+const ITEM: Item = Item { name: "fireball", count: 99 };
+const ARR: [3]i32 = [3]i32 { 1, 2, 3 };
+const MATRIX: [2]Vec2 = [2]Vec2 { Vec2 { x: 1, y: 2 }, Vec2 { x: 3, y: 4 } };
+const ARR_OF_CONST: [3]i32 = [3]i32 { CHAIN_A, CHAIN_B, CHAIN_C };
+
+// ── Enum ──────────────────────────────────────────────────────────────────────
+
+const DIR: Direction = Direction::North;
+
+// ── Reflection ────────────────────────────────────────────────────────────────
+
+const SZ: u32 = sizeof(Vec2);
+const AL: u32 = alignof(i64);
+const OFF: u32 = offsetof(Vec2, y);
+const INFO: &TypeInfo = typeof(Vec2);
+
+// ── Functions ─────────────────────────────────────────────────────────────────
+
+const DOUBLE: func(i32) i32 = twice;
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[test("const: literal bool")]
+func testLitBool() bool {
+    return LIT_BOOL == true;
+}
+
+#[test("const: literal integer")]
+func testLitInt() bool {
+    return LIT_INT == 42;
+}
+
+#[test("const: negative literal")]
+func testLitNeg() bool {
+    return LIT_NEG == -7;
+}
+
+#[test("const: f64 constant")]
+func testLitF64() bool {
+    return LIT_F64 == 3.5;
+}
+
+#[test("const: f32 constant")]
+func testLitF32() bool {
+    return LIT_F32 == 1.25f;
+}
+
+#[test("const: char constant")]
+func testLitChar() bool {
+    return LIT_CHAR == 'A';
+}
+
+#[test("const: hex and binary literals")]
+func testLitHexBin() bool {
+    return LIT_HEX == 0xFFFF && LIT_BIN == 0b1010;
+}
+
+#[test("const: arithmetic folds")]
+func testArith() bool {
+    return ARITH == 11;
+}
+
+#[test("const: negation at comptime")]
+func testNegate() bool {
+    return NEGATE == -10;
+}
+
+#[test("const: modulo at comptime")]
+func testModulo() bool {
+    return MOD == 2;
+}
+
+#[test("const: shift at comptime")]
+func testShift() bool {
+    return SHIFT == 16u;
+}
+
+#[test("const: bitwise mask")]
+func testMask() bool {
+    return MASK == 255u;
+}
+
+#[test("const: bitwise or")]
+func testBitwise() bool {
+    return BITWISE == 15u;
+}
+
+#[test("const: f64 arithmetic at comptime")]
+func testFloatArith() bool {
+    return F_SUM == 3.75;
+}
+
+#[test("const: f32 arithmetic at comptime")]
+func testFloatMul() bool {
+    return F_MUL == 6.0f;
+}
+
+#[test("const: chained constants")]
+func testChain() bool {
+    return CHAIN_B == 15 && CHAIN_C == 30;
+}
+
+#[test("const: forward reference")]
+func testForward() bool {
+    return FORWARD_USE == 42;
+}
+
+#[test("const: widening cast")]
+func testCastWide() bool {
+    return CAST_WIDE == 7;
+}
+
+#[test("const: narrowing cast wraps")]
+func testCastNarrow() bool {
+    return CAST_NARROW == -56;
+}
+
+#[test("const: string size")]
+func testString() bool {
+    return GREETING.size == 5;
+}
+
+#[test("const: string data")]
+func testStringData() bool {
+    return GREETING.ptr[0u] == 'h';
+}
+
+#[test("const: empty string")]
+func testEmptyString() bool {
+    return EMPTY.size == 0;
+}
+
+#[test("const: struct constant fields")]
+func testStruct() bool {
+    return VEC.x == 3 && VEC.y == 4;
+}
+
+#[test("const: struct constant referencing constants")]
+func testStructFromConst() bool {
+    return NESTED.x == 30 && NESTED.y == 11;
+}
+
+#[test("const: struct with string and integer")]
+func testStructString() bool {
+    return ITEM.count == 99 && ITEM.name.size == 8;
+}
+
+#[test("const: array constant elements")]
+func testArray() bool {
+    return ARR[0u] == 1 && ARR[1u] == 2 && ARR[2u] == 3;
+}
+
+#[test("const: nested aggregate")]
+func testMatrix() bool {
+    return MATRIX[0u].x == 1 && MATRIX[1u].x == 3 && MATRIX[1u].y == 4;
+}
+
+#[test("const: array of constants")]
+func testArrayOfConst() bool {
+    return ARR_OF_CONST[0u] == 10 && ARR_OF_CONST[2u] == 30;
+}
+
+#[test("const: enum constant")]
+func testEnumConst() bool {
+    return DIR == Direction::North;
+}
+
+#[test("const: sizeof constant")]
+func testSizeofConst() bool {
+    return SZ == sizeof(Vec2);
+}
+
+#[test("const: alignof constant")]
+func testAlignofConst() bool {
+    return AL == alignof(i64);
+}
+
+#[test("const: offsetof constant")]
+func testOffsetofConst() bool {
+    return OFF == offsetof(Vec2, y);
+}
+
+#[test("const: typeof constant")]
+func testTypeofConst() bool {
+    return INFO.size == sizeof(Vec2);
+}
+
+#[test("const: function constant")]
+func testFuncConst() bool {
+    return DOUBLE(21) == 42;
+}
+
+#[test("const: matches runtime evaluation")]
+func testMatchesRuntime() bool {
+    return ARITH == (2 + 3 * 4 - 6 / 2);
+}
+
+#[test("const: used in computation")]
+func testInComputation() bool {
+    return LIT_INT + CHAIN_C == 72;
+}
+
+#[test("const: used in struct initializer")]
+func testInInitializer() bool {
+    var v = Vec2 { x: LIT_INT, y: CHAIN_A };
+    return v.x == 42 && v.y == 10;
+}
+
+#[test("const: array constant read in loop")]
+func testArrayInLoop() bool {
+    var sum = 0;
+
+    for (var i = 0; i < 3; i = i + 1) {
+        sum = sum + ARR[i];
+    }
+
+    return sum == 6;
+}

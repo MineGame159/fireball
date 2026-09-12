@@ -16,7 +16,7 @@ func (hi *highlighter) VisitExpression(e *ast.Expression) {
 }
 
 func (hi *highlighter) VisitVar(v *ast.Var) {
-	hi.AddFull(v.Name, variableKind)
+	hi.AddFull(v.Name, variableKind, 0)
 	hi.VisitType(v.Type)
 	hi.VisitExpr(v.Initializer)
 }

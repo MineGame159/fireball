@@ -42,6 +42,8 @@ const (
 	Type
 	Func
 
+	Const
+
 	Var
 	If
 	Else

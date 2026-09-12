@@ -114,6 +114,23 @@ func parseProject(env cfg.Env, start *time.Time) (*project.Project, map[string]*
 		proj.Analyze(depMap, instantiations, typeEnv, builtins)
 	}
 
+	// Evaluate comp-time
+	fileDataMap := make(map[*ast.File]codegen.FileData)
+
+	for _, proj := range ordered {
+		for _, file := range proj.Files {
+			fileDataMap[file.Ast] = codegen.FileData{
+				ExprInfos:   file.ExprInfos,
+				NodeTypes:   file.NodeTypes,
+				Evaluations: file.Evaluations,
+			}
+		}
+	}
+
+	for _, proj := range ordered {
+		proj.EvalCompTime(instantiations, typeEnv, fileDataMap, builtins)
+	}
+
 	// Print diagnostics
 	hasDiagnostics := false
 	hasErrors := false

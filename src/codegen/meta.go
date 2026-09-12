@@ -6,27 +6,27 @@ import (
 	"fireball/types"
 )
 
-func (c *codegen) emitDbgDeclare(name string, typ types.Type, ptr ir.Value, arg uint32, node ast.Node) {
-	ref := c.module.AddMeta(&ir.LocalVariableMeta{
+func (c *Codegen) emitDbgDeclare(name string, typ types.Type, ptr ir.Value, arg uint32, node ast.Node) {
+	ref := c.Module.AddMeta(&ir.LocalVariableMeta{
 		Name:  name,
-		Type:  c.types.GetMeta(typ),
+		Type:  c.Types.GetMeta(typ),
 		Arg:   arg,
-		Scope: c.emitter.PeekScope(),
-		File:  c.fileRef,
+		Scope: c.Emitter.PeekScope(),
+		File:  c.FileRef,
 		Line:  node.Range().Start.Line,
 	})
 
-	c.emitter.DbgDeclare(
+	c.Emitter.DbgDeclare(
 		ptr,
 		ref,
-		c.emitter.GetLocMetaRef(),
+		c.Emitter.GetLocMetaRef(),
 	)
 }
 
-func (c *codegen) emitMetaScope(node ast.Node) ir.MetaRef {
-	return c.module.AddMeta(&ir.LexicalBlockMeta{
-		Scope:  c.emitter.PeekScope(),
-		File:   c.fileRef,
+func (c *Codegen) emitMetaScope(node ast.Node) ir.MetaRef {
+	return c.Module.AddMeta(&ir.LexicalBlockMeta{
+		Scope:  c.Emitter.PeekScope(),
+		File:   c.FileRef,
 		Line:   node.Range().Start.Line,
 		Column: node.Range().Start.Column,
 	})

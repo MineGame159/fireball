@@ -7,6 +7,7 @@ type DeclVisitor interface {
 	VisitInterface(i *Interface)
 	VisitImpl(i *Impl)
 
+	VisitConst(c *Const)
 	VisitGlobalVar(g *GlobalVar)
 	VisitFunc(f *Func)
 
@@ -26,6 +27,8 @@ func VisitDecl[V DeclVisitor](visitor V, decl Decl) {
 	case *Impl:
 		visitor.VisitImpl(decl)
 
+	case *Const:
+		visitor.VisitConst(decl)
 	case *GlobalVar:
 		visitor.VisitGlobalVar(decl)
 	case *Func:

@@ -9,8 +9,8 @@ import (
 
 // Visitor
 
-func (c *codegen) VisitBlock(b *ast.Block) {
-	c.emitter.PushScope(c.emitMetaScope(b))
+func (c *Codegen) VisitBlock(b *ast.Block) {
+	c.Emitter.PushScope(c.emitMetaScope(b))
 	c.scope.Push()
 
 	for _, stmt := range b.Stmts {
@@ -18,17 +18,17 @@ func (c *codegen) VisitBlock(b *ast.Block) {
 	}
 
 	c.scope.Pop()
-	c.emitter.PopScope()
+	c.Emitter.PopScope()
 }
 
-func (c *codegen) VisitExpression(e *ast.Expression) {
+func (c *Codegen) VisitExpression(e *ast.Expression) {
 	c.GenerateExpr(e.Expr)
 }
 
-func (c *codegen) VisitVar(v *ast.Var) {
+func (c *Codegen) VisitVar(v *ast.Var) {
 	// Type
-	varTyp := c.ResolveType(c.nodeTypes[v])
-	typ := c.types.Get(varTyp)
+	varTyp := c.ResolveType(c.NodeTypes[v])
+	typ := c.Types.Get(varTyp)
 
 	// Pointer
 	ptr := c.Alloca(typ, "var."+v.Name.Token.Text)
@@ -45,11 +45,11 @@ func (c *codegen) VisitVar(v *ast.Var) {
 	}
 
 	// Variable
-	c.emitter.Store(value, ptr)
+	c.Emitter.Store(value, ptr)
 	c.scope.Add(v.Name.Token.Text, ptr)
 }
 
-func (c *codegen) VisitIf(i *ast.If) {
+func (c *Codegen) VisitIf(i *ast.If) {
 	bThen := c.fun.NewBlock("if.then")
 
 	var bElse *ir.Block
@@ -64,25 +64,25 @@ func (c *codegen) VisitIf(i *ast.If) {
 
 	// Condition
 	condition := c.LoadImplicitCast(i.Condition, types.PrimitiveBool)
-	c.emitter.BrCond(condition, bThen, bElse)
+	c.Emitter.BrCond(condition, bThen, bElse)
 
 	// Then
-	c.emitter.Begin(bThen)
+	c.Emitter.Begin(bThen)
 	c.GenerateStmt(i.BranchTrue)
-	c.emitter.Br(bExit)
+	c.Emitter.Br(bExit)
 
 	// Else
 	if !core.IsNil(i.BranchFalse) {
-		c.emitter.Begin(bElse)
+		c.Emitter.Begin(bElse)
 		c.GenerateStmt(i.BranchFalse)
-		c.emitter.Br(bExit)
+		c.Emitter.Br(bExit)
 	}
 
 	// Exit
-	c.emitter.Begin(bExit)
+	c.Emitter.Begin(bExit)
 }
 
-func (c *codegen) VisitWhile(w *ast.While) {
+func (c *Codegen) VisitWhile(w *ast.While) {
 	bCondition := c.fun.NewBlock("while.condition")
 	bBody := c.fun.NewBlock("while.body")
 	bExit := c.fun.NewBlock("while.exit")
@@ -94,25 +94,25 @@ func (c *codegen) VisitWhile(w *ast.While) {
 	c.bLoopContinue = bCondition
 
 	// Condition
-	c.emitter.Br(bCondition)
-	c.emitter.Begin(bCondition)
+	c.Emitter.Br(bCondition)
+	c.Emitter.Begin(bCondition)
 
 	condition := c.LoadImplicitCast(w.Condition, types.PrimitiveBool)
-	c.emitter.BrCond(condition, bBody, bExit)
+	c.Emitter.BrCond(condition, bBody, bExit)
 
 	// Body
-	c.emitter.Begin(bBody)
+	c.Emitter.Begin(bBody)
 	c.GenerateStmt(w.Body)
-	c.emitter.Br(bCondition)
+	c.Emitter.Br(bCondition)
 
 	// Exit
-	c.emitter.Begin(bExit)
+	c.Emitter.Begin(bExit)
 
 	c.bLoopBreak = prevBLoopBreak
 	c.bLoopContinue = prevBLoopContinue
 }
 
-func (c *codegen) VisitFor(f *ast.For) {
+func (c *Codegen) VisitFor(f *ast.For) {
 	var bCondition *ir.Block
 	if !core.IsNil(f.Condition) {
 		bCondition = c.fun.NewBlock("for.condition")
@@ -139,7 +139,7 @@ func (c *codegen) VisitFor(f *ast.For) {
 		c.bLoopContinue = bIncrement
 	}
 
-	c.emitter.PushScope(c.emitMetaScope(f))
+	c.Emitter.PushScope(c.emitMetaScope(f))
 	c.scope.Push()
 
 	// Initializer
@@ -149,23 +149,23 @@ func (c *codegen) VisitFor(f *ast.For) {
 
 	// Condition
 	if bCondition != nil {
-		c.emitter.Br(bCondition)
-		c.emitter.Begin(bCondition)
+		c.Emitter.Br(bCondition)
+		c.Emitter.Begin(bCondition)
 
 		condition := c.LoadImplicitCast(f.Condition, types.PrimitiveBool)
-		c.emitter.BrCond(condition, bBody, bExit)
+		c.Emitter.BrCond(condition, bBody, bExit)
 	} else {
-		c.emitter.Br(bBody)
+		c.Emitter.Br(bBody)
 	}
 
 	// Body
-	c.emitter.Begin(bBody)
+	c.Emitter.Begin(bBody)
 	c.GenerateStmt(f.Body)
-	c.emitter.Br(c.bLoopContinue)
+	c.Emitter.Br(c.bLoopContinue)
 
 	// Increment
 	if bIncrement != nil {
-		c.emitter.Begin(bIncrement)
+		c.Emitter.Begin(bIncrement)
 		c.GenerateExpr(f.Increment)
 
 		next := bBody
@@ -173,20 +173,20 @@ func (c *codegen) VisitFor(f *ast.For) {
 			next = bCondition
 		}
 
-		c.emitter.Br(next)
+		c.Emitter.Br(next)
 	}
 
 	// Exit
-	c.emitter.Begin(bExit)
+	c.Emitter.Begin(bExit)
 
 	c.scope.Pop()
-	c.emitter.PopScope()
+	c.Emitter.PopScope()
 
 	c.bLoopBreak = prevBLoopBreak
 	c.bLoopContinue = prevBLoopContinue
 }
 
-func (c *codegen) VisitReturn(r *ast.Return) {
+func (c *Codegen) VisitReturn(r *ast.Return) {
 	var value ir.Value
 
 	if !core.IsNil(r.Value) {
@@ -196,32 +196,32 @@ func (c *codegen) VisitReturn(r *ast.Return) {
 	c.ReturnValue(value)
 }
 
-func (c *codegen) VisitBreak(_ *ast.Break) {
-	c.emitter.Br(c.bLoopBreak)
+func (c *Codegen) VisitBreak(_ *ast.Break) {
+	c.Emitter.Br(c.bLoopBreak)
 }
 
-func (c *codegen) VisitContinue(_ *ast.Continue) {
-	c.emitter.Br(c.bLoopContinue)
+func (c *Codegen) VisitContinue(_ *ast.Continue) {
+	c.Emitter.Br(c.bLoopContinue)
 }
 
-func (c *codegen) VisitBadStmt(_ *ast.BadStmt) {}
+func (c *Codegen) VisitBadStmt(_ *ast.BadStmt) {}
 
 // Utils
 
-func (c *codegen) ReturnValue(value ir.Value) {
+func (c *Codegen) ReturnValue(value ir.Value) {
 	if !core.IsNil(value) {
 		if core.IsNil(c.returnPtr) {
 			value = c.BitCast(value, c.fun.Signature.Returns)
 		} else {
-			c.emitter.Store(value, c.returnPtr)
+			c.Emitter.Store(value, c.returnPtr)
 			value = nil
 		}
 	}
 
-	c.emitter.Ret(value)
+	c.Emitter.Ret(value)
 }
 
-func (c *codegen) GenerateStmt(stmt ast.Stmt) {
-	c.emitter.SetDebugLocation(stmt.Range().Start)
+func (c *Codegen) GenerateStmt(stmt ast.Stmt) {
+	c.Emitter.SetDebugLocation(stmt.Range().Start)
 	ast.VisitStmt(c, stmt)
 }

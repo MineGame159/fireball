@@ -7,7 +7,7 @@ import (
 )
 
 func (hi *highlighter) VisitPrimitiveType(p *ast.PrimitiveType) int {
-	hi.AddFull(p, typeKind)
+	hi.AddFull(p, typeKind, 0)
 
 	return 0
 }
@@ -32,7 +32,7 @@ func (hi *highlighter) VisitPointerType(p *ast.PointerType) int {
 
 func (hi *highlighter) VisitFuncType(f *ast.FuncType) int {
 	for _, param := range f.Params {
-		hi.AddFull(param.Name, parameterKind)
+		hi.AddFull(param.Name, parameterKind, 0)
 		hi.VisitType(param.Type)
 	}
 
@@ -83,7 +83,7 @@ func (hi *highlighter) VisitBadType(_ *ast.BadType) int {
 func (hi *highlighter) AddType(node ast.Node, typ types.Type) {
 	switch typ := typ.(type) {
 	case *types.Primitive:
-		hi.AddFull(node, typeKind)
+		hi.AddFull(node, typeKind, 0)
 	case *types.Array:
 		if node, ok := node.(*ast.ArrayType); ok {
 			hi.AddType(node.Type, typ.Element)
@@ -98,15 +98,15 @@ func (hi *highlighter) AddType(node ast.Node, typ types.Type) {
 		}
 
 	case *types.Struct:
-		hi.Add(node, classKind)
+		hi.Add(node, classKind, 0)
 	case *types.Enum:
-		hi.Add(node, enumKind)
+		hi.Add(node, enumKind, 0)
 	case *types.Interface:
-		hi.Add(node, interfaceKind)
+		hi.Add(node, interfaceKind, 0)
 	case *types.Func:
-		hi.Add(node, functionKind)
+		hi.Add(node, functionKind, 0)
 	case *types.Param:
-		hi.Add(node, genericKind)
+		hi.Add(node, genericKind, 0)
 	}
 }
 

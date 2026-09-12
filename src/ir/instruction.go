@@ -6,7 +6,10 @@ type Instruction interface {
 	Name() string
 	SetName(name string)
 
-	next() Instruction
+	Block() *Block
+	setBlock(b *Block)
+
+	Next() Instruction
 	setNext(in Instruction)
 }
 
@@ -16,6 +19,7 @@ type baseInstruction struct {
 	type_ Type
 	name  string
 
+	block  *Block
 	nextIn Instruction
 }
 
@@ -27,7 +31,15 @@ func (b *baseInstruction) SetName(name string) {
 	b.name = name
 }
 
-func (b *baseInstruction) next() Instruction {
+func (b *baseInstruction) Block() *Block {
+	return b.block
+}
+
+func (b *baseInstruction) setBlock(block *Block) {
+	b.block = block
+}
+
+func (b *baseInstruction) Next() Instruction {
 	return b.nextIn
 }
 

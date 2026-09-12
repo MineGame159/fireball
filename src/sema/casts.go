@@ -37,6 +37,15 @@ const (
 	ArrayToSlice
 )
 
+func (c CastKind) CompTime() bool {
+	switch c {
+	case ImplicitAs:
+		return false
+	default:
+		return true
+	}
+}
+
 func CommonType(env *TypeEnvironment, a, b types.Type) types.Type {
 	if ia, ok := a.(*types.Integer); ok {
 		if pb, ok := b.(*types.Primitive); ok && (types.IsInteger(pb.Kind) || types.IsFloating(pb.Kind)) {

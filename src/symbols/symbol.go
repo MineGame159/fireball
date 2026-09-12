@@ -13,6 +13,7 @@ const (
 	Struct
 	Enum
 	Interface
+	Const
 	Func
 	TypeParam
 	Case
@@ -28,7 +29,7 @@ func (k Kind) Domain() Domain {
 		return Type
 	case Func:
 		return Function
-	case Var, Param, Case:
+	case Const, Var, Param, Case:
 		return Variable
 
 	default:

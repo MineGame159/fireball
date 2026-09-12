@@ -31,13 +31,13 @@ func (s *Server) SemanticTokensFull(_ context.Context, params *protocol.Semantic
 
 	// Mod
 	for _, entry := range file.Ast.Mod.Path {
-		hi.AddFull(entry, namespaceKind)
+		hi.AddFull(entry, namespaceKind, 0)
 	}
 
 	// Imports
 	for _, im := range file.Ast.Imports {
 		for _, entry := range im.Path {
-			hi.AddFull(entry, namespaceKind)
+			hi.AddFull(entry, namespaceKind, 0)
 		}
 
 		for _, symbol := range im.Symbols {
@@ -52,7 +52,7 @@ func (s *Server) SemanticTokensFull(_ context.Context, params *protocol.Semantic
 
 	// Stripped
 	for _, range_ := range file.Ast.Stripped {
-		hi.AddRange(range_, commentKind)
+		hi.AddRange(range_, commentKind, 0)
 	}
 
 	return &protocol.SemanticTokens{Data: hi.Data()}, nil
@@ -85,36 +85,44 @@ const (
 	commentKind
 )
 
+type modifierKind uint8
+
+const (
+	readonlyKind modifierKind = 1 << iota
+)
+
 type semantic struct {
 	line   uint16
 	column uint16
 
 	length uint16
 	kind   semanticKind
+	mods   modifierKind
 }
 
-func newSemantic(line, column, length uint32, kind semanticKind) semantic {
+func newSemantic(line, column, length uint32, kind semanticKind, mods modifierKind) semantic {
 	return semantic{
 		line:   uint16(line) - 1,
 		column: uint16(column),
 		length: uint16(length),
 		kind:   kind,
+		mods:   mods,
 	}
 }
 
-func (hi *highlighter) AddFull(node ast.Node, kind semanticKind) {
+func (hi *highlighter) AddFull(node ast.Node, kind semanticKind, mods modifierKind) {
 	if hi.fullSemanticTokens {
-		hi.Add(node, kind)
+		hi.Add(node, kind, mods)
 	}
 }
 
-func (hi *highlighter) Add(node ast.Node, kind semanticKind) {
+func (hi *highlighter) Add(node ast.Node, kind semanticKind, mods modifierKind) {
 	if !core.IsNil(node) {
-		hi.AddRange(node.Range(), kind)
+		hi.AddRange(node.Range(), kind, mods)
 	}
 }
 
-func (hi *highlighter) AddRange(range_ core.Range, kind semanticKind) {
+func (hi *highlighter) AddRange(range_ core.Range, kind semanticKind, mods modifierKind) {
 	startL := range_.Start.Line
 	endL := range_.End.Line
 
@@ -139,7 +147,7 @@ func (hi *highlighter) AddRange(range_ core.Range, kind semanticKind) {
 		}
 
 		length = min(length, math.MaxUint16)
-		hi.tokens = append(hi.tokens, newSemantic(line, column, length, kind))
+		hi.tokens = append(hi.tokens, newSemantic(line, column, length, kind, mods))
 	}
 }
 
@@ -174,7 +182,7 @@ func (hi *highlighter) Data() []uint32 {
 		data[j+1] = uint32(token.column - lastColumn)
 		data[j+2] = uint32(token.length)
 		data[j+3] = uint32(token.kind)
-		data[j+4] = 0
+		data[j+4] = uint32(token.mods)
 
 		lastLine = token.line
 		lastColumn = token.column

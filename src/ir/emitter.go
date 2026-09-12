@@ -146,6 +146,8 @@ func (e *Emitter) Add(left, right Value) Instruction {
 		return dummy
 	}
 
+	assertExactType(left.Type(), right.Type())
+
 	return emit(e, &Add{
 		Left:  left,
 		Right: right,
@@ -156,6 +158,8 @@ func (e *Emitter) Sub(left, right Value) Instruction {
 	if e.skip {
 		return dummy
 	}
+
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Sub{
 		Left:  left,
@@ -168,6 +172,8 @@ func (e *Emitter) Mul(left, right Value) Instruction {
 		return dummy
 	}
 
+	assertExactType(left.Type(), right.Type())
+
 	return emit(e, &Mul{
 		Left:  left,
 		Right: right,
@@ -178,6 +184,8 @@ func (e *Emitter) Div(kind DivKind, left, right Value) Instruction {
 	if e.skip {
 		return dummy
 	}
+
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Div{
 		Kind:  kind,
@@ -190,6 +198,8 @@ func (e *Emitter) Rem(kind DivKind, left, right Value) Instruction {
 	if e.skip {
 		return dummy
 	}
+
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Rem{
 		Kind:  kind,
@@ -206,7 +216,7 @@ func (e *Emitter) Shl(left, right Value) Instruction {
 	}
 
 	assertIntegerType(left.Type(), 0, 255)
-	assertIntegerType(right.Type(), 0, 255)
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Shl{
 		Left:  left,
@@ -220,7 +230,7 @@ func (e *Emitter) Shr(signExt bool, left, right Value) Instruction {
 	}
 
 	assertIntegerType(left.Type(), 0, 255)
-	assertIntegerType(right.Type(), 0, 255)
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Shr{
 		SignExt: signExt,
@@ -235,7 +245,7 @@ func (e *Emitter) And(left, right Value) Instruction {
 	}
 
 	assertIntegerType(left.Type(), 0, 255)
-	assertIntegerType(right.Type(), 0, 255)
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &And{
 		Left:  left,
@@ -249,7 +259,7 @@ func (e *Emitter) Or(left, right Value) Instruction {
 	}
 
 	assertIntegerType(left.Type(), 0, 255)
-	assertIntegerType(right.Type(), 0, 255)
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Or{
 		Left:  left,
@@ -263,7 +273,7 @@ func (e *Emitter) Xor(left, right Value) Instruction {
 	}
 
 	assertIntegerType(left.Type(), 0, 255)
-	assertIntegerType(right.Type(), 0, 255)
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &Xor{
 		Left:  left,
@@ -279,6 +289,7 @@ func (e *Emitter) ExtractElement(value, index Value) Instruction {
 	}
 
 	assertVectorType(value.Type())
+	assertIntegerType(index.Type(), 0, 255)
 
 	return emit(e, &ExtractElement{
 		Value: value,
@@ -292,6 +303,8 @@ func (e *Emitter) InsertElement(value, element, index Value) Instruction {
 	}
 
 	assertVectorType(value.Type())
+	assertExactType(value.Type().(*VectorType).Element, element.Type())
+	assertIntegerType(index.Type(), 0, 255)
 
 	return emit(e, &InsertElement{
 		Value:   value,
@@ -307,6 +320,8 @@ func (e *Emitter) ShuffleVector(value1, value2, mask Value) Instruction {
 
 	assertVectorType(value1.Type())
 	assertVectorType(value2.Type())
+	assertVectorType(mask.Type())
+	assertIntegerType(mask.Type().(*VectorType).Element, 32, 32)
 
 	return emit(e, &ShuffleVector{
 		Value1: value1,
@@ -438,6 +453,14 @@ func (e *Emitter) Trunc(value Value, typ Type) Instruction {
 		return dummy
 	}
 
+	if _, ok := typ.(*SimpleType); ok {
+		assertSimpleType(value.Type(), FloatKind, DoubleKind)
+		assertSimpleType(typ, FloatKind, DoubleKind)
+	} else {
+		assertIntegerType(value.Type(), 0, 255)
+		assertIntegerType(typ, 0, 255)
+	}
+
 	return emit(e, &Trunc{
 		Value: value,
 		Typ:   typ,
@@ -447,6 +470,14 @@ func (e *Emitter) Trunc(value Value, typ Type) Instruction {
 func (e *Emitter) Ext(kind DivKind, value Value, typ Type) Instruction {
 	if e.skip {
 		return dummy
+	}
+
+	if kind == Floating {
+		assertSimpleType(value.Type(), FloatKind, DoubleKind)
+		assertSimpleType(typ, FloatKind, DoubleKind)
+	} else {
+		assertIntegerType(value.Type(), 0, 255)
+		assertIntegerType(typ, 0, 255)
 	}
 
 	return emit(e, &Ext{
@@ -492,6 +523,7 @@ func (e *Emitter) PtrToInt(value Value, typ Type) Instruction {
 	}
 
 	assertSimpleType(value.Type(), PointerKind)
+	assertIntegerType(typ, 64, 64)
 
 	return emit(e, &PtrToInt{
 		Value: value,
@@ -553,7 +585,7 @@ func (e *Emitter) FCmp(op CmpOp, ordered bool, left, right Value) Instruction {
 	}
 
 	assertSimpleType(left.Type(), FloatKind, DoubleKind)
-	assertSimpleType(right.Type(), FloatKind, DoubleKind)
+	assertExactType(left.Type(), right.Type())
 
 	return emit(e, &FCmp{
 		Op:      op,
@@ -568,6 +600,12 @@ func (e *Emitter) Phi(pairs ...PhiPair) Instruction {
 		return dummy
 	}
 
+	typ := pairs[0].Value.Type()
+
+	for _, pair := range pairs[1:] {
+		assertExactType(typ, pair.Value.Type())
+	}
+
 	return emit(e, &Phi{
 		Pairs: pairs,
 	})
@@ -579,6 +617,7 @@ func (e *Emitter) Select(condition, ifTrue, ifFalse Value) Instruction {
 	}
 
 	assertIntegerType(condition.Type(), 1, 1)
+	assertExactType(ifTrue.Type(), ifFalse.Type())
 
 	return emit(e, &Select{
 		Condition: condition,
@@ -677,5 +716,11 @@ func assertAggregateType(typ Type, negate bool) {
 		panic("ir.Emitter.() - Required a non-aggregate, got " + reflect.TypeOf(typ).String())
 	} else if !negate && !ok {
 		panic("ir.Emitter.() - Required an aggregate, got " + reflect.TypeOf(typ).String())
+	}
+}
+
+func assertExactType(typ1, typ2 Type) {
+	if !typ1.Equals(typ2) {
+		panic("ir.Emitter.() - Required exactly the same types, got " + reflect.TypeOf(typ1).String() + " and " + reflect.TypeOf(typ2).String())
 	}
 }
